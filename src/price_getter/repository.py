@@ -118,6 +118,17 @@ def latest_snapshots(session: Session, *, limit: int = 100) -> list[PriceSnapsho
     return latest
 
 
+def product_history_chronological(
+    session: Session,
+    product_key: str,
+    *,
+    source_key: str | None = None,
+    limit: int = 200,
+) -> list[PriceSnapshot]:
+    rows = product_history(session, product_key, source_key=source_key, limit=limit)
+    return list(reversed(rows))
+
+
 def product_history(
     session: Session,
     product_key: str,
@@ -134,4 +145,29 @@ def product_history(
 
 def recent_errors(session: Session, *, limit: int = 50) -> list[FetchError]:
     statement = select(FetchError).order_by(FetchError.observed_at.desc(), FetchError.id.desc()).limit(limit)
+    return list(session.scalars(statement))
+
+
+def recent_runs(session: Session, *, limit: int = 20) -> list[Run]:
+    statement = select(Run).order_by(Run.started_at.desc(), Run.id.desc()).limit(limit)
+    return list(session.scalars(statement))
+
+
+def latest_run(session: Session) -> Run | None:
+    return session.scalars(select(Run).order_by(Run.started_at.desc(), Run.id.desc()).limit(1)).first()
+
+
+def products_from_latest_run(session: Session) -> list[ProductSnapshot]:
+    run = latest_run(session)
+    if run is None:
+        return []
+    statement = select(ProductSnapshot).where(ProductSnapshot.run_id == run.id).order_by(ProductSnapshot.key)
+    return list(session.scalars(statement))
+
+
+def sources_from_latest_run(session: Session) -> list[SourceSnapshot]:
+    run = latest_run(session)
+    if run is None:
+        return []
+    statement = select(SourceSnapshot).where(SourceSnapshot.run_id == run.id).order_by(SourceSnapshot.key)
     return list(session.scalars(statement))

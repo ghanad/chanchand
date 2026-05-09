@@ -88,3 +88,35 @@ targets: []
 
     assert result.exit_code == 0
     assert "status=success" in result.output
+
+
+def test_cli_ui_launches_local_dashboard(monkeypatch, tmp_path) -> None:
+    calls = {}
+
+    def fake_launch(**kwargs):
+        calls.update(kwargs)
+
+    monkeypatch.setattr("price_getter.cli._launch_ui", fake_launch)
+
+    result = runner.invoke(
+        app,
+        [
+            "ui",
+            "--config",
+            str(tmp_path / "config.yml"),
+            "--db-url",
+            f"sqlite:///{tmp_path / 'prices.db'}",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "9000",
+            "--no-browser",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert calls["config_path"] == tmp_path / "config.yml"
+    assert calls["db_url"] == f"sqlite:///{tmp_path / 'prices.db'}"
+    assert calls["host"] == "0.0.0.0"
+    assert calls["port"] == 9000
+    assert calls["open_browser"] is False

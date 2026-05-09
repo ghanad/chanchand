@@ -129,6 +129,23 @@ def errors(
     )
 
 
+@app.command("ui")
+def ui(
+    config_path: Path = typer.Option(Path("config/example.yml"), "--config", "-c", help="YAML config path."),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind the local web UI."),
+    port: int = typer.Option(8000, "--port", min=1, max=65535, help="Port to bind the local web UI."),
+    no_browser: bool = typer.Option(False, "--no-browser", help="Do not open a browser tab automatically."),
+) -> None:
+    _launch_ui(config_path=config_path, db_url=db_url, host=host, port=port, open_browser=not no_browser)
+
+
+def _launch_ui(*, config_path: Path, db_url: str, host: str, port: int, open_browser: bool) -> None:
+    from price_getter.ui import run_ui
+
+    run_ui(config_path=config_path, db_url=db_url, host=host, port=port, open_browser=open_browser)
+
+
 def _echo_table(headers: list[str], rows: list[list[Any]]) -> None:
     string_rows = [[_format_cell(cell) for cell in row] for row in rows]
     widths = [

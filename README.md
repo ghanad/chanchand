@@ -12,6 +12,7 @@ price-getter init-db
 price-getter validate-config --config config/example.yml
 price-getter run --config config/example.yml
 price-getter latest
+price-getter ui --config config/example.yml --db-url sqlite:///price_getter.db
 ```
 
 The example config contains a sample Digikala target. Replace it with your own product URLs, or disable targets before running against live sources.
@@ -24,6 +25,7 @@ The example config contains a sample Digikala target. Replace it with your own p
 - `price-getter latest`: show the latest snapshot for each product/source pair.
 - `price-getter history <product-key>`: show historical snapshots for one product.
 - `price-getter errors`: show recent fetch failures.
+- `price-getter ui --config config/example.yml`: open a local dashboard for latest prices, history charts, recent runs/errors, manual collection, and YAML-backed product edits.
 
 Prices are stored as normalized `price_irr` values. CLI reports also show `price_toman` because Iranian ecommerce sites, including Digikala's UI, commonly display prices in toman.
 

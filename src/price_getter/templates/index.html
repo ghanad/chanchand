@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Price Getter</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">داشبورد محلی</p>
+        <h1>Price Getter</h1>
+        <p class="meta">Config: {{ config_path }} · DB: {{ db_url }}</p>
+      </div>
+      <button id="runNowButton" class="primary-button" type="button">اجرای جمع‌آوری</button>
+    </header>
+
+    <main class="shell">
+      <section class="summary-grid" aria-label="خلاصه">
+        <article class="stat-card">
+          <span>محصول‌ها</span>
+          <strong id="productCount">-</strong>
+        </article>
+        <article class="stat-card">
+          <span>آخرین run</span>
+          <strong id="latestRunStatus">-</strong>
+        </article>
+        <article class="stat-card">
+          <span>موفق / خطا</span>
+          <strong id="latestRunCounts">-</strong>
+        </article>
+        <article class="stat-card">
+          <span>آخرین مشاهده</span>
+          <strong id="latestObservedAt">-</strong>
+        </article>
+      </section>
+
+      <section class="surface">
+        <div class="section-head">
+          <h2>آخرین قیمت‌ها</h2>
+          <span id="latestStatus" class="muted"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>محصول</th>
+                <th>منبع</th>
+                <th>قیمت تومان</th>
+                <th>قیمت IRR</th>
+                <th>وضعیت</th>
+                <th>فروشنده</th>
+                <th>زمان</th>
+              </tr>
+            </thead>
+            <tbody id="latestRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="surface">
+        <div class="section-head">
+          <h2>تاریخچه و نمودار</h2>
+          <div class="filter-row">
+            <select id="productSelect" aria-label="محصول"></select>
+            <select id="historySourceSelect" aria-label="منبع"></select>
+            <select id="historyLimitSelect" aria-label="تعداد">
+              <option value="50">۵۰</option>
+              <option value="100">۱۰۰</option>
+              <option value="200" selected>۲۰۰</option>
+              <option value="500">۵۰۰</option>
+            </select>
+            <button id="refreshHistoryButton" class="secondary-button" type="button">بارگذاری</button>
+            <button id="disableProductButton" class="danger-button" type="button">غیرفعال کردن</button>
+          </div>
+        </div>
+        <div class="chart-grid">
+          <div class="chart-box">
+            <canvas id="priceChart" aria-label="نمودار قیمت"></canvas>
+            <p id="chartEmptyState" class="empty-state">داده‌ای برای نمودار نیست.</p>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>زمان</th>
+                  <th>منبع</th>
+                  <th>تومان</th>
+                  <th>IRR</th>
+                  <th>وضعیت</th>
+                  <th>فروشنده</th>
+                </tr>
+              </thead>
+              <tbody id="historyRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="split-grid">
+        <div class="surface">
+          <div class="section-head">
+            <h2>افزودن محصول</h2>
+            <span id="configStatus" class="muted"></span>
+          </div>
+          <form id="addProductForm" class="form-grid">
+            <label>
+              عنوان
+              <input id="newProductTitle" name="title" type="text" autocomplete="off" required />
+            </label>
+            <label>
+              URL
+              <input id="newProductUrl" name="url" type="url" required />
+            </label>
+            <label>
+              منبع
+              <select id="newProductSource" name="source_key"></select>
+            </label>
+            <button class="primary-button" type="submit">اضافه کردن</button>
+          </form>
+        </div>
+
+        <div class="surface">
+          <div class="section-head">
+            <h2>Runهای اخیر</h2>
+          </div>
+          <div class="table-wrap compact">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>وضعیت</th>
+                  <th>هدف</th>
+                  <th>موفق</th>
+                  <th>خطا</th>
+                  <th>شروع</th>
+                </tr>
+              </thead>
+              <tbody id="runRows"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="surface">
+        <div class="section-head">
+          <h2>خطاهای اخیر</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>محصول</th>
+                <th>منبع</th>
+                <th>نوع</th>
+                <th>پیام</th>
+                <th>زمان</th>
+              </tr>
+            </thead>
+            <tbody id="errorRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+    <script src="/static/app.js"></script>
+  </body>
+</html>
