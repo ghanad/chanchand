@@ -1,7 +1,8 @@
 import pytest
 
 from price_getter.adapters import get_adapter
-from price_getter.adapters.base import AdapterError
+from price_getter.adapters.base import AdapterError, FetchContext
+from price_getter.adapters.brsapi_market import BrsapiMarketAdapter
 from price_getter.adapters.digikala import DigikalaAdapter, DigikalaApiAdapter, DigikalaWebAdapter
 from price_getter.adapters.generic_html import GenericHtmlAdapter
 from price_getter.config import SourceConfig, TargetConfig
@@ -165,3 +166,131 @@ def test_digikala_api_adapter_rejects_missing_requested_api_variant() -> None:
 def test_digikala_adapter_name_is_backward_compatible_alias() -> None:
     assert get_adapter("digikala") is get_adapter("digikala_api")
     assert DigikalaAdapter is DigikalaApiAdapter
+
+
+def test_brsapi_market_adapter_parses_requested_gold_item() -> None:
+    source = SourceConfig(adapter="brsapi_market", price_multiplier=10)
+    target = TargetConfig(
+        product_key="gold-18k",
+        source_key="brsapi_market",
+        url="https://api.brsapi.ir/Market/Gold_Currency.php",
+        adapter_settings={"symbol": "IR_GOLD_18K"},
+    )
+    payload = {
+        "gold": [
+            {
+                "date": "1405/02/19",
+                "time": "21:30",
+                "time_unix": 1778349655,
+                "symbol": "IR_GOLD_18K",
+                "name_en": "18K Gold",
+                "name": "طلای 18 عیار",
+                "price": 19206800,
+                "change_value": -92400,
+                "change_percent": -0.48,
+                "unit": "تومان",
+            }
+        ],
+        "currency": [],
+    }
+
+    observation = BrsapiMarketAdapter().parse_market_payload(
+        payload,
+        source,
+        target,
+        api_url="https://api.brsapi.ir/Market/Gold_Currency.php?key=secret",
+        status_code=200,
+    )
+
+    assert observation.title == "طلای 18 عیار"
+    assert observation.seller == "BRS API"
+    assert observation.price_irr == 192_068_000
+    assert observation.availability == "in_stock"
+    assert observation.raw_observation["api_url"] == "https://api.brsapi.ir/Market/Gold_Currency.php?key=<redacted>"
+    assert observation.raw_observation["category"] == "gold"
+
+
+def test_brsapi_market_adapter_parses_requested_currency_item_by_name() -> None:
+    source = SourceConfig(adapter="brsapi_market", price_multiplier=10)
+    target = TargetConfig(
+        product_key="usd",
+        source_key="brsapi_market",
+        url="https://api.brsapi.ir/Market/Gold_Currency.php",
+        adapter_settings={"name": "دلار"},
+    )
+    payload = {
+        "gold": [],
+        "currency": [
+            {
+                "symbol": "USD",
+                "name_en": "US Dollar",
+                "name": "دلار",
+                "price": "175790",
+                "unit": "تومان",
+            }
+        ],
+    }
+
+    observation = BrsapiMarketAdapter().parse_market_payload(payload, source, target)
+
+    assert observation.title == "دلار"
+    assert observation.price_irr == 1_757_900
+    assert observation.raw_observation["category"] == "currency"
+
+
+def test_brsapi_market_adapter_fetch_uses_env_key_and_browser_user_agent(monkeypatch) -> None:
+    monkeypatch.setenv("BRSAPI_TEST_KEY", "secret")
+    source = SourceConfig(
+        adapter="brsapi_market",
+        price_multiplier=10,
+        settings={"api_key_env": "BRSAPI_TEST_KEY", "cache_ttl_seconds": 0},
+    )
+    target = TargetConfig(
+        product_key="usd",
+        source_key="brsapi_market",
+        url="https://api.brsapi.ir/Market/Gold_Currency.php?ignored=1&key=ZZZZ",
+        adapter_settings={"symbol": "USD"},
+    )
+    client = FakeJsonClient(
+        {
+            "currency": [
+                {
+                    "symbol": "USD",
+                    "name": "دلار",
+                    "price": 175790,
+                    "unit": "تومان",
+                }
+            ]
+        }
+    )
+
+    observation = BrsapiMarketAdapter().fetch(FetchContext(source=source, target=target, client=client))
+
+    assert observation.price_irr == 1_757_900
+    assert client.calls[0]["url"] == "https://api.brsapi.ir/Market/Gold_Currency.php?ignored=1&key=secret"
+    assert client.calls[0]["headers"]["User-Agent"].startswith("Mozilla/5.0")
+    assert "Python" not in client.calls[0]["headers"]["User-Agent"]
+    assert get_adapter("brsapi_market").name == "brsapi_market"
+
+
+class FakeJsonResponse:
+    status_code = 200
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self):
+        return self._payload
+
+
+class FakeJsonClient:
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = []
+
+    def get(self, url, headers):
+        self.calls.append({"url": url, "headers": headers})
+        return FakeJsonResponse(self.payload)

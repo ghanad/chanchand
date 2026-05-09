@@ -63,9 +63,13 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     history = client.get("/api/history", params={"product_key": "chair"})
     runs = client.get("/api/runs")
     errors = client.get("/api/errors")
+    styles = client.get("/static/styles.css")
+    font = client.get("/font-assets/Webfonts/fonts/woff2/IRANSansX-Regular.woff2")
 
     assert page.status_code == 200
     assert "Price Getter" in page.text
+    assert 'font-family: "IranSansX"' in styles.text
+    assert font.status_code == 200
     assert latest.json()["rows"][0]["price_toman"] == 1200
     assert products.json()["products"][0]["key"] == "chair"
     assert history.json()["rows"][0]["price_irr"] == 12000

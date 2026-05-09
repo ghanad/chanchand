@@ -13,7 +13,7 @@ If this file becomes long, prefer better routing and file maps over broad explan
 
 ## Project Shape
 
-Price Getter is a CLI-first Python app that collects ecommerce price observations and stores snapshots/errors in SQLite.
+Price Getter is a CLI-first Python app that collects ecommerce and market price observations and stores snapshots/errors in SQLite.
 
 Core flow:
 1. `price_getter.cli` parses Typer commands.
@@ -35,6 +35,7 @@ Core flow:
 - Price parsing, Persian/Arabic digits, stock text: `src/price_getter/pricing.py`
 - Adapter interface and HTTP request helper: `src/price_getter/adapters/base.py`
 - Generic selector-based scraping: `src/price_getter/adapters/generic_html.py`
+- BRSAPI gold/currency behavior and `.env` API key lookup: `src/price_getter/adapters/brsapi_market.py`
 - Digikala API behavior: `src/price_getter/adapters/digikala_api.py`
 - Digikala HTML behavior: `src/price_getter/adapters/digikala_web.py`
 - Adapter registry and backward-compatible aliases: `src/price_getter/adapters/__init__.py` and `src/price_getter/adapters/digikala.py`
@@ -43,6 +44,7 @@ Core flow:
 
 Use this task routing to keep context small:
 - Add a new ecommerce source: read `adapters/base.py`, `adapters/generic_html.py` or one similar adapter, `adapters/__init__.py`, and `tests/test_adapters.py`.
+- Change gold/currency market parsing: read `adapters/brsapi_market.py`, `config/example.yml`, and BRSAPI tests in `tests/test_adapters.py`.
 - Change Digikala API parsing: read `adapters/digikala_api.py` and Digikala tests in `tests/test_adapters.py`.
 - Change Digikala web/HTML parsing: read `adapters/digikala_web.py` and Digikala tests in `tests/test_adapters.py`.
 - Change config format: read `config.py`, `config/example.yml`, `tests/test_config.py`, and CLI validation tests.
@@ -65,8 +67,9 @@ Use the project virtualenv when present:
 
 ## Config Notes
 
-- Source adapter names currently allowed by config: `generic_html`, `digikala`, `digikala_api`, `digikala_web`.
+- Source adapter names currently allowed by config: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`.
 - `digikala` is a backward-compatible alias for `digikala_api`.
+- `brsapi_market` targets select one item with `adapter_settings.symbol` or `adapter_settings.name`; default API key env name is `brsapi_api`.
 - Prices are stored as `price_irr`.
 - `price_multiplier` normalizes parsed source values into IRR. Use `10` when source text is toman.
 - `TargetConfig.adapter_settings` overrides or supplements source-level adapter settings for one URL.

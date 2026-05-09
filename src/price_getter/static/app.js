@@ -263,7 +263,7 @@ function renderChart(rows) {
   ctx.lineWidth = 1;
   ctx.strokeStyle = "#d8dedf";
   ctx.fillStyle = "#667174";
-  ctx.font = "12px Tahoma, Arial, sans-serif";
+  ctx.font = "12px IranSansX, Tahoma, Arial, sans-serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
 

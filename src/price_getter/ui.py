@@ -46,6 +46,9 @@ def create_app(
     app.state.config_path = config_path
     app.state.db_url = db_url
     app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
+    font_dir = package_dir.parents[1] / "IranSansX"
+    if font_dir.exists():
+        app.mount("/font-assets", StaticFiles(directory=str(font_dir)), name="font-assets")
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:

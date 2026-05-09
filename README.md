@@ -17,6 +17,12 @@ price-getter ui --config config/example.yml --db-url sqlite:///price_getter.db
 
 The example config contains a sample Digikala target. Replace it with your own product URLs, or disable targets before running against live sources.
 
+For BRSAPI gold/currency targets, keep the API key out of YAML and set it in `.env`:
+
+```bash
+brsapi_api=your_api_key
+```
+
 ## Commands
 
 - `price-getter init-db`: create SQLite tables.
@@ -28,5 +34,7 @@ The example config contains a sample Digikala target. Replace it with your own p
 - `price-getter ui --config config/example.yml`: open a local dashboard for latest prices, history charts, recent runs/errors, manual collection, and YAML-backed product edits.
 
 Prices are stored as normalized `price_irr` values. CLI reports also show `price_toman` because Iranian ecommerce sites, including Digikala's UI, commonly display prices in toman.
+
+Supported source adapters are `generic_html`, `digikala_api`, `digikala_web`, `digikala`, and `brsapi_market`. The BRSAPI adapter sends a browser-style User-Agent by default and reads each target item from `adapter_settings.symbol` or `adapter_settings.name`.
 
 For low-token LLM-assisted maintenance, start with `AGENTS.md`.
