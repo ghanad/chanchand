@@ -14,7 +14,7 @@ price-getter run --config config/example.yml
 price-getter latest
 ```
 
-The example config contains disabled sample targets. Replace them with real product URLs and enable the targets before running against live sources.
+The example config contains a sample Digikala target. Replace it with your own product URLs, or disable targets before running against live sources.
 
 ## Commands
 
@@ -26,3 +26,5 @@ The example config contains disabled sample targets. Replace them with real prod
 - `price-getter errors`: show recent fetch failures.
 
 Prices are stored as normalized `price_irr` values. CLI reports also show `price_toman` because Iranian ecommerce sites, including Digikala's UI, commonly display prices in toman.
+
+For low-token LLM-assisted maintenance, start with `AGENTS.md`.
