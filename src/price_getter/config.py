@@ -7,7 +7,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, ValidationError, field_validator, model_validator
 
-AdapterName = Literal["generic_html", "digikala"]
+AdapterName = Literal["generic_html", "digikala", "digikala_api", "digikala_web"]
 
 KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 

@@ -4,6 +4,7 @@ import json
 import re
 from collections.abc import Iterable
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -13,18 +14,18 @@ from price_getter.config import SourceConfig, TargetConfig
 from price_getter.pricing import detect_availability, parse_price_to_irr
 
 
-class DigikalaAdapter:
-    name = "digikala"
+class DigikalaApiAdapter:
+    name = "digikala_api"
 
     def fetch(self, context: FetchContext) -> PriceObservation:
         product_id = _extract_product_id(context.target.url)
-        if product_id:
-            return self.fetch_api(context, product_id)
+        if product_id is None:
+            raise AdapterError("could not extract Digikala product ID from target URL")
 
-        html, status_code = request_text(context)
-        return self.parse(html, context.source, context.target, status_code=status_code)
+        variant_id = _extract_variant_id(context.target.url)
+        return self.fetch_api(context, product_id, variant_id=variant_id)
 
-    def fetch_api(self, context: FetchContext, product_id: str) -> PriceObservation:
+    def fetch_api(self, context: FetchContext, product_id: str, *, variant_id: str | None = None) -> PriceObservation:
         api_url = f"https://api.digikala.com/v2/product/{product_id}/"
         headers = {
             "User-Agent": "price-getter/0.1",
@@ -45,6 +46,7 @@ class DigikalaAdapter:
         return self.parse_api_product(
             product,
             context.source,
+            variant_id=variant_id,
             api_url=api_url,
             status_code=response.status_code,
         )
@@ -54,10 +56,14 @@ class DigikalaAdapter:
         product: dict[str, Any],
         source: SourceConfig,
         *,
+        variant_id: str | None = None,
         api_url: str | None = None,
         status_code: int | None = None,
     ) -> PriceObservation:
-        variant = _best_variant(product)
+        variant = _best_variant(product, variant_id=variant_id)
+        if variant_id is not None and variant is None:
+            raise AdapterError(f"Digikala API response did not include requested variant {variant_id}")
+
         price_irr = _variant_price_irr(variant, source)
         seller = _seller_name(variant.get("seller") if variant else None)
         availability = _api_availability(product, variant)
@@ -77,6 +83,7 @@ class DigikalaAdapter:
                 "parse_method": "digikala_api",
                 "api_url": api_url,
                 "product_id": product.get("id"),
+                "requested_variant_id": variant_id,
                 "variant_id": variant.get("id") if variant else None,
                 "extracted": {
                     "title": title,
@@ -85,6 +92,14 @@ class DigikalaAdapter:
                 },
             },
         )
+
+
+class DigikalaWebAdapter:
+    name = "digikala_web"
+
+    def fetch(self, context: FetchContext) -> PriceObservation:
+        html, status_code = request_text(context)
+        return self.parse(html, context.source, context.target, status_code=status_code)
 
     def parse(
         self,
@@ -125,6 +140,9 @@ class DigikalaAdapter:
                 },
             },
         )
+
+
+DigikalaAdapter = DigikalaApiAdapter
 
 
 def _parse_json_ld(soup: BeautifulSoup, source: SourceConfig) -> dict[str, Any] | None:
@@ -189,8 +207,26 @@ def _extract_product_id(url: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _best_variant(product: dict[str, Any]) -> dict[str, Any] | None:
+def _extract_variant_id(url: str) -> str | None:
+    values = parse_qs(urlparse(url).query).get("variant_id", [])
+    if not values:
+        return None
+    value = values[0].strip()
+    return value if re.fullmatch(r"\d+", value) else None
+
+
+def _best_variant(product: dict[str, Any], *, variant_id: str | None = None) -> dict[str, Any] | None:
     default_variant = product.get("default_variant")
+    if variant_id is not None:
+        if isinstance(default_variant, dict) and _variant_id_matches(default_variant, variant_id):
+            return default_variant
+        variants = product.get("variants")
+        if isinstance(variants, list):
+            for variant in variants:
+                if isinstance(variant, dict) and _variant_id_matches(variant, variant_id):
+                    return variant
+        return None
+
     if isinstance(default_variant, dict):
         return default_variant
 
@@ -203,6 +239,10 @@ def _best_variant(product: dict[str, Any]) -> dict[str, Any] | None:
             if isinstance(variant, dict):
                 return variant
     return None
+
+
+def _variant_id_matches(variant: dict[str, Any], variant_id: str) -> bool:
+    return str(variant.get("id")) == variant_id
 
 
 def _variant_price_irr(variant: dict[str, Any] | None, source: SourceConfig) -> int | None:

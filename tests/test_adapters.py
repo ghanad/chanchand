@@ -1,4 +1,8 @@
-from price_getter.adapters.digikala import DigikalaAdapter
+import pytest
+
+from price_getter.adapters import get_adapter
+from price_getter.adapters.base import AdapterError
+from price_getter.adapters.digikala import DigikalaAdapter, DigikalaApiAdapter, DigikalaWebAdapter
 from price_getter.adapters.generic_html import GenericHtmlAdapter
 from price_getter.config import SourceConfig, TargetConfig
 
@@ -32,9 +36,9 @@ def test_generic_html_adapter_parses_configured_selectors() -> None:
     assert observation.availability == "in_stock"
 
 
-def test_digikala_adapter_parses_next_data_fixture() -> None:
-    source = SourceConfig(adapter="digikala")
-    target = TargetConfig(product_key="phone", source_key="digikala", url="https://www.digikala.com/product/1")
+def test_digikala_web_adapter_parses_next_data_fixture() -> None:
+    source = SourceConfig(adapter="digikala_web")
+    target = TargetConfig(product_key="phone", source_key="digikala_web", url="https://www.digikala.com/product/1")
     html = """
     <script id="__NEXT_DATA__" type="application/json">
     {
@@ -54,7 +58,7 @@ def test_digikala_adapter_parses_next_data_fixture() -> None:
     </script>
     """
 
-    observation = DigikalaAdapter().parse(html, source, target)
+    observation = DigikalaWebAdapter().parse(html, source, target)
 
     assert observation.title == "گوشی نمونه"
     assert observation.seller == "دیجی‌کالا"
@@ -62,9 +66,9 @@ def test_digikala_adapter_parses_next_data_fixture() -> None:
     assert observation.availability == "in_stock"
 
 
-def test_digikala_adapter_parses_json_ld_fixture() -> None:
-    source = SourceConfig(adapter="digikala")
-    target = TargetConfig(product_key="phone", source_key="digikala", url="https://www.digikala.com/product/1")
+def test_digikala_web_adapter_parses_json_ld_fixture() -> None:
+    source = SourceConfig(adapter="digikala_web")
+    target = TargetConfig(product_key="phone", source_key="digikala_web", url="https://www.digikala.com/product/1")
     html = """
     <script type="application/ld+json">
     {
@@ -79,7 +83,7 @@ def test_digikala_adapter_parses_json_ld_fixture() -> None:
     </script>
     """
 
-    observation = DigikalaAdapter().parse(html, source, target)
+    observation = DigikalaWebAdapter().parse(html, source, target)
 
     assert observation.title == "Sample Phone"
     assert observation.seller == "Sample Seller"
@@ -87,8 +91,8 @@ def test_digikala_adapter_parses_json_ld_fixture() -> None:
     assert observation.availability == "in_stock"
 
 
-def test_digikala_adapter_parses_api_product_payload() -> None:
-    source = SourceConfig(adapter="digikala")
+def test_digikala_api_adapter_parses_api_product_payload() -> None:
+    source = SourceConfig(adapter="digikala_api")
     product = {
         "id": 3271540,
         "title_fa": "صندلی اداری نیلپر مدل OCT 515o",
@@ -101,10 +105,63 @@ def test_digikala_adapter_parses_api_product_payload() -> None:
         },
     }
 
-    observation = DigikalaAdapter().parse_api_product(product, source)
+    observation = DigikalaApiAdapter().parse_api_product(product, source)
 
     assert observation.title == "صندلی اداری نیلپر مدل OCT 515o"
     assert observation.seller == "دیجی‌کالا"
     assert observation.price_irr == 97_000_000
     assert observation.availability == "in_stock"
     assert observation.raw_observation["parse_method"] == "digikala_api"
+
+
+def test_digikala_api_adapter_selects_requested_api_variant() -> None:
+    source = SourceConfig(adapter="digikala_api")
+    product = {
+        "id": 14590108,
+        "title_fa": "صندلی اداری هوگر مدل KH460",
+        "status": "marketable",
+        "default_variant": {
+            "id": 56432925,
+            "status": "marketable",
+            "price": {"selling_price": 113700000},
+            "seller": {"title": "دیجی‌کالا"},
+        },
+        "variants": [
+            {
+                "id": 50179968,
+                "status": "marketable",
+                "price": {"selling_price": 129492000},
+                "seller": {"title": "فروشنده دیگر"},
+            }
+        ],
+    }
+
+    observation = DigikalaApiAdapter().parse_api_product(product, source, variant_id="50179968")
+
+    assert observation.seller == "فروشنده دیگر"
+    assert observation.price_irr == 129_492_000
+    assert observation.raw_observation["requested_variant_id"] == "50179968"
+    assert observation.raw_observation["variant_id"] == 50179968
+
+
+def test_digikala_api_adapter_rejects_missing_requested_api_variant() -> None:
+    source = SourceConfig(adapter="digikala_api")
+    product = {
+        "id": 14590108,
+        "title_fa": "صندلی اداری هوگر مدل KH460",
+        "status": "marketable",
+        "default_variant": {
+            "id": 56432925,
+            "status": "marketable",
+            "price": {"selling_price": 113700000},
+            "seller": {"title": "دیجی‌کالا"},
+        },
+    }
+
+    with pytest.raises(AdapterError, match="requested variant"):
+        DigikalaApiAdapter().parse_api_product(product, source, variant_id="50179968")
+
+
+def test_digikala_adapter_name_is_backward_compatible_alias() -> None:
+    assert get_adapter("digikala") is get_adapter("digikala_api")
+    assert DigikalaAdapter is DigikalaApiAdapter

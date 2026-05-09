@@ -1,6 +1,15 @@
 sources:
-  digikala:
-    adapter: digikala
+  digikala_api:
+    adapter: digikala_api
+    timeout_seconds: 20
+    rate_limit_seconds: 3
+    currency: IRR
+    price_multiplier: 1
+    headers:
+      User-Agent: "price-getter/0.1 (+https://example.local)"
+
+  digikala_web:
+    adapter: digikala_web
     timeout_seconds: 20
     rate_limit_seconds: 3
     currency: IRR
@@ -29,6 +38,6 @@ products:
 
 targets:
   - product_key: chair1
-    source_key: digikala
+    source_key: digikala_api
     url: "https://www.digikala.com/product/dkp-3271540/"
     enabled: true
