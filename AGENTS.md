@@ -21,7 +21,7 @@ Core flow:
 3. `price_getter.runner.PriceRunner` loops through active targets, enforces per-source rate limits, calls adapters, and records results.
 4. `price_getter.adapters.*` fetch and parse source-specific price data into `PriceObservation`.
 5. `price_getter.repository` writes and reads SQLAlchemy models from `price_getter.models`.
-6. `price_getter.ui` serves a local FastAPI dashboard for SQLite history and YAML config edits.
+6. `price_getter.ui` serves JSON endpoints plus the built React dashboard for SQLite history and YAML config edits.
 
 ## Read These First
 
@@ -30,7 +30,8 @@ Core flow:
 - Run orchestration, HTTP client lifecycle, rate limiting: `src/price_getter/runner.py`
 - Database schema: `src/price_getter/models.py`
 - Database queries/writes: `src/price_getter/repository.py`
-- Local web UI and JSON endpoints: `src/price_getter/ui.py`, `src/price_getter/templates/index.html`, `src/price_getter/static/app.js`, `src/price_getter/static/styles.css`
+- Local web UI backend and JSON endpoints: `src/price_getter/ui.py`
+- Local web UI frontend: `frontend/src/main.tsx`, `frontend/src/styles.css`, `frontend/vite.config.ts`; built assets are emitted to `src/price_getter/ui_dist/`
 - Safe YAML product edits: `src/price_getter/config_editor.py`
 - Price parsing, Persian/Arabic digits, stock text: `src/price_getter/pricing.py`
 - Adapter interface and HTTP request helper: `src/price_getter/adapters/base.py`
@@ -51,7 +52,7 @@ Use this task routing to keep context small:
 - Change stored data: read `models.py`, `repository.py`, `migrations/versions/`, and repository/CLI tests.
 - Change output tables: read `cli.py` and `tests/test_cli.py`.
 - Change run behavior: read `runner.py`, `repository.py`, and `tests/test_runner.py`.
-- Change local UI behavior: read `ui.py`, `config_editor.py`, UI static/template files, and UI/CLI tests.
+- Change local UI behavior: read `ui.py`, `config_editor.py`, `frontend/src/main.tsx`, `frontend/src/styles.css`, and UI/CLI tests.
 
 ## Local Commands
 
@@ -63,6 +64,8 @@ Use the project virtualenv when present:
 .venv/bin/price-getter run --config config/example.yml
 .venv/bin/price-getter latest
 .venv/bin/price-getter ui --config config/example.yml --db-url sqlite:///price_getter.db
+cd frontend && npm install
+cd frontend && npm run build
 ```
 
 ## Config Notes

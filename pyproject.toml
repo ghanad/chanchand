@@ -34,7 +34,7 @@ price-getter = "price_getter.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-price_getter = ["templates/*.html", "static/*.css", "static/*.js"]
+price_getter = ["ui_dist/*.html", "ui_dist/assets/*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

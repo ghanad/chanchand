@@ -6,10 +6,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from price_getter.config import AppConfig, ConfigLoadError, load_config
@@ -40,26 +39,22 @@ def create_app(
 ) -> FastAPI:
     config_path = Path(config_path)
     package_dir = Path(__file__).parent
-    templates = Jinja2Templates(directory=str(package_dir / "templates"))
+    ui_dist_dir = package_dir / "ui_dist"
+    ui_assets_dir = ui_dist_dir / "assets"
+    ui_index = ui_dist_dir / "index.html"
 
     app = FastAPI(title="Price Getter UI")
     app.state.config_path = config_path
     app.state.db_url = db_url
-    app.mount("/static", StaticFiles(directory=str(package_dir / "static")), name="static")
+    if ui_assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(ui_assets_dir)), name="ui-assets")
     font_dir = package_dir.parents[1] / "IranSansX"
     if font_dir.exists():
         app.mount("/font-assets", StaticFiles(directory=str(font_dir)), name="font-assets")
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "config_path": str(config_path),
-                "db_url": db_url,
-            },
-        )
+    def index() -> FileResponse:
+        return _ui_index_response(ui_index)
 
     @app.get("/api/latest")
     def api_latest() -> dict[str, Any]:
@@ -152,6 +147,12 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
+    @app.get("/{path:path}", response_class=HTMLResponse)
+    def spa_fallback(path: str) -> FileResponse:
+        if path.startswith(("api/", "assets/", "font-assets/", "config/")) or path == "run-now":
+            raise HTTPException(status_code=404, detail="Not found")
+        return _ui_index_response(ui_index)
+
     return app
 
 
@@ -177,6 +178,15 @@ def _load_config_or_400(path: Path) -> AppConfig:
         return load_config(path)
     except ConfigLoadError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+def _ui_index_response(ui_index: Path) -> FileResponse:
+    if not ui_index.exists():
+        raise HTTPException(
+            status_code=500,
+            detail="UI build is missing. Run `npm install` and `npm run build` from the frontend directory.",
+        )
+    return FileResponse(ui_index)
 
 
 def _products_payload(config: AppConfig, db_products: list[ProductSnapshot]) -> list[dict[str, Any]]:

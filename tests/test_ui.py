@@ -63,18 +63,31 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     history = client.get("/api/history", params={"product_key": "chair"})
     runs = client.get("/api/runs")
     errors = client.get("/api/errors")
-    styles = client.get("/static/styles.css")
     font = client.get("/font-assets/Webfonts/fonts/woff2/IRANSansX-Regular.woff2")
 
     assert page.status_code == 200
     assert "Price Getter" in page.text
-    assert 'font-family: "IranSansX"' in styles.text
+    assert "/assets/" in page.text
     assert font.status_code == 200
     assert latest.json()["rows"][0]["price_toman"] == 1200
     assert products.json()["products"][0]["key"] == "chair"
     assert history.json()["rows"][0]["price_irr"] == 12000
     assert runs.json()["rows"][0]["status"] == "partial"
     assert errors.json()["rows"][0]["message"] == "temporary failure"
+
+
+def test_ui_serves_built_frontend_assets(tmp_path) -> None:
+    config_path = tmp_path / "config.yml"
+    db_url = f"sqlite:///{tmp_path / 'prices.db'}"
+    write_config(config_path)
+    client = TestClient(create_app(config_path=config_path, db_url=db_url))
+
+    page = client.get("/")
+    asset_path = page.text.split('src="', 1)[1].split('"', 1)[0]
+    asset = client.get(asset_path)
+
+    assert asset.status_code == 200
+    assert "Price Getter" in page.text
 
 
 def test_ui_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
