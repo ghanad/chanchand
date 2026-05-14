@@ -1,7 +1,7 @@
 import pytest
 
 from price_getter.config import load_config
-from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, make_product_key
+from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, enable_product, make_product_key
 
 
 def write_config(path) -> None:
@@ -60,6 +60,19 @@ def test_disable_product_keeps_history_source_config_but_disables_targets(tmp_pa
     assert "phone" in config.products
     assert config.targets[0].enabled is False
     assert config.active_targets() == []
+
+
+def test_enable_product_reactivates_disabled_targets(tmp_path) -> None:
+    config_path = tmp_path / "config.yml"
+    write_config(config_path)
+    disable_product(config_path, "phone")
+
+    result = enable_product(config_path, "phone")
+
+    config = load_config(config_path)
+    assert result.backup_path.exists()
+    assert config.targets[0].enabled is True
+    assert len(config.active_targets()) == 1
 
 
 def test_invalid_add_rolls_back_config_text(tmp_path) -> None:

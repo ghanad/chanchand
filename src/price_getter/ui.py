@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from price_getter.config import AppConfig, ConfigLoadError, load_config
-from price_getter.config_editor import ConfigEditError, add_product_target, disable_product
+from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, enable_product
 from price_getter.db import DEFAULT_DB_URL, init_database, session_scope
 from price_getter.models import FetchError, PriceSnapshot, ProductSnapshot, Run, SourceSnapshot
 from price_getter.repository import (
@@ -143,6 +143,14 @@ def create_app(
     def disable_product_endpoint(product_key: str) -> dict[str, Any]:
         try:
             result = disable_product(config_path, product_key)
+        except ConfigEditError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
+
+    @app.post("/config/products/{product_key}/enable")
+    def enable_product_endpoint(product_key: str) -> dict[str, Any]:
+        try:
+            result = enable_product(config_path, product_key)
         except ConfigEditError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}

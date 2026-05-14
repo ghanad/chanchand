@@ -110,14 +110,16 @@ def test_ui_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
         json={"title": "New Phone", "url": "https://www.digikala.com/product/dkp-2/", "source_key": "digikala_api"},
     )
     disabled = client.post("/config/products/new-phone/disable")
+    enabled = client.post("/config/products/new-phone/enable")
     run = client.post("/run-now")
     config = load_config(config_path)
 
     assert added.status_code == 200
     assert added.json()["product_key"] == "new-phone"
     assert disabled.status_code == 200
+    assert enabled.status_code == 200
     assert config.products["new-phone"].title == "New Phone"
-    assert next(target for target in config.targets if target.product_key == "new-phone").enabled is False
+    assert next(target for target in config.targets if target.product_key == "new-phone").enabled is True
     assert run.json()["run_id"] == 42
 
 

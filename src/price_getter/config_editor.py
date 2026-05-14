@@ -81,6 +81,36 @@ def disable_product(config_path: str | Path, product_key: str) -> ConfigEditResu
     return ConfigEditResult(product_key=product_key, backup_path=backup_path)
 
 
+def enable_product(config_path: str | Path, product_key: str) -> ConfigEditResult:
+    path = Path(config_path)
+    raw = _load_raw_config(path)
+    products = _mapping(raw, "products")
+    targets = _target_list(raw)
+
+    if product_key not in products:
+        raise ConfigEditError(f"unknown product: {product_key}")
+
+    changed = False
+    matched = False
+    for target in targets:
+        if not isinstance(target, dict):
+            raise ConfigEditError("targets must contain YAML mappings")
+        if target.get("product_key") != product_key:
+            continue
+        matched = True
+        if target.get("enabled", True) is False:
+            target["enabled"] = True
+            changed = True
+
+    if not matched:
+        raise ConfigEditError(f"product has no targets: {product_key}")
+    if not changed:
+        raise ConfigEditError(f"product has no disabled targets: {product_key}")
+
+    backup_path = _write_validated_config(path, raw)
+    return ConfigEditResult(product_key=product_key, backup_path=backup_path)
+
+
 def make_product_key(title: str, existing: dict[str, Any]) -> str:
     base = re.sub(r"[^a-z0-9_.-]+", "-", title.strip().lower())
     base = re.sub(r"-+", "-", base).strip("-.")

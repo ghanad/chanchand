@@ -287,6 +287,23 @@ function App() {
     }
   }
 
+  async function enableProduct(productKey: string) {
+    if (!productKey) return;
+    setBusyAction(`enable:${productKey}`);
+    try {
+      const result = await requestJson<{ product_key: string }>(
+        `/config/products/${encodeURIComponent(productKey)}/enable`,
+        { method: "POST" },
+      );
+      showToast(`محصول ${result.product_key} فعال شد.`);
+      await refreshAll();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "خطای ناشناخته");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -353,6 +370,7 @@ function App() {
             setForm={setForm}
             addProduct={addProduct}
             disableProduct={disableProduct}
+            enableProduct={enableProduct}
             busyAction={busyAction}
           />
         )}
@@ -555,6 +573,7 @@ function Products({
   setForm,
   addProduct,
   disableProduct,
+  enableProduct,
   busyAction,
 }: {
   products: ProductRow[];
@@ -563,6 +582,7 @@ function Products({
   setForm: React.Dispatch<React.SetStateAction<{ title: string; url: string; source_key: string }>>;
   addProduct: (event: React.FormEvent<HTMLFormElement>) => void;
   disableProduct: (productKey: string) => void;
+  enableProduct: (productKey: string) => void;
   busyAction: string | null;
 }) {
   const activeTargetCount = products.reduce((total, product) => total + product.enabled_target_count, 0);
@@ -623,6 +643,8 @@ function Products({
           <div className="product-list">
             {products.map((product) => {
               const isActive = product.enabled_target_count > 0;
+              const canToggle = product.target_count > 0;
+              const actionBusy = busyAction === `disable:${product.key}` || busyAction === `enable:${product.key}`;
               const status = product.target_count === 0 ? "بدون هدف" : isActive ? "فعال" : "غیرفعال";
               const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";
               return (
@@ -650,10 +672,12 @@ function Products({
                     <button
                       className={isActive ? "danger-button" : "secondary-button"}
                       type="button"
-                      onClick={() => disableProduct(product.key)}
-                      disabled={!isActive || busyAction === `disable:${product.key}`}
+                      onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
+                      disabled={!canToggle || actionBusy}
                     >
-                      {busyAction === `disable:${product.key}` ? "در حال غیرفعال‌سازی" : isActive ? "غیرفعال کردن" : "غیرفعال است"}
+                      {actionBusy
+                        ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
+                        : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
                     </button>
                   </div>
                 </article>
