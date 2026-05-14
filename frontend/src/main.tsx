@@ -508,8 +508,10 @@ function History({
               <XAxis dataKey="time" tick={{ fill: "#647174", fontSize: 12 }} />
               <YAxis
                 domain={chartPriceDomain}
+                tickMargin={12}
+                width={96}
                 tickFormatter={(value) => numberFormatter.format(Number(value))}
-                tick={{ fill: "#647174", fontSize: 12 }}
+                tick={{ fill: "#647174", fontSize: 12, dx: -40 }}
               />
               <Tooltip
                 formatter={(value) => [`${numberFormatter.format(Number(value))} تومان`, "قیمت"]}
