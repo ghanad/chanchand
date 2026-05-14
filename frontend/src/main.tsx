@@ -35,6 +35,11 @@ interface ProductRow {
   target_count: number;
   enabled_target_count: number;
   sources: string[];
+  primary_target: {
+    source_key: string;
+    url: string;
+    enabled: boolean;
+  } | null;
 }
 
 interface SourceRow {
@@ -163,6 +168,8 @@ function App() {
   const [busyAction, setBusyAction] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [form, setForm] = React.useState({ title: "", url: "", source_key: "" });
+  const [editProductKey, setEditProductKey] = React.useState<string | null>(null);
+  const [editForm, setEditForm] = React.useState({ title: "", url: "", source_key: "" });
 
   const showToast = React.useCallback((message: string) => {
     setToast(message);
@@ -270,6 +277,47 @@ function App() {
     }
   }
 
+  function startEditProduct(product: ProductRow) {
+    if (!product.primary_target) return;
+    setEditProductKey(product.key);
+    setEditForm({
+      title: product.title,
+      url: product.primary_target.url,
+      source_key: product.primary_target.source_key,
+    });
+  }
+
+  function cancelEditProduct() {
+    setEditProductKey(null);
+    setEditForm({ title: "", url: "", source_key: "" });
+  }
+
+  async function updateProduct(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editProductKey) return;
+    setBusyAction(`edit:${editProductKey}`);
+    try {
+      const result = await requestJson<{ product_key: string; backup_path: string }>(
+        `/config/products/${encodeURIComponent(editProductKey)}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            title: editForm.title.trim(),
+            url: editForm.url.trim(),
+            source_key: editForm.source_key || null,
+          }),
+        },
+      );
+      showToast(`محصول ${result.product_key} ویرایش شد.`);
+      cancelEditProduct();
+      await refreshAll();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "خطای ناشناخته");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   async function disableProduct(productKey: string) {
     if (!productKey) return;
     setBusyAction(`disable:${productKey}`);
@@ -368,7 +416,13 @@ function App() {
             configuredSources={configuredSources}
             form={form}
             setForm={setForm}
+            editProductKey={editProductKey}
+            editForm={editForm}
+            setEditForm={setEditForm}
             addProduct={addProduct}
+            updateProduct={updateProduct}
+            startEditProduct={startEditProduct}
+            cancelEditProduct={cancelEditProduct}
             disableProduct={disableProduct}
             enableProduct={enableProduct}
             busyAction={busyAction}
@@ -571,7 +625,13 @@ function Products({
   configuredSources,
   form,
   setForm,
+  editProductKey,
+  editForm,
+  setEditForm,
   addProduct,
+  updateProduct,
+  startEditProduct,
+  cancelEditProduct,
   disableProduct,
   enableProduct,
   busyAction,
@@ -580,7 +640,13 @@ function Products({
   configuredSources: SourceRow[];
   form: { title: string; url: string; source_key: string };
   setForm: React.Dispatch<React.SetStateAction<{ title: string; url: string; source_key: string }>>;
+  editProductKey: string | null;
+  editForm: { title: string; url: string; source_key: string };
+  setEditForm: React.Dispatch<React.SetStateAction<{ title: string; url: string; source_key: string }>>;
   addProduct: (event: React.FormEvent<HTMLFormElement>) => void;
+  updateProduct: (event: React.FormEvent<HTMLFormElement>) => void;
+  startEditProduct: (product: ProductRow) => void;
+  cancelEditProduct: () => void;
   disableProduct: (productKey: string) => void;
   enableProduct: (productKey: string) => void;
   busyAction: string | null;
@@ -645,41 +711,98 @@ function Products({
               const isActive = product.enabled_target_count > 0;
               const canToggle = product.target_count > 0;
               const actionBusy = busyAction === `disable:${product.key}` || busyAction === `enable:${product.key}`;
+              const editBusy = busyAction === `edit:${product.key}`;
+              const isEditing = editProductKey === product.key;
               const status = product.target_count === 0 ? "بدون هدف" : isActive ? "فعال" : "غیرفعال";
               const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";
               return (
                 <article className="product-row" key={product.key}>
-                  <div className="product-main">
-                    <div className="product-title-row">
-                      <strong>{product.title}</strong>
-                      <StatusPill text={status} tone={statusTone} />
-                    </div>
-                    <span className="product-key">{product.key}</span>
-                    <div className="source-chip-row">
-                      {product.sources.length ? (
-                        product.sources.map((source) => (
-                          <span className="source-chip" key={`${product.key}:${source}`}>
-                            {source}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="source-chip muted-chip">بدون منبع</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="product-meta">
-                    <span>{formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)} هدف فعال</span>
-                    <button
-                      className={isActive ? "danger-button" : "secondary-button"}
-                      type="button"
-                      onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
-                      disabled={!canToggle || actionBusy}
-                    >
-                      {actionBusy
-                        ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
-                        : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
-                    </button>
-                  </div>
+                  {isEditing ? (
+                    <form className="product-edit-form" onSubmit={updateProduct}>
+                      <label>
+                        عنوان
+                        <input
+                          value={editForm.title}
+                          onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                          autoComplete="off"
+                          required
+                        />
+                      </label>
+                      <label>
+                        URL
+                        <input
+                          value={editForm.url}
+                          onChange={(event) => setEditForm((current) => ({ ...current, url: event.target.value }))}
+                          type="url"
+                          required
+                        />
+                      </label>
+                      <label>
+                        منبع
+                        <select
+                          value={editForm.source_key}
+                          onChange={(event) => setEditForm((current) => ({ ...current, source_key: event.target.value }))}
+                        >
+                          {configuredSources.map((source) => (
+                            <option key={source.key} value={source.key}>
+                              {source.key} ({source.adapter})
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <div className="product-edit-actions">
+                        <button className="primary-button" type="submit" disabled={editBusy}>
+                          {editBusy ? "در حال ذخیره" : "ذخیره"}
+                        </button>
+                        <button className="secondary-button" type="button" onClick={cancelEditProduct} disabled={editBusy}>
+                          انصراف
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="product-main">
+                        <div className="product-title-row">
+                          <strong>{product.title}</strong>
+                          <StatusPill text={status} tone={statusTone} />
+                        </div>
+                        <span className="product-key">{product.key}</span>
+                        {product.primary_target ? <span className="product-url">{product.primary_target.url}</span> : null}
+                        <div className="source-chip-row">
+                          {product.sources.length ? (
+                            product.sources.map((source) => (
+                              <span className="source-chip" key={`${product.key}:${source}`}>
+                                {source}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="source-chip muted-chip">بدون منبع</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="product-meta">
+                        <span>{formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)} هدف فعال</span>
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => startEditProduct(product)}
+                          disabled={!product.primary_target || busyAction !== null}
+                        >
+                          ویرایش
+                        </button>
+                        <button
+                          className={isActive ? "danger-button" : "secondary-button"}
+                          type="button"
+                          onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
+                          disabled={!canToggle || actionBusy}
+                        >
+                          {actionBusy
+                            ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
+                            : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </article>
               );
             })}

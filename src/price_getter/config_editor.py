@@ -57,6 +57,43 @@ def add_product_target(
     return ConfigEditResult(product_key=product_key, backup_path=backup_path)
 
 
+def update_product_target(
+    config_path: str | Path,
+    product_key: str,
+    *,
+    title: str,
+    url: str,
+    source_key: str | None = None,
+) -> ConfigEditResult:
+    path = Path(config_path)
+    raw = _load_raw_config(path)
+    sources = _mapping(raw, "sources")
+    products = _mapping(raw, "products")
+    targets = _target_list(raw)
+
+    if product_key not in products:
+        raise ConfigEditError(f"unknown product: {product_key}")
+
+    clean_title = title.strip()
+    clean_url = url.strip()
+    if not clean_title:
+        raise ConfigEditError("title cannot be empty")
+
+    selected_source = _select_source(sources, source_key)
+    products[product_key] = {"title": clean_title}
+
+    for target in targets:
+        if not isinstance(target, dict):
+            raise ConfigEditError("targets must contain YAML mappings")
+        if target.get("product_key") == product_key:
+            target["source_key"] = selected_source
+            target["url"] = clean_url
+            backup_path = _write_validated_config(path, raw)
+            return ConfigEditResult(product_key=product_key, backup_path=backup_path)
+
+    raise ConfigEditError(f"product has no targets: {product_key}")
+
+
 def disable_product(config_path: str | Path, product_key: str) -> ConfigEditResult:
     path = Path(config_path)
     raw = _load_raw_config(path)

@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from price_getter.config import AppConfig, ConfigLoadError, load_config
-from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, enable_product
+from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, enable_product, update_product_target
 from price_getter.db import DEFAULT_DB_URL, init_database, session_scope
 from price_getter.models import FetchError, PriceSnapshot, ProductSnapshot, Run, SourceSnapshot
 from price_getter.repository import (
@@ -27,6 +27,12 @@ from price_getter.runner import PriceRunner
 
 
 class AddProductRequest(BaseModel):
+    title: str = Field(min_length=1)
+    url: str = Field(min_length=1)
+    source_key: str | None = None
+
+
+class UpdateProductRequest(BaseModel):
     title: str = Field(min_length=1)
     url: str = Field(min_length=1)
     source_key: str | None = None
@@ -139,6 +145,20 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
+    @app.put("/config/products/{product_key}")
+    def update_product(product_key: str, payload: UpdateProductRequest) -> dict[str, Any]:
+        try:
+            result = update_product_target(
+                config_path,
+                product_key,
+                title=payload.title,
+                url=payload.url,
+                source_key=payload.source_key,
+            )
+        except ConfigEditError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
+
     @app.post("/config/products/{product_key}/disable")
     def disable_product_endpoint(product_key: str) -> dict[str, Any]:
         try:
@@ -206,6 +226,7 @@ def _products_payload(config: AppConfig, db_products: list[ProductSnapshot]) -> 
             "target_count": 0,
             "enabled_target_count": 0,
             "sources": [],
+            "primary_target": None,
         }
         for key, product in config.products.items()
     }
@@ -220,6 +241,7 @@ def _products_payload(config: AppConfig, db_products: list[ProductSnapshot]) -> 
                 "target_count": 0,
                 "enabled_target_count": 0,
                 "sources": [],
+                "primary_target": None,
             },
         )
         product["target_count"] += 1
@@ -227,6 +249,12 @@ def _products_payload(config: AppConfig, db_products: list[ProductSnapshot]) -> 
             product["enabled_target_count"] += 1
         if target.source_key not in product["sources"]:
             product["sources"].append(target.source_key)
+        if product["primary_target"] is None:
+            product["primary_target"] = {
+                "source_key": target.source_key,
+                "url": target.url,
+                "enabled": target.enabled,
+            }
 
     for db_product in db_products:
         products.setdefault(
@@ -238,6 +266,7 @@ def _products_payload(config: AppConfig, db_products: list[ProductSnapshot]) -> 
                 "target_count": 0,
                 "enabled_target_count": 0,
                 "sources": [],
+                "primary_target": None,
             },
         )
 

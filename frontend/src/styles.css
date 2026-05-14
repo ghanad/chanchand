@@ -458,9 +458,17 @@ tbody tr:last-child td {
 }
 
 .product-key,
+.product-url,
 .product-meta {
   color: var(--muted);
   font-size: 12px;
+}
+
+.product-url {
+  max-width: 100%;
+  direction: ltr;
+  overflow-wrap: anywhere;
+  text-align: left;
 }
 
 .product-meta {
@@ -472,6 +480,23 @@ tbody tr:last-child td {
 
 .product-meta button {
   min-width: 128px;
+}
+
+.product-edit-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.9fr) minmax(240px, 1.6fr) minmax(160px, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
+  width: 100%;
+}
+
+.product-edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.product-edit-actions button {
+  min-width: 90px;
 }
 
 .source-chip-row {
@@ -554,6 +579,7 @@ tbody tr:last-child td {
   .overview-grid,
   .product-grid,
   .toolbar,
+  .product-edit-form,
   .product-form {
     grid-template-columns: 1fr;
   }
@@ -570,7 +596,8 @@ tbody tr:last-child td {
 
   .workspace-header,
   .product-row,
-  .product-meta {
+  .product-meta,
+  .product-edit-actions {
     align-items: stretch;
     flex-direction: column;
   }

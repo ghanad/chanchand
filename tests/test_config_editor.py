@@ -1,7 +1,14 @@
 import pytest
 
 from price_getter.config import load_config
-from price_getter.config_editor import ConfigEditError, add_product_target, disable_product, enable_product, make_product_key
+from price_getter.config_editor import (
+    ConfigEditError,
+    add_product_target,
+    disable_product,
+    enable_product,
+    make_product_key,
+    update_product_target,
+)
 
 
 def write_config(path) -> None:
@@ -60,6 +67,25 @@ def test_disable_product_keeps_history_source_config_but_disables_targets(tmp_pa
     assert "phone" in config.products
     assert config.targets[0].enabled is False
     assert config.active_targets() == []
+
+
+def test_update_product_target_writes_title_url_and_source(tmp_path) -> None:
+    config_path = tmp_path / "config.yml"
+    write_config(config_path)
+
+    result = update_product_target(
+        config_path,
+        "phone",
+        title="Updated Phone",
+        url="https://www.digikala.com/product/dkp-22/",
+        source_key="digikala_api",
+    )
+
+    config = load_config(config_path)
+    assert result.backup_path.exists()
+    assert config.products["phone"].title == "Updated Phone"
+    assert config.targets[0].url == "https://www.digikala.com/product/dkp-22/"
+    assert config.targets[0].source_key == "digikala_api"
 
 
 def test_enable_product_reactivates_disabled_targets(tmp_path) -> None:

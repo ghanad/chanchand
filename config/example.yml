@@ -57,6 +57,8 @@ products:
     title: دلار
   product:
     title: سیب زرد دماوند
+  product-2:
+    title: موز
 targets:
 - product_key: chair1
   source_key: digikala_api
@@ -104,5 +106,9 @@ targets:
     symbol: USD
 - product_key: product
   source_key: digikala_api
-  url: https://www.digikala.com/fresh/product/dkp-856977/%D8%B3%DB%8C%D8%A8-%D8%B2%D8%B1%D8%AF-%D8%AF%D9%85%D8%A7%D9%88%D9%86%D8%AF-fresh-%D9%88%D8%B2%D9%86-1-%DA%A9%DB%8C%D9%84%D9%88%DA%AF%D8%B1%D9%85/
+  url: https://www.digikala.com/fresh/product/dkp-856977/
+  enabled: true
+- product_key: product-2
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-6778050
   enabled: true
