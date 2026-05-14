@@ -105,6 +105,16 @@ function formatDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
 }
 
+function priceAxisDomain(rows: Array<{ price: number }>): [number, number] {
+  const prices = rows.map((row) => row.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const spread = max - min;
+  const padding = spread > 0 ? spread * 0.15 : Math.max(max * 0.05, 1);
+
+  return [Math.max(0, Math.floor(min - padding)), Math.ceil(max + padding)];
+}
+
 function availabilityText(value: Availability) {
   const labels: Record<string, string> = {
     in_stock: "موجود",
@@ -434,13 +444,16 @@ function History({
   setSelectedSource: (value: string) => void;
   setHistoryLimit: (value: string) => void;
 }) {
-  const chartRows = history
-    .filter((row) => Number.isFinite(row.price_toman))
-    .map((row) => ({
+  const chartRows = history.flatMap((row) => {
+    if (!Number.isFinite(row.price_toman)) return [];
+
+    return [{
       time: formatDate(row.observed_at),
       source: row.source_key,
-      price: row.price_toman,
-    }));
+      price: Number(row.price_toman),
+    }];
+  });
+  const chartPriceDomain = chartRows.length ? priceAxisDomain(chartRows) : undefined;
 
   return (
     <div className="page-stack">
@@ -493,7 +506,11 @@ function History({
               </defs>
               <CartesianGrid stroke="#dce4e5" vertical={false} />
               <XAxis dataKey="time" tick={{ fill: "#647174", fontSize: 12 }} />
-              <YAxis tickFormatter={(value) => numberFormatter.format(Number(value))} tick={{ fill: "#647174", fontSize: 12 }} />
+              <YAxis
+                domain={chartPriceDomain}
+                tickFormatter={(value) => numberFormatter.format(Number(value))}
+                tick={{ fill: "#647174", fontSize: 12 }}
+              />
               <Tooltip
                 formatter={(value) => [`${numberFormatter.format(Number(value))} تومان`, "قیمت"]}
                 labelFormatter={(value) => `زمان: ${value}`}
