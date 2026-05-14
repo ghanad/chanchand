@@ -8,6 +8,29 @@ from price_getter.adapters.generic_html import GenericHtmlAdapter
 from price_getter.config import SourceConfig, TargetConfig
 
 
+class _FakeJsonResponse:
+    status_code = 200
+
+    def __init__(self, payload: dict) -> None:
+        self._payload = payload
+
+    def raise_for_status(self) -> None:
+        return None
+
+    def json(self) -> dict:
+        return self._payload
+
+
+class _FakeJsonClient:
+    def __init__(self, responses: dict[str, dict]) -> None:
+        self.responses = responses
+        self.requested_urls: list[str] = []
+
+    def get(self, url: str, **_: object) -> _FakeJsonResponse:
+        self.requested_urls.append(url)
+        return _FakeJsonResponse(self.responses[url])
+
+
 def test_generic_html_adapter_parses_configured_selectors() -> None:
     source = SourceConfig(
         adapter="generic_html",
@@ -161,6 +184,81 @@ def test_digikala_api_adapter_rejects_missing_requested_api_variant() -> None:
 
     with pytest.raises(AdapterError, match="requested variant"):
         DigikalaApiAdapter().parse_api_product(product, source, variant_id="50179968")
+
+
+def test_digikala_api_adapter_fetches_fresh_product_api_for_fresh_url() -> None:
+    source = SourceConfig(adapter="digikala_api")
+    target = TargetConfig(
+        product_key="apple",
+        source_key="digikala_api",
+        url="https://www.digikala.com/fresh/product/dkp-856977/apple/",
+    )
+    client = _FakeJsonClient(
+        {
+            "https://api.digikala.com/fresh/v1/product/856977/": {
+                "data": {
+                    "product": {
+                        "id": 856977,
+                        "title_fa": "سیب زرد دماوند Fresh وزن 1 کیلوگرم",
+                        "status": "marketable",
+                        "default_variant": {
+                            "id": 1711424,
+                            "status": "marketable",
+                            "price": {"selling_price": 2_200_000},
+                            "seller": {"title": "دیجی‌کالا"},
+                        },
+                    }
+                }
+            }
+        }
+    )
+
+    observation = DigikalaApiAdapter().fetch(FetchContext(source=source, target=target, client=client))
+
+    assert client.requested_urls == ["https://api.digikala.com/fresh/v1/product/856977/"]
+    assert observation.title == "سیب زرد دماوند Fresh وزن 1 کیلوگرم"
+    assert observation.price_irr == 2_200_000
+    assert observation.availability == "in_stock"
+
+
+def test_digikala_api_adapter_follows_fresh_redirect_payload() -> None:
+    source = SourceConfig(adapter="digikala_api")
+    client = _FakeJsonClient(
+        {
+            "https://api.digikala.com/v2/product/856977/": {
+                "status": 302,
+                "redirect_url": {"uri": "/fresh/product/dkp-856977/"},
+            },
+            "https://api.digikala.com/fresh/v1/product/856977/": {
+                "data": {
+                    "product": {
+                        "id": 856977,
+                        "title_fa": "سیب زرد دماوند Fresh وزن 1 کیلوگرم",
+                        "status": "marketable",
+                        "default_variant": {
+                            "id": 1711424,
+                            "status": "marketable",
+                            "price": {"selling_price": 2_200_000},
+                        },
+                    }
+                }
+            },
+        }
+    )
+    target = TargetConfig(
+        product_key="apple",
+        source_key="digikala_api",
+        url="https://www.digikala.com/product/dkp-856977/apple/",
+    )
+
+    observation = DigikalaApiAdapter().fetch(FetchContext(source=source, target=target, client=client))
+
+    assert client.requested_urls == [
+        "https://api.digikala.com/v2/product/856977/",
+        "https://api.digikala.com/fresh/v1/product/856977/",
+    ]
+    assert observation.raw_observation["api_url"] == "https://api.digikala.com/fresh/v1/product/856977/"
+    assert observation.price_irr == 2_200_000
 
 
 def test_digikala_adapter_name_is_backward_compatible_alias() -> None:

@@ -21,10 +21,17 @@ class DigikalaApiAdapter:
             raise AdapterError("could not extract Digikala product ID from target URL")
 
         variant_id = _extract_variant_id(context.target.url)
-        return self.fetch_api(context, product_id, variant_id=variant_id)
+        return self.fetch_api(context, product_id, variant_id=variant_id, fresh=_is_fresh_url(context.target.url))
 
-    def fetch_api(self, context: FetchContext, product_id: str, *, variant_id: str | None = None) -> PriceObservation:
-        api_url = f"https://api.digikala.com/v2/product/{product_id}/"
+    def fetch_api(
+        self,
+        context: FetchContext,
+        product_id: str,
+        *,
+        variant_id: str | None = None,
+        fresh: bool = False,
+    ) -> PriceObservation:
+        api_url = _product_api_url(product_id, fresh=fresh)
         headers = {
             "User-Agent": "price-getter/0.1",
             "Accept": "application/json",
@@ -36,10 +43,18 @@ class DigikalaApiAdapter:
         except (httpx.HTTPError, json.JSONDecodeError) as exc:
             raise AdapterError(f"Digikala API request failed: {exc}") from exc
 
-        try:
-            product = payload["data"]["product"]
-        except (KeyError, TypeError) as exc:
-            raise AdapterError("Digikala API response did not include product data") from exc
+        product = _payload_product(payload)
+        if product is None and not fresh and _redirects_to_fresh_product(payload):
+            api_url = _product_api_url(product_id, fresh=True)
+            try:
+                response = context.client.get(api_url, headers=headers)
+                response.raise_for_status()
+                payload = response.json()
+            except (httpx.HTTPError, json.JSONDecodeError) as exc:
+                raise AdapterError(f"Digikala Fresh API request failed: {exc}") from exc
+            product = _payload_product(payload)
+        if product is None:
+            raise AdapterError("Digikala API response did not include product data")
 
         return self.parse_api_product(
             product,
@@ -95,6 +110,36 @@ class DigikalaApiAdapter:
 def _extract_product_id(url: str) -> str | None:
     match = re.search(r"(?:dkp-|/product/)(\d+)", url)
     return match.group(1) if match else None
+
+
+def _is_fresh_url(url: str) -> bool:
+    return "/fresh/" in urlparse(url).path
+
+
+def _product_api_url(product_id: str, *, fresh: bool = False) -> str:
+    if fresh:
+        return f"https://api.digikala.com/fresh/v1/product/{product_id}/"
+    return f"https://api.digikala.com/v2/product/{product_id}/"
+
+
+def _payload_product(payload: Any) -> dict[str, Any] | None:
+    if not isinstance(payload, dict):
+        return None
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return None
+    product = data.get("product")
+    return product if isinstance(product, dict) else None
+
+
+def _redirects_to_fresh_product(payload: Any) -> bool:
+    if not isinstance(payload, dict):
+        return False
+    redirect = payload.get("redirect_url")
+    if not isinstance(redirect, dict):
+        return False
+    uri = redirect.get("uri")
+    return isinstance(uri, str) and "/fresh/product/" in uri
 
 
 def _extract_variant_id(url: str) -> str | None:
