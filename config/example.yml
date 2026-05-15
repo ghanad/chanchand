@@ -39,8 +39,6 @@ sources:
 products:
   example-phone:
     title: Example phone
-  chair1:
-    title: Digikala chair 1
   smart-air-purifier-6:
     title: دستگاه تصفیه کننده هوا میجیا مدل Smart Air Purifier 6
   gold-18k:
@@ -60,10 +58,6 @@ products:
   product-2:
     title: موز
 targets:
-- product_key: chair1
-  source_key: digikala_api
-  url: https://www.digikala.com/product/dkp-3271540/
-  enabled: false
 - product_key: smart-air-purifier-6
   source_key: digikala_api
   url: https://www.digikala.com/product/dkp-20769143/

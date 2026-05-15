@@ -352,6 +352,32 @@ function App() {
     }
   }
 
+  async function deleteProduct(product: ProductRow) {
+    if (!product.key) return;
+    const confirmed = window.confirm(`محصول «${product.title}» از config حذف شود؟`);
+    if (!confirmed) return;
+
+    setBusyAction(`delete:${product.key}`);
+    try {
+      const result = await requestJson<{ product_key: string }>(
+        `/config/products/${encodeURIComponent(product.key)}`,
+        { method: "DELETE" },
+      );
+      showToast(`محصول ${result.product_key} حذف شد.`);
+      if (selectedProduct === product.key) {
+        setSelectedProduct("");
+      }
+      if (editProductKey === product.key) {
+        cancelEditProduct();
+      }
+      await refreshAll();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "خطای ناشناخته");
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -425,6 +451,7 @@ function App() {
             cancelEditProduct={cancelEditProduct}
             disableProduct={disableProduct}
             enableProduct={enableProduct}
+            deleteProduct={deleteProduct}
             busyAction={busyAction}
           />
         )}
@@ -634,6 +661,7 @@ function Products({
   cancelEditProduct,
   disableProduct,
   enableProduct,
+  deleteProduct,
   busyAction,
 }: {
   products: ProductRow[];
@@ -649,16 +677,19 @@ function Products({
   cancelEditProduct: () => void;
   disableProduct: (productKey: string) => void;
   enableProduct: (productKey: string) => void;
+  deleteProduct: (product: ProductRow) => void;
   busyAction: string | null;
 }) {
   const activeTargetCount = products.reduce((total, product) => total + product.enabled_target_count, 0);
   const targetCount = products.reduce((total, product) => total + product.target_count, 0);
   const activeProducts = products.filter((product) => product.enabled_target_count > 0).length;
+  const configProducts = products.filter((product) => product.configured);
+  const configuredProductCount = configProducts.length;
 
   return (
     <div className="products-page">
       <section className="product-summary-grid" aria-label="خلاصه محصولات">
-        <Metric label="کل محصول‌ها" value={formatNumber(products.length)} />
+        <Metric label="کل محصول‌ها" value={formatNumber(configuredProductCount)} />
         <Metric label="محصول فعال" value={formatNumber(activeProducts)} />
         <Metric label="هدف‌های فعال" value={`${formatNumber(activeTargetCount)} / ${formatNumber(targetCount)}`} />
         <Metric label="منبع‌های config" value={formatNumber(configuredSources.length)} />
@@ -705,13 +736,15 @@ function Products({
           </form>
         </section>
         <section className="panel product-list-panel">
-          <PanelHead title="محصول‌های config" meta={`${formatNumber(products.length)} محصول`} />
+          <PanelHead title="محصول‌های config" meta={`${formatNumber(configuredProductCount)} محصول`} />
           <div className="product-list">
-            {products.map((product) => {
+            {configProducts.map((product) => {
               const isActive = product.enabled_target_count > 0;
               const canToggle = product.target_count > 0;
               const actionBusy = busyAction === `disable:${product.key}` || busyAction === `enable:${product.key}`;
               const editBusy = busyAction === `edit:${product.key}`;
+              const deleteBusy = busyAction === `delete:${product.key}`;
+              const canDelete = product.configured && configuredProductCount > 1;
               const isEditing = editProductKey === product.key;
               const status = product.target_count === 0 ? "بدون هدف" : isActive ? "فعال" : "غیرفعال";
               const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";
@@ -794,11 +827,19 @@ function Products({
                           className={isActive ? "danger-button" : "secondary-button"}
                           type="button"
                           onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
-                          disabled={!canToggle || actionBusy}
+                          disabled={!canToggle || actionBusy || busyAction === `delete:${product.key}`}
                         >
                           {actionBusy
                             ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
                             : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
+                        </button>
+                        <button
+                          className="danger-button"
+                          type="button"
+                          onClick={() => deleteProduct(product)}
+                          disabled={!canDelete || deleteBusy || busyAction !== null}
+                        >
+                          {deleteBusy ? "در حال حذف" : "حذف"}
                         </button>
                       </div>
                     </>

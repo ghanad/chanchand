@@ -4,6 +4,7 @@ from price_getter.config import load_config
 from price_getter.config_editor import (
     ConfigEditError,
     add_product_target,
+    delete_product,
     disable_product,
     enable_product,
     make_product_key,
@@ -26,6 +27,33 @@ targets:
   - product_key: phone
     source_key: generic_demo
     url: "https://example.com/phone"
+    enabled: true
+""",
+        encoding="utf-8",
+    )
+
+
+def write_two_product_config(path) -> None:
+    path.write_text(
+        """
+sources:
+  generic_demo:
+    adapter: generic_html
+  digikala_api:
+    adapter: digikala_api
+products:
+  phone:
+    title: Phone
+  chair:
+    title: Chair
+targets:
+  - product_key: phone
+    source_key: generic_demo
+    url: "https://example.com/phone"
+    enabled: true
+  - product_key: chair
+    source_key: digikala_api
+    url: "https://www.digikala.com/product/dkp-1/"
     enabled: true
 """,
         encoding="utf-8",
@@ -86,6 +114,19 @@ def test_update_product_target_writes_title_url_and_source(tmp_path) -> None:
     assert config.products["phone"].title == "Updated Phone"
     assert config.targets[0].url == "https://www.digikala.com/product/dkp-22/"
     assert config.targets[0].source_key == "digikala_api"
+
+
+def test_delete_product_removes_product_and_targets(tmp_path) -> None:
+    config_path = tmp_path / "config.yml"
+    write_two_product_config(config_path)
+
+    result = delete_product(config_path, "phone")
+
+    config = load_config(config_path)
+    assert result.product_key == "phone"
+    assert result.backup_path.exists()
+    assert "phone" not in config.products
+    assert [target.product_key for target in config.targets] == ["chair"]
 
 
 def test_enable_product_reactivates_disabled_targets(tmp_path) -> None:

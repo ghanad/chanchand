@@ -113,20 +113,25 @@ def test_ui_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
         "/config/products/new-phone",
         json={"title": "Updated Phone", "url": "https://www.digikala.com/product/dkp-3/", "source_key": "digikala_api"},
     )
+    config_after_update = load_config(config_path)
     disabled = client.post("/config/products/new-phone/disable")
     enabled = client.post("/config/products/new-phone/enable")
+    deleted = client.delete("/config/products/new-phone")
     run = client.post("/run-now")
     config = load_config(config_path)
 
     assert added.status_code == 200
     assert added.json()["product_key"] == "new-phone"
     assert updated.status_code == 200
+    assert config_after_update.products["new-phone"].title == "Updated Phone"
+    edited_target = next(target for target in config_after_update.targets if target.product_key == "new-phone")
+    assert edited_target.url == "https://www.digikala.com/product/dkp-3/"
     assert disabled.status_code == 200
     assert enabled.status_code == 200
-    assert config.products["new-phone"].title == "Updated Phone"
-    edited_target = next(target for target in config.targets if target.product_key == "new-phone")
-    assert edited_target.url == "https://www.digikala.com/product/dkp-3/"
-    assert edited_target.enabled is True
+    assert deleted.status_code == 200
+    assert deleted.json()["product_key"] == "new-phone"
+    assert "new-phone" not in config.products
+    assert all(target.product_key != "new-phone" for target in config.targets)
     assert run.json()["run_id"] == 42
 
 

@@ -94,6 +94,28 @@ def update_product_target(
     raise ConfigEditError(f"product has no targets: {product_key}")
 
 
+def delete_product(config_path: str | Path, product_key: str) -> ConfigEditResult:
+    path = Path(config_path)
+    raw = _load_raw_config(path)
+    products = _mapping(raw, "products")
+    targets = _target_list(raw)
+
+    if product_key not in products:
+        raise ConfigEditError(f"unknown product: {product_key}")
+    if len(products) <= 1:
+        raise ConfigEditError("cannot delete the last product")
+
+    for target in targets:
+        if not isinstance(target, dict):
+            raise ConfigEditError("targets must contain YAML mappings")
+
+    del products[product_key]
+    raw["targets"] = [target for target in targets if target.get("product_key") != product_key]
+
+    backup_path = _write_validated_config(path, raw)
+    return ConfigEditResult(product_key=product_key, backup_path=backup_path)
+
+
 def disable_product(config_path: str | Path, product_key: str) -> ConfigEditResult:
     path = Path(config_path)
     raw = _load_raw_config(path)
