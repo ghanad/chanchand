@@ -43,16 +43,26 @@ Core flow:
 
 ## Avoid Reading Everything
 
-Use this task routing to keep context small:
-- Add a new ecommerce source: read `adapters/base.py`, `adapters/generic_html.py` or one similar adapter, `adapters/__init__.py`, and `tests/test_adapters.py`.
-- Change gold/currency market parsing: read `adapters/brsapi_market.py`, `config/example.yml`, and BRSAPI tests in `tests/test_adapters.py`.
-- Change Digikala API parsing: read `adapters/digikala_api.py` and Digikala tests in `tests/test_adapters.py`.
-- Change Digikala web/HTML parsing: read `adapters/digikala_web.py` and Digikala tests in `tests/test_adapters.py`.
-- Change config format: read `config.py`, `config/example.yml`, `tests/test_config.py`, and CLI validation tests.
-- Change stored data: read `models.py`, `repository.py`, `migrations/versions/`, and repository/CLI tests.
-- Change output tables: read `cli.py` and `tests/test_cli.py`.
+Use `rg` first, then read only the matching function/class/test block. Avoid opening all of `frontend/src/main.tsx`, `frontend/src/styles.css`, or `ui.py` unless the request is broad.
+
+Task routing:
+- Add a new ecommerce source: read `adapters/base.py`, `adapters/generic_html.py` or one similar adapter, `adapters/__init__.py`, and the relevant tests in `tests/test_adapters.py`.
+- Change gold/currency market parsing: read `adapters/brsapi_market.py`, `config/example.yml`, and `test_brsapi_*` tests in `tests/test_adapters.py`.
+- Change Digikala API parsing: read `adapters/digikala_api.py` and `test_digikala_api_*` tests in `tests/test_adapters.py`.
+- Change Digikala web/HTML parsing: read `adapters/digikala_web.py` and `test_digikala_web_*` tests in `tests/test_adapters.py`.
+- Change config format: read `config.py`, `config/example.yml`, `tests/test_config.py`, and `test_cli_init_db_and_validate_config` in `tests/test_cli.py`.
+- Change safe YAML product editing: read `config_editor.py`, config edit endpoints in `ui.py`, and `tests/test_config_editor.py`.
+- Change stored data: read `models.py`, `repository.py`, `migrations/versions/`, `tests/test_repository.py`, and only CLI/UI tests that display the changed fields.
+- Change output tables: read command function(s) in `cli.py` plus matching tests in `tests/test_cli.py`.
 - Change run behavior: read `runner.py`, `repository.py`, and `tests/test_runner.py`.
-- Change local UI behavior: read `ui.py`, `config_editor.py`, `frontend/src/main.tsx`, `frontend/src/styles.css`, and UI/CLI tests.
+- Change local UI API behavior: read the matching endpoint in `ui.py`, related serializer/helper functions in the same file, and `tests/test_ui.py`.
+- Change local UI frontend: use `rg` for the component/state name in `frontend/src/main.tsx` and CSS selector in `frontend/src/styles.css`; rebuild frontend only when shipped assets in `src/price_getter/ui_dist/` must change.
+
+Useful anchors:
+- CLI commands live in `cli.py` as Typer functions: `init_db`, `validate_config`, `run`, `latest`, `history`, `errors`, `ui`.
+- UI endpoints in `ui.py`: `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, `/run-now`, and `/config/products...`.
+- UI serialization helpers in `ui.py`: `_products_payload`, `_sources_payload`, `_serialize_price`, `_serialize_error`, `_serialize_run`.
+- Adapter tests are grouped by name prefix: `test_generic_html_*`, `test_digikala_web_*`, `test_digikala_api_*`, `test_brsapi_*`.
 
 ## Local Commands
 
@@ -60,6 +70,9 @@ Use the project virtualenv when present:
 
 ```bash
 .venv/bin/pytest
+.venv/bin/pytest tests/test_adapters.py -k digikala_api
+.venv/bin/pytest tests/test_adapters.py -k brsapi
+.venv/bin/pytest tests/test_ui.py
 .venv/bin/price-getter validate-config --config config/example.yml
 .venv/bin/price-getter run --config config/example.yml
 .venv/bin/price-getter latest
