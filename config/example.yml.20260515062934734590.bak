@@ -1,0 +1,106 @@
+sources:
+  digikala_api:
+    adapter: digikala_api
+    timeout_seconds: 20
+    rate_limit_seconds: 3
+    currency: IRR
+    price_multiplier: 1
+    headers:
+      User-Agent: price-getter/0.1 (+https://example.local)
+  digikala_web:
+    adapter: digikala_web
+    timeout_seconds: 20
+    rate_limit_seconds: 3
+    currency: IRR
+    price_multiplier: 1
+    headers:
+      User-Agent: price-getter/0.1 (+https://example.local)
+  generic_demo:
+    adapter: generic_html
+    timeout_seconds: 15
+    rate_limit_seconds: 2
+    currency: TOMAN
+    price_multiplier: 10
+    settings:
+      selectors:
+        title: h1.product-title
+        price: .price
+        seller: .seller
+        availability: .availability
+  brsapi_market:
+    adapter: brsapi_market
+    timeout_seconds: 15
+    rate_limit_seconds: 2
+    currency: TOMAN
+    price_multiplier: 10
+    settings:
+      api_key_env: brsapi_api
+      cache_ttl_seconds: 30
+products:
+  smart-air-purifier-6:
+    title: دستگاه تصفیه کننده هوا میجیا مدل Smart Air Purifier 6
+  gold-18k:
+    title: طلای 18 عیار
+  gold-24k:
+    title: طلای 24 عیار
+  coin-quarter:
+    title: ربع سکه
+  coin-half:
+    title: نیم سکه
+  coin-emami:
+    title: سکه امامی
+  usd:
+    title: دلار
+  product:
+    title: سیب زرد دماوند
+  product-2:
+    title: موز
+targets:
+- product_key: smart-air-purifier-6
+  source_key: digikala_api
+  url: https://www.digikala.com/product/dkp-20769143/
+  enabled: true
+- product_key: gold-18k
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: IR_GOLD_18K
+- product_key: gold-24k
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: IR_GOLD_24K
+- product_key: coin-quarter
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: IR_COIN_QUARTER
+- product_key: coin-half
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: IR_COIN_HALF
+- product_key: coin-emami
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: IR_COIN_EMAMI
+- product_key: usd
+  source_key: brsapi_market
+  url: https://api.brsapi.ir/Market/Gold_Currency.php
+  enabled: true
+  adapter_settings:
+    symbol: USD
+- product_key: product
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-856977/
+  enabled: true
+- product_key: product-2
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-6778050
+  enabled: true

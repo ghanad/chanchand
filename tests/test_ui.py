@@ -72,6 +72,7 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     assert latest.json()["rows"][0]["price_toman"] == 1200
     assert products.json()["products"][0]["key"] == "chair"
     assert history.json()["rows"][0]["price_irr"] == 12000
+    assert history.json()["rows"][0]["url"] == "https://www.digikala.com/product/dkp-1/"
     assert runs.json()["rows"][0]["status"] == "partial"
     assert errors.json()["rows"][0]["message"] == "temporary failure"
 

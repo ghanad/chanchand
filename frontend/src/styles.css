@@ -380,6 +380,21 @@ tbody tr:last-child td {
   overflow-wrap: anywhere;
 }
 
+.table-link {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.table-link:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+.muted-cell {
+  color: var(--muted);
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;

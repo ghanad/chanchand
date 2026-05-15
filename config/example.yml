@@ -55,6 +55,12 @@ products:
     title: سیب زرد دماوند
   product-2:
     title: موز
+  product-3:
+    title: خیار
+  product-4:
+    title: گوجه فرنگی
+  product-5:
+    title: سیب قرمز
 targets:
 - product_key: smart-air-purifier-6
   source_key: digikala_api
@@ -103,4 +109,16 @@ targets:
 - product_key: product-2
   source_key: digikala_api
   url: https://www.digikala.com/fresh/product/dkp-6778050
+  enabled: true
+- product_key: product-3
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-857318
+  enabled: true
+- product_key: product-4
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-857299
+  enabled: true
+- product_key: product-5
+  source_key: digikala_api
+  url: https://www.digikala.com/fresh/product/dkp-857299
   enabled: true

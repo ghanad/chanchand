@@ -110,6 +110,19 @@ function formatDate(value: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
 }
 
+function productLinkUrl(row: Pick<PriceRow, "url">) {
+  if (!row.url) return null;
+
+  try {
+    const url = new URL(row.url);
+    if (!["http:", "https:"].includes(url.protocol)) return null;
+    if (url.hostname === "api.brsapi.ir") return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function priceAxisDomain(rows: Array<{ price: number }>): [number, number] {
   const prices = rows.map((row) => row.price);
   const min = Math.min(...prices);
@@ -908,6 +921,7 @@ function HistoryTable({ rows }: { rows: PriceRow[] }) {
         <tr>
           <th>زمان</th>
           <th>منبع</th>
+          <th>لینک</th>
           <th>تومان</th>
           <th>IRR</th>
           <th>وضعیت</th>
@@ -915,16 +929,29 @@ function HistoryTable({ rows }: { rows: PriceRow[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => (
-          <tr key={row.id}>
-            <td>{formatDate(row.observed_at)}</td>
-            <td>{row.source_key}</td>
-            <td>{formatNumber(row.price_toman)}</td>
-            <td>{formatNumber(row.price_irr)}</td>
-            <td><StatusPill text={availabilityText(row.availability)} tone={row.availability} /></td>
-            <td>{row.seller || "-"}</td>
-          </tr>
-        ))}
+        {rows.map((row) => {
+          const url = productLinkUrl(row);
+
+          return (
+            <tr key={row.id}>
+              <td>{formatDate(row.observed_at)}</td>
+              <td>{row.source_key}</td>
+              <td>
+                {url ? (
+                  <a className="table-link" href={url} target="_blank" rel="noreferrer">
+                    باز کردن
+                  </a>
+                ) : (
+                  <span className="muted-cell">-</span>
+                )}
+              </td>
+              <td>{formatNumber(row.price_toman)}</td>
+              <td>{formatNumber(row.price_irr)}</td>
+              <td><StatusPill text={availabilityText(row.availability)} tone={row.availability} /></td>
+              <td>{row.seller || "-"}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </DataTable>
   );
