@@ -37,8 +37,6 @@ sources:
       api_key_env: brsapi_api
       cache_ttl_seconds: 30
 products:
-  example-phone:
-    title: Example phone
   smart-air-purifier-6:
     title: دستگاه تصفیه کننده هوا میجیا مدل Smart Air Purifier 6
   gold-18k:
