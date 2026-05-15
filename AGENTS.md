@@ -25,6 +25,10 @@ Core flow:
 
 ## Read These First
 
+- Cross-layer orientation: `docs/architecture.md`
+- Adapter-specific guidance: `docs/adapters.md`
+- Config/database guidance: `docs/storage-config.md`
+- Local dashboard/API guidance: `docs/ui.md`
 - CLI or command behavior: `src/price_getter/cli.py`
 - YAML schema or validation: `src/price_getter/config.py` and `config/example.yml`
 - Run orchestration, HTTP client lifecycle, rate limiting: `src/price_getter/runner.py`
@@ -46,17 +50,17 @@ Core flow:
 Use `rg` first, then read only the matching function/class/test block. Avoid opening all of `frontend/src/main.tsx`, `frontend/src/styles.css`, or `ui.py` unless the request is broad.
 
 Task routing:
-- Add a new ecommerce source: read `adapters/base.py`, `adapters/generic_html.py` or one similar adapter, `adapters/__init__.py`, and the relevant tests in `tests/test_adapters.py`.
-- Change gold/currency market parsing: read `adapters/brsapi_market.py`, `config/example.yml`, and `test_brsapi_*` tests in `tests/test_adapters.py`.
-- Change Digikala API parsing: read `adapters/digikala_api.py` and `test_digikala_api_*` tests in `tests/test_adapters.py`.
-- Change Digikala web/HTML parsing: read `adapters/digikala_web.py` and `test_digikala_web_*` tests in `tests/test_adapters.py`.
-- Change config format: read `config.py`, `config/example.yml`, `tests/test_config.py`, and `test_cli_init_db_and_validate_config` in `tests/test_cli.py`.
-- Change safe YAML product editing: read `config_editor.py`, config edit endpoints in `ui.py`, and `tests/test_config_editor.py`.
-- Change stored data: read `models.py`, `repository.py`, `migrations/versions/`, `tests/test_repository.py`, and only CLI/UI tests that display the changed fields.
+- Add a new ecommerce source: read `docs/adapters.md`, `adapters/base.py`, `adapters/generic_html.py` or one similar adapter, `adapters/__init__.py`, and the relevant tests in `tests/test_adapters.py`.
+- Change gold/currency market parsing: read `docs/adapters.md`, `adapters/brsapi_market.py`, `config/example.yml`, and `test_brsapi_*` tests in `tests/test_adapters.py`.
+- Change Digikala API parsing: read `docs/adapters.md`, `adapters/digikala_api.py`, and `test_digikala_api_*` tests in `tests/test_adapters.py`.
+- Change Digikala web/HTML parsing: read `docs/adapters.md`, `adapters/digikala_web.py`, and `test_digikala_web_*` tests in `tests/test_adapters.py`.
+- Change config format: read `docs/storage-config.md`, `config.py`, `config/example.yml`, `tests/test_config.py`, and `test_cli_init_db_and_validate_config` in `tests/test_cli.py`.
+- Change safe YAML product editing: read `docs/storage-config.md`, `config_editor.py`, config edit endpoints in `ui.py`, and `tests/test_config_editor.py`.
+- Change stored data: read `docs/storage-config.md`, `models.py`, `repository.py`, `migrations/versions/`, `tests/test_repository.py`, and only CLI/UI tests that display the changed fields.
 - Change output tables: read command function(s) in `cli.py` plus matching tests in `tests/test_cli.py`.
 - Change run behavior: read `runner.py`, `repository.py`, and `tests/test_runner.py`.
-- Change local UI API behavior: read the matching endpoint in `ui.py`, related serializer/helper functions in the same file, and `tests/test_ui.py`.
-- Change local UI frontend: use `rg` for the component/state name in `frontend/src/main.tsx` and CSS selector in `frontend/src/styles.css`; rebuild frontend only when shipped assets in `src/price_getter/ui_dist/` must change.
+- Change local UI API behavior: read `docs/ui.md`, the matching endpoint in `ui.py`, related serializer/helper functions in the same file, and `tests/test_ui.py`.
+- Change local UI frontend: read `docs/ui.md`; use `rg` for the component/state name in `frontend/src/main.tsx` and CSS selector in `frontend/src/styles.css`; rebuild frontend only when shipped assets in `src/price_getter/ui_dist/` must change.
 
 Useful anchors:
 - CLI commands live in `cli.py` as Typer functions: `init_db`, `validate_config`, `run`, `latest`, `history`, `errors`, `ui`.
