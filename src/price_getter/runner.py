@@ -11,7 +11,7 @@ from price_getter.adapters import get_adapter
 from price_getter.adapters.base import FetchContext
 from price_getter.config import AppConfig, load_config
 from price_getter.db import DEFAULT_DB_URL, init_database, session_scope
-from price_getter.repository import finish_run, record_error, record_price, start_run
+from price_getter.repository import finish_run, has_successful_price_today, record_error, record_price, start_run
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,9 @@ class PriceRunner:
 
         for target in config.active_targets():
             source = config.sources[target.source_key]
+            if source.adapter != "brsapi_market" and self._has_successful_price_today(target.product_key):
+                continue
+
             adapter = get_adapter(source.adapter)
             self._respect_rate_limit(source_key=target.source_key, seconds=source.rate_limit_seconds, last_request_at=last_request_at)
 
@@ -83,3 +86,7 @@ class PriceRunner:
         wait_for = seconds - elapsed
         if wait_for > 0:
             self.sleep_func(wait_for)
+
+    def _has_successful_price_today(self, product_key: str) -> bool:
+        with session_scope(self.db_url) as session:
+            return has_successful_price_today(session, product_key)

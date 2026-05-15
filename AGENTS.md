@@ -93,6 +93,7 @@ cd frontend && npm run build
 - Prices are stored as `price_irr`.
 - `price_multiplier` normalizes parsed source values into IRR. Use `10` when source text is toman.
 - `TargetConfig.adapter_settings` overrides or supplements source-level adapter settings for one URL.
+- `PriceRunner` skips non-`brsapi_market` products after any successful same-day `price_irr`; no-price snapshots and fetch errors can be retried the same day.
 
 ## Coding Notes
 

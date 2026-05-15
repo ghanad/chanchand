@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, time, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -101,6 +101,26 @@ def record_error(
     session.add(error)
     session.commit()
     return error
+
+
+def has_successful_price_today(session: Session, product_key: str, *, now: datetime | None = None) -> bool:
+    now = now or datetime.now().astimezone()
+    if now.tzinfo is None:
+        now = now.astimezone()
+    start_of_day = datetime.combine(now.date(), time.min, tzinfo=now.tzinfo)
+    end_of_day = datetime.combine(now.date(), time.max, tzinfo=now.tzinfo)
+    start_utc = start_of_day.astimezone(timezone.utc)
+    end_utc = end_of_day.astimezone(timezone.utc)
+
+    statement = (
+        select(PriceSnapshot.id)
+        .where(PriceSnapshot.product_key == product_key)
+        .where(PriceSnapshot.price_irr.is_not(None))
+        .where(PriceSnapshot.observed_at >= start_utc)
+        .where(PriceSnapshot.observed_at <= end_utc)
+        .limit(1)
+    )
+    return session.scalars(statement).first() is not None
 
 
 def latest_snapshots(session: Session, *, limit: int = 100) -> list[PriceSnapshot]:
