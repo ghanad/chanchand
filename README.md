@@ -23,6 +23,20 @@ For BRSAPI gold/currency targets, keep the API key out of YAML and set it in `.e
 brsapi_api=your_api_key
 ```
 
+## VPS Docker Compose
+
+Prepare persistent files, then build and run the app behind Nginx:
+
+```bash
+mkdir -p data
+cp config/example.yml data/config.yml
+touch data/price_getter.db
+docker compose build
+docker compose up
+```
+
+Compose reads secrets from `.env`, including `brsapi_api`. Set `PRICE_GETTER_PUBLIC_PORT` in `.env` to publish Nginx on a port other than `80`.
+
 ## Commands
 
 - `price-getter init-db`: create SQLite tables.
