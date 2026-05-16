@@ -306,9 +306,34 @@ label {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 1.3fr) minmax(160px, 1fr) 130px;
+  grid-template-columns: minmax(180px, 1.3fr) minmax(160px, 1fr) 130px auto;
   gap: 12px;
   align-items: end;
+}
+
+.metric-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(72px, 1fr));
+  gap: 4px;
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.metric-toggle button {
+  min-height: 32px;
+  border-color: transparent;
+  background: transparent;
+  color: #647174;
+  padding: 0 10px;
+}
+
+.metric-toggle button.active {
+  border-color: var(--line);
+  background: #fff;
+  color: var(--text);
 }
 
 .product-form {

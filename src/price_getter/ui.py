@@ -32,6 +32,9 @@ from price_getter.repository import (
 )
 from price_getter.runner import PriceRunner
 
+USD_PRODUCT_KEY = "usd"
+USD_HISTORY_LIMIT = 10000
+
 
 class AddProductRequest(BaseModel):
     title: str = Field(min_length=1)
@@ -109,7 +112,8 @@ def create_app(
         init_database(db_url)
         with session_scope(db_url) as session:
             rows = product_history_chronological(session, product_key, source_key=source_key, limit=limit)
-        return {"rows": [_serialize_price(row) for row in rows]}
+            usd_rows = product_history_chronological(session, USD_PRODUCT_KEY, limit=USD_HISTORY_LIMIT)
+        return {"rows": _serialize_history_prices(rows, usd_rows)}
 
     @app.get("/api/runs")
     def api_runs(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
@@ -309,7 +313,33 @@ def _sources_payload(config: AppConfig, db_sources: list[SourceSnapshot]) -> lis
     return sorted(sources.values(), key=lambda item: item["key"])
 
 
-def _serialize_price(row: PriceSnapshot) -> dict[str, Any]:
+def _serialize_history_prices(rows: list[PriceSnapshot], usd_rows: list[PriceSnapshot]) -> list[dict[str, Any]]:
+    usd_rates = [row for row in usd_rows if row.price_irr and row.price_irr > 0 and row.observed_at]
+    return [_serialize_price(row, usd_rate_irr=_usd_rate_for(row, usd_rates)) for row in rows]
+
+
+def _usd_rate_for(row: PriceSnapshot, usd_rates: list[PriceSnapshot]) -> int | None:
+    if not usd_rates or row.observed_at is None:
+        return None
+
+    observed_at = _utc_timestamp(row.observed_at)
+    latest_before: PriceSnapshot | None = None
+    first_after: PriceSnapshot | None = None
+    for usd_rate in usd_rates:
+        if usd_rate.observed_at is None:
+            continue
+        usd_observed_at = _utc_timestamp(usd_rate.observed_at)
+        if usd_observed_at <= observed_at:
+            latest_before = usd_rate
+            continue
+        first_after = usd_rate
+        break
+
+    selected = latest_before or first_after
+    return selected.price_irr if selected else None
+
+
+def _serialize_price(row: PriceSnapshot, *, usd_rate_irr: int | None = None) -> dict[str, Any]:
     return {
         "id": row.id,
         "run_id": row.run_id,
@@ -320,6 +350,9 @@ def _serialize_price(row: PriceSnapshot) -> dict[str, Any]:
         "seller": row.seller,
         "price_irr": row.price_irr,
         "price_toman": _price_toman(row.price_irr),
+        "price_usd": _price_usd(row.price_irr, usd_rate_irr),
+        "usd_rate_irr": usd_rate_irr,
+        "usd_rate_toman": _price_toman(usd_rate_irr),
         "availability": row.availability,
         "observed_at": _datetime(row.observed_at),
     }
@@ -359,9 +392,21 @@ def _datetime(value: datetime | None) -> str | None:
     return value.isoformat()
 
 
+def _utc_timestamp(value: datetime) -> float:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.timestamp()
+
+
 def _price_toman(price_irr: int | None) -> int | float | None:
     if price_irr is None:
         return None
     if price_irr % 10 == 0:
         return price_irr // 10
     return round(price_irr / 10, 1)
+
+
+def _price_usd(price_irr: int | None, usd_rate_irr: int | None) -> float | None:
+    if price_irr is None or usd_rate_irr is None or usd_rate_irr <= 0:
+        return None
+    return round(price_irr / usd_rate_irr, 2)

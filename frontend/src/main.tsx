@@ -24,6 +24,9 @@ interface PriceRow {
   seller: string | null;
   price_irr: number | null;
   price_toman: number | null;
+  price_usd: number | null;
+  usd_rate_irr: number | null;
+  usd_rate_toman: number | null;
   availability: Availability;
   observed_at: string | null;
 }
@@ -85,6 +88,7 @@ interface ProductsPayload {
 }
 
 type Tab = "overview" | "prices" | "history" | "runs" | "products";
+type HistoryMetric = "toman" | "usd";
 
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", {
@@ -556,13 +560,18 @@ function History({
   setSelectedSource: (value: string) => void;
   setHistoryLimit: (value: string) => void;
 }) {
+  const [historyMetric, setHistoryMetric] = React.useState<HistoryMetric>("toman");
+  const metricConfig = historyMetric === "usd"
+    ? { key: "price_usd" as const, label: "دلار", suffix: "دلار", empty: "برای نمایش قیمت دلاری، نرخ دلار باید در محصول usd ثبت شده باشد." }
+    : { key: "price_toman" as const, label: "تومان", suffix: "تومان", empty: "داده‌ای برای نمودار نیست." };
   const chartRows = history.flatMap((row) => {
-    if (!Number.isFinite(row.price_toman)) return [];
+    const price = row[metricConfig.key];
+    if (!Number.isFinite(price)) return [];
 
     return [{
       time: formatDate(row.observed_at),
       source: row.source_key,
-      price: Number(row.price_toman),
+      price: Number(price),
     }];
   });
   const chartPriceDomain = chartRows.length ? priceAxisDomain(chartRows) : undefined;
@@ -602,11 +611,27 @@ function History({
               <option value="500">۵۰۰</option>
             </select>
           </label>
+          <div className="metric-toggle" aria-label="واحد نمودار">
+            <button
+              type="button"
+              className={historyMetric === "toman" ? "active" : ""}
+              onClick={() => setHistoryMetric("toman")}
+            >
+              تومان
+            </button>
+            <button
+              type="button"
+              className={historyMetric === "usd" ? "active" : ""}
+              onClick={() => setHistoryMetric("usd")}
+            >
+              دلار
+            </button>
+          </div>
         </div>
       </section>
 
       <section className="panel chart-panel">
-        <PanelHead title="روند قیمت" meta="تومان" />
+        <PanelHead title="روند قیمت" meta={metricConfig.label} />
         {chartRows.length ? (
           <ResponsiveContainer width="100%" height={360}>
             <AreaChart data={chartRows} margin={{ top: 24, right: 18, left: 18, bottom: 12 }}>
@@ -626,14 +651,14 @@ function History({
                 tick={{ fill: "#647174", fontSize: 12, dx: -40 }}
               />
               <Tooltip
-                formatter={(value) => [`${numberFormatter.format(Number(value))} تومان`, "قیمت"]}
+                formatter={(value) => [`${numberFormatter.format(Number(value))} ${metricConfig.suffix}`, "قیمت"]}
                 labelFormatter={(value) => `زمان: ${value}`}
               />
               <Area type="monotone" dataKey="price" stroke="#0f766e" strokeWidth={3} fill="url(#priceFill)" />
             </AreaChart>
           </ResponsiveContainer>
         ) : (
-          <EmptyState text="داده‌ای برای نمودار نیست." />
+          <EmptyState text={metricConfig.empty} />
         )}
       </section>
 
@@ -923,6 +948,8 @@ function HistoryTable({ rows }: { rows: PriceRow[] }) {
           <th>منبع</th>
           <th>لینک</th>
           <th>تومان</th>
+          <th>دلار</th>
+          <th>نرخ دلار</th>
           <th>IRR</th>
           <th>وضعیت</th>
           <th>فروشنده</th>
@@ -946,6 +973,8 @@ function HistoryTable({ rows }: { rows: PriceRow[] }) {
                 )}
               </td>
               <td>{formatNumber(row.price_toman)}</td>
+              <td>{formatNumber(row.price_usd)}</td>
+              <td>{formatNumber(row.usd_rate_toman)}</td>
               <td>{formatNumber(row.price_irr)}</td>
               <td><StatusPill text={availabilityText(row.availability)} tone={row.availability} /></td>
               <td>{row.seller || "-"}</td>

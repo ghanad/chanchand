@@ -8,6 +8,7 @@ Read this when changing the local dashboard or its JSON API.
 - API endpoints: `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, `/run-now`, `/config/products...`
 - Payload helpers: `_products_payload`, `_sources_payload`
 - Serializers: `_serialize_price`, `_serialize_error`, `_serialize_run`
+- History price rows include `price_toman`, `price_usd`, and `usd_rate_toman`; `price_usd` is calculated from the configured `usd` product history.
 - UI tests: `tests/test_ui.py`
 
 Use `rg` for the endpoint or helper name before reading the whole file.

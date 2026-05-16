@@ -16,14 +16,24 @@ def write_config(path) -> None:
 sources:
   digikala_api:
     adapter: digikala_api
+  brsapi_market:
+    adapter: brsapi_market
 products:
   chair:
     title: Chair
+  usd:
+    title: Dollar
 targets:
   - product_key: chair
     source_key: digikala_api
     url: "https://www.digikala.com/product/dkp-1/"
     enabled: true
+  - product_key: usd
+    source_key: brsapi_market
+    url: "https://api.brsapi.ir/Market/Gold_Currency.php"
+    enabled: true
+    adapter_settings:
+      symbol: USD
 """,
         encoding="utf-8",
     )
@@ -32,22 +42,30 @@ targets:
 def seed_database(db_url: str) -> None:
     init_database(db_url)
     config = AppConfig(
-        sources={"digikala_api": SourceConfig(adapter="digikala_api")},
-        products={"chair": ProductConfig(title="Chair")},
+        sources={"digikala_api": SourceConfig(adapter="digikala_api"), "brsapi_market": SourceConfig(adapter="brsapi_market")},
+        products={"chair": ProductConfig(title="Chair"), "usd": ProductConfig(title="Dollar")},
         targets=[
             TargetConfig(
                 product_key="chair",
                 source_key="digikala_api",
                 url="https://www.digikala.com/product/dkp-1/",
-            )
+            ),
+            TargetConfig(
+                product_key="usd",
+                source_key="brsapi_market",
+                url="https://api.brsapi.ir/Market/Gold_Currency.php",
+                adapter_settings={"symbol": "USD"},
+            ),
         ],
     )
-    target = config.targets[0]
+    chair_target = config.targets[0]
+    usd_target = config.targets[1]
     with session_scope(db_url) as session:
         run = start_run(session, "config.yml", config)
-        record_price(session, run.id, target, PriceObservation(title="Chair", seller="Shop", price_irr=12000, availability="in_stock"))
-        record_error(session, run.id, target, RuntimeError("temporary failure"))
-        finish_run(session, run.id, success_count=1, error_count=1)
+        record_price(session, run.id, chair_target, PriceObservation(title="Chair", seller="Shop", price_irr=12000, availability="in_stock"))
+        record_price(session, run.id, usd_target, PriceObservation(title="Dollar", seller="BRS API", price_irr=600000, availability="in_stock"))
+        record_error(session, run.id, chair_target, RuntimeError("temporary failure"))
+        finish_run(session, run.id, success_count=2, error_count=1)
 
 
 def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
@@ -69,9 +87,12 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     assert "Price Getter" in page.text
     assert "/assets/" in page.text
     assert font.status_code == 200
-    assert latest.json()["rows"][0]["price_toman"] == 1200
+    latest_chair = next(row for row in latest.json()["rows"] if row["product_key"] == "chair")
+    assert latest_chair["price_toman"] == 1200
     assert products.json()["products"][0]["key"] == "chair"
     assert history.json()["rows"][0]["price_irr"] == 12000
+    assert history.json()["rows"][0]["price_usd"] == 0.02
+    assert history.json()["rows"][0]["usd_rate_toman"] == 60000
     assert history.json()["rows"][0]["url"] == "https://www.digikala.com/product/dkp-1/"
     assert runs.json()["rows"][0]["status"] == "partial"
     assert errors.json()["rows"][0]["message"] == "temporary failure"
