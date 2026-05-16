@@ -37,8 +37,9 @@ Core flow:
 - Database queries/writes: `src/price_getter/repository.py`
 - Local web UI backend and JSON endpoints: `src/price_getter/ui.py`
 - Local web UI frontend: `frontend/src/main.tsx`, `frontend/src/styles.css`, `frontend/vite.config.ts`; built assets are emitted to `src/price_getter/ui_dist/`
+- Deployment and VPS operations: `docs/deploy.md`
 - Container/VPS packaging: root `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `nginx/price-getter.conf`
-- Nginx Basic Auth for admin routes uses host-mounted `data/.htpasswd-price-getter`; creation command is documented in `README.md`.
+- Nginx Basic Auth for admin routes uses host-mounted `data/.htpasswd-price-getter`; creation and ops commands are documented in `docs/deploy.md`.
 - Safe YAML product edits: `src/price_getter/config_editor.py`
 - Price parsing, Persian/Arabic digits, stock text: `src/price_getter/pricing.py`
 - Adapter interface and HTTP request helper: `src/price_getter/adapters/base.py`
@@ -64,10 +65,11 @@ Task routing:
 - Change run behavior: read `runner.py`, `repository.py`, and `tests/test_runner.py`.
 - Change local UI API behavior: read `docs/ui.md`, the matching endpoint in `ui.py`, related serializer/helper functions in the same file, and `tests/test_ui.py`.
 - Change local UI frontend: read `docs/ui.md`; use `rg` for the component/state name in `frontend/src/main.tsx` and CSS selector in `frontend/src/styles.css`; rebuild frontend only when shipped assets in `src/price_getter/ui_dist/` must change.
+- Change deployment, production operations, Docker, Compose, Nginx, or backups: read `docs/deploy.md`, `Dockerfile`, `docker-compose.yml`, `nginx/price-getter.conf`, and relevant README pointers.
 
 Useful anchors:
 - CLI commands live in `cli.py` as Typer functions: `init_db`, `validate_config`, `run`, `latest`, `history`, `errors`, `ui`.
-- UI routes/endpoints in `ui.py`: `/`, `/admin`, public reads under `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, and admin writes under `/admin/run-now` and `/admin/config/products...`.
+- UI route model: `/` and `/assets/*` are public UI assets; `GET`/`HEAD /api/*` are public read-only JSON APIs; `/admin` and `/admin/*` are Nginx Basic Auth protected admin UI and mutating endpoints, including `/admin/run-now` and `/admin/config/products...`.
 - UI serialization helpers in `ui.py`: `_products_payload`, `_sources_payload`, `_serialize_price`, `_serialize_error`, `_serialize_run`.
 - Adapter tests are grouped by name prefix: `test_generic_html_*`, `test_digikala_web_*`, `test_digikala_api_*`, `test_brsapi_*`.
 
@@ -92,8 +94,17 @@ docker run --rm -p 8000:8000 -v "$PWD/config/example.yml:/data/config.yml:ro" pr
 docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter
 docker compose build
 docker compose up
+docker compose up -d
+docker compose ps
+docker compose logs -f app
+docker compose logs -f scheduler
+docker compose run --rm app price-getter validate-config --config /data/config.yml
+docker compose run --rm app price-getter init-db --db-url sqlite:////data/price_getter.db
 PRICE_GETTER_RUN_INTERVAL_SECONDS=3600 docker compose up scheduler
 docker compose run --rm app price-getter run --config /data/config.yml
+docker compose run --rm app price-getter latest --db-url sqlite:////data/price_getter.db
+docker compose run --rm app price-getter errors --db-url sqlite:////data/price_getter.db
+docker compose exec app python -c "import sqlite3; src=sqlite3.connect('/data/price_getter.db'); dst=sqlite3.connect('/data/price_getter.backup.db'); src.backup(dst); dst.close(); src.close()"
 ```
 
 ## Config Notes
