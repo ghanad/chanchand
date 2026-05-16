@@ -26,7 +26,13 @@ Use `rg` for the endpoint or helper name before reading the whole file.
 Minimal Nginx boundary:
 
 ```nginx
-location /admin {
+location = /admin {
+    auth_basic "Price Getter Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd-price-getter;
+    proxy_pass http://127.0.0.1:8000;
+}
+
+location ^~ /admin/ {
     auth_basic "Price Getter Admin";
     auth_basic_user_file /etc/nginx/.htpasswd-price-getter;
     proxy_pass http://127.0.0.1:8000;

@@ -89,6 +89,7 @@ interface ProductsPayload {
 
 type Tab = "overview" | "prices" | "history" | "runs" | "products";
 type HistoryMetric = "toman" | "usd";
+type AppMode = "public" | "admin";
 
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", {
@@ -104,8 +105,9 @@ const tabs: Array<{ id: Tab; label: string }> = [
   { id: "products", label: "محصولات" },
 ];
 
-function isAdminPath() {
-  return window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
+function appModeFromPath(): AppMode {
+  const path = window.location.pathname;
+  return path === "/admin" || path.startsWith("/admin/") ? "admin" : "public";
 }
 
 function formatNumber(value: number | null | undefined) {
@@ -175,7 +177,8 @@ async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T
 }
 
 function App() {
-  const isAdmin = isAdminPath();
+  const mode = appModeFromPath();
+  const isAdmin = mode === "admin";
   const [activeTab, setActiveTab] = React.useState<Tab>("overview");
   const [latest, setLatest] = React.useState<LatestPayload | null>(null);
   const [products, setProducts] = React.useState<ProductRow[]>([]);
@@ -264,6 +267,7 @@ function App() {
   const configuredSources = sources.filter((source) => source.configured);
 
   async function runNow() {
+    if (!isAdmin) return;
     setBusyAction("run");
     try {
       const result = await requestJson<{ run_id: number; status: RunStatus }>("/admin/run-now", { method: "POST" });
@@ -278,6 +282,7 @@ function App() {
 
   async function addProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isAdmin) return;
     setBusyAction("add");
     try {
       const result = await requestJson<{ product_key: string; backup_path: string }>("/admin/config/products", {
@@ -300,6 +305,7 @@ function App() {
   }
 
   function startEditProduct(product: ProductRow) {
+    if (!isAdmin) return;
     if (!product.primary_target) return;
     setEditProductKey(product.key);
     setEditForm({
@@ -316,6 +322,7 @@ function App() {
 
   async function updateProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!isAdmin) return;
     if (!editProductKey) return;
     setBusyAction(`edit:${editProductKey}`);
     try {
@@ -341,6 +348,7 @@ function App() {
   }
 
   async function disableProduct(productKey: string) {
+    if (!isAdmin) return;
     if (!productKey) return;
     setBusyAction(`disable:${productKey}`);
     try {
@@ -358,6 +366,7 @@ function App() {
   }
 
   async function enableProduct(productKey: string) {
+    if (!isAdmin) return;
     if (!productKey) return;
     setBusyAction(`enable:${productKey}`);
     try {
@@ -375,6 +384,7 @@ function App() {
   }
 
   async function deleteProduct(product: ProductRow) {
+    if (!isAdmin) return;
     if (!product.key) return;
     const confirmed = window.confirm(`محصول «${product.title}» از config حذف شود؟`);
     if (!confirmed) return;

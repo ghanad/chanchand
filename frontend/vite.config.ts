@@ -11,8 +11,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": "http://127.0.0.1:8000",
-      "/config": "http://127.0.0.1:8000",
-      "/run-now": "http://127.0.0.1:8000",
+      "/admin": "http://127.0.0.1:8000",
       "/font-assets": "http://127.0.0.1:8000",
     },
   },

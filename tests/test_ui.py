@@ -77,6 +77,7 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
 
     page = client.get("/")
     admin_page = client.get("/admin")
+    admin_refresh = client.get("/admin/products")
     latest = client.get("/api/latest")
     products = client.get("/api/products")
     history = client.get("/api/history", params={"product_key": "chair"})
@@ -86,8 +87,10 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
 
     assert page.status_code == 200
     assert admin_page.status_code == 200
+    assert admin_refresh.status_code == 200
     assert "Price Getter" in page.text
     assert "Price Getter" in admin_page.text
+    assert "Price Getter" in admin_refresh.text
     assert "/assets/" in page.text
     assert font.status_code == 200
     assert latest.status_code == 200
