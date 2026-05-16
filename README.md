@@ -31,11 +31,24 @@ Prepare persistent files, then build and run the app behind Nginx:
 mkdir -p data
 cp config/example.yml data/config.yml
 touch data/price_getter.db
+docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter
 docker compose build
 docker compose up
 ```
 
 Compose reads secrets from `.env`, including `brsapi_api`. Set `PRICE_GETTER_PUBLIC_PORT` in `.env` to publish Nginx on a port other than `80`.
+
+Nginx serves `/` and `/api/*` publicly, while `/admin` and direct mutating calls such as `/admin/run-now` require Basic Auth from `data/.htpasswd-price-getter`. Smoke-test the boundary over HTTP before adding TLS:
+
+```bash
+curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/
+curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/api/latest
+curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin
+curl -i -X POST http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin/run-now
+curl -i -u admin:change-this-password http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin
+```
+
+For TLS, keep this HTTP server for local/VPS smoke tests, then either let Certbot add a `listen 443 ssl` server using the same location rules and redirect port 80 to HTTPS, or terminate TLS at an external proxy/load balancer and forward plain HTTP to this Nginx service.
 
 ## Commands
 

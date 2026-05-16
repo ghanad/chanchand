@@ -22,6 +22,9 @@ Use `rg` for the endpoint or helper name before reading the whole file.
 - Mutating routes are admin-only at the reverse proxy: `/admin/run-now` and `/admin/config/products...`.
 - Admin users can run collection manually and add, edit, delete, enable, or disable products.
 - Authentication is handled by Nginx Basic Auth for `/admin`, `/admin/run-now`, and `/admin/config/products...`.
+- The compose setup mounts `./data/.htpasswd-price-getter` into Nginx. Generate it outside the image, for example: `docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter`.
+- The app has no websocket endpoints; do not add websocket proxy headers unless a future route needs them.
+- TLS can be added by Certbot with a `listen 443 ssl` server that keeps these same location rules, or by external TLS termination in front of this Nginx service.
 - Do not add application user accounts, sessions, or cookies in this phase.
 - Container-friendly startup can rely on `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_HOST`, and `PRICE_GETTER_PORT`; explicit CLI flags still override these env vars.
 
@@ -37,6 +40,13 @@ location = /admin {
 location ^~ /admin/ {
     auth_basic "Price Getter Admin";
     auth_basic_user_file /etc/nginx/.htpasswd-price-getter;
+    proxy_pass http://127.0.0.1:8000;
+}
+
+location ^~ /api/ {
+    limit_except GET HEAD {
+        deny all;
+    }
     proxy_pass http://127.0.0.1:8000;
 }
 

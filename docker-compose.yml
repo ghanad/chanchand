@@ -36,4 +36,5 @@ services:
       - "${PRICE_GETTER_PUBLIC_PORT:-80}:80"
     volumes:
       - ./nginx/price-getter.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./data/.htpasswd-price-getter:/etc/nginx/.htpasswd-price-getter:ro
     restart: unless-stopped

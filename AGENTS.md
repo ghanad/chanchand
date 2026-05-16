@@ -38,6 +38,7 @@ Core flow:
 - Local web UI backend and JSON endpoints: `src/price_getter/ui.py`
 - Local web UI frontend: `frontend/src/main.tsx`, `frontend/src/styles.css`, `frontend/vite.config.ts`; built assets are emitted to `src/price_getter/ui_dist/`
 - Container/VPS packaging: root `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `nginx/price-getter.conf`
+- Nginx Basic Auth for admin routes uses host-mounted `data/.htpasswd-price-getter`; creation command is documented in `README.md`.
 - Safe YAML product edits: `src/price_getter/config_editor.py`
 - Price parsing, Persian/Arabic digits, stock text: `src/price_getter/pricing.py`
 - Adapter interface and HTTP request helper: `src/price_getter/adapters/base.py`
@@ -88,6 +89,7 @@ cd frontend && npm install
 cd frontend && npm run build
 docker build -t price-getter:local .
 docker run --rm -p 8000:8000 -v "$PWD/config/example.yml:/data/config.yml:ro" price-getter:local
+docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter
 docker compose build
 docker compose up
 ```

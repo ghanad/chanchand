@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .venv/
 .env
+data/.htpasswd-price-getter
 node_modules/
 *.db
 *.sqlite
