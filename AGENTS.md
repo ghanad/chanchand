@@ -92,12 +92,15 @@ docker run --rm -p 8000:8000 -v "$PWD/config/example.yml:/data/config.yml:ro" pr
 docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter
 docker compose build
 docker compose up
+PRICE_GETTER_RUN_INTERVAL_SECONDS=3600 docker compose up scheduler
+docker compose run --rm app price-getter run --config /data/config.yml
 ```
 
 ## Config Notes
 
 - Source adapter names currently allowed by config: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`.
 - Runtime env defaults for CLI/UI live in `runtime.py`: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_HOST`, `PRICE_GETTER_PORT`; explicit CLI options override them.
+- Docker Compose includes a `scheduler` service that shares the app's `/data/config.yml` and `/data/price_getter.db` mounts and repeats `price-getter run --config /data/config.yml`; tune with `PRICE_GETTER_RUN_INTERVAL_SECONDS` (default `3600`).
 - `digikala` is a backward-compatible alias for `digikala_api`.
 - `brsapi_market` targets select one item with `adapter_settings.symbol` or `adapter_settings.name`; default API key env name is `brsapi_api`.
 - Prices are stored as `price_irr`.

@@ -36,7 +36,13 @@ docker compose build
 docker compose up
 ```
 
-Compose reads secrets from `.env`, including `brsapi_api`. Set `PRICE_GETTER_PUBLIC_PORT` in `.env` to publish Nginx on a port other than `80`.
+Compose starts the web app, Nginx, and a `scheduler` service. The scheduler uses the same `/data/config.yml` and `/data/price_getter.db` mounts as the web app, then runs `price-getter run --config /data/config.yml` every `PRICE_GETTER_RUN_INTERVAL_SECONDS` seconds. Compose reads secrets from `.env`, including `brsapi_api`; set `PRICE_GETTER_RUN_INTERVAL_SECONDS=3600` there to change the collection interval. Set `PRICE_GETTER_PUBLIC_PORT` in `.env` to publish Nginx on a port other than `80`.
+
+Run a one-off collection against the same compose config and SQLite DB with:
+
+```bash
+docker compose run --rm app price-getter run --config /data/config.yml
+```
 
 Nginx serves `/` and `/api/*` publicly, while `/admin` and direct mutating calls such as `/admin/run-now` require Basic Auth from `data/.htpasswd-price-getter`. Smoke-test the boundary over HTTP before adding TLS:
 

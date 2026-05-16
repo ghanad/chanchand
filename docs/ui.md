@@ -27,6 +27,7 @@ Use `rg` for the endpoint or helper name before reading the whole file.
 - TLS can be added by Certbot with a `listen 443 ssl` server that keeps these same location rules, or by external TLS termination in front of this Nginx service.
 - Do not add application user accounts, sessions, or cookies in this phase.
 - Container-friendly startup can rely on `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_HOST`, and `PRICE_GETTER_PORT`; explicit CLI flags still override these env vars.
+- The compose `scheduler` service shares the web app's `/data/config.yml` and SQLite DB mounts, and runs collection on `PRICE_GETTER_RUN_INTERVAL_SECONDS` with a default of `3600`.
 
 Minimal Nginx boundary:
 
