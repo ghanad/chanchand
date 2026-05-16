@@ -304,6 +304,10 @@ label {
   align-items: start;
 }
 
+.product-grid.read-only {
+  grid-template-columns: 1fr;
+}
+
 .toolbar {
   display: grid;
   grid-template-columns: minmax(180px, 1.3fr) minmax(160px, 1fr) 130px auto;

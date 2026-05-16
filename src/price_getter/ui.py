@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import APIRouter, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -67,12 +67,18 @@ def create_app(
     font_dir = package_dir.parents[1] / "IranSansX"
     if font_dir.exists():
         app.mount("/font-assets", StaticFiles(directory=str(font_dir)), name="font-assets")
+    api_router = APIRouter(prefix="/api", tags=["public"])
+    admin_router = APIRouter(prefix="/admin", tags=["admin"])
 
     @app.get("/", response_class=HTMLResponse)
     def index() -> FileResponse:
         return _ui_index_response(ui_index)
 
-    @app.get("/api/latest")
+    @app.get("/admin", response_class=HTMLResponse)
+    def admin_index() -> FileResponse:
+        return _ui_index_response(ui_index)
+
+    @api_router.get("/latest")
     def api_latest() -> dict[str, Any]:
         config = _load_config_or_400(config_path)
         init_database(db_url)
@@ -91,7 +97,7 @@ def create_app(
             "rows": [_serialize_price(row) for row in rows],
         }
 
-    @app.get("/api/products")
+    @api_router.get("/products")
     def api_products() -> dict[str, Any]:
         config = _load_config_or_400(config_path)
         init_database(db_url)
@@ -103,7 +109,7 @@ def create_app(
             "sources": _sources_payload(config, db_sources),
         }
 
-    @app.get("/api/history")
+    @api_router.get("/history")
     def api_history(
         product_key: str = Query(min_length=1),
         source_key: str | None = None,
@@ -115,21 +121,21 @@ def create_app(
             usd_rows = product_history_chronological(session, USD_PRODUCT_KEY, limit=USD_HISTORY_LIMIT)
         return {"rows": _serialize_history_prices(rows, usd_rows)}
 
-    @app.get("/api/runs")
+    @api_router.get("/runs")
     def api_runs(limit: int = Query(default=20, ge=1, le=100)) -> dict[str, Any]:
         init_database(db_url)
         with session_scope(db_url) as session:
             rows = recent_runs(session, limit=limit)
         return {"rows": [_serialize_run(row) for row in rows]}
 
-    @app.get("/api/errors")
+    @api_router.get("/errors")
     def api_errors(limit: int = Query(default=50, ge=1, le=200)) -> dict[str, Any]:
         init_database(db_url)
         with session_scope(db_url) as session:
             rows = recent_errors(session, limit=limit)
         return {"rows": [_serialize_error(row) for row in rows]}
 
-    @app.post("/run-now")
+    @admin_router.post("/run-now")
     def run_now() -> dict[str, Any]:
         try:
             summary = PriceRunner(db_url=db_url).run_config_file(config_path)
@@ -143,7 +149,7 @@ def create_app(
             "status": summary.status,
         }
 
-    @app.post("/config/products")
+    @admin_router.post("/config/products")
     def add_product(payload: AddProductRequest) -> dict[str, Any]:
         try:
             result = add_product_target(
@@ -156,7 +162,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
-    @app.put("/config/products/{product_key}")
+    @admin_router.put("/config/products/{product_key}")
     def update_product(product_key: str, payload: UpdateProductRequest) -> dict[str, Any]:
         try:
             result = update_product_target(
@@ -170,7 +176,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
-    @app.delete("/config/products/{product_key}")
+    @admin_router.delete("/config/products/{product_key}")
     def delete_product_endpoint(product_key: str) -> dict[str, Any]:
         try:
             result = delete_product(config_path, product_key)
@@ -178,7 +184,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
-    @app.post("/config/products/{product_key}/disable")
+    @admin_router.post("/config/products/{product_key}/disable")
     def disable_product_endpoint(product_key: str) -> dict[str, Any]:
         try:
             result = disable_product(config_path, product_key)
@@ -186,13 +192,16 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
 
-    @app.post("/config/products/{product_key}/enable")
+    @admin_router.post("/config/products/{product_key}/enable")
     def enable_product_endpoint(product_key: str) -> dict[str, Any]:
         try:
             result = enable_product(config_path, product_key)
         except ConfigEditError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"product_key": result.product_key, "backup_path": str(result.backup_path)}
+
+    app.include_router(api_router)
+    app.include_router(admin_router)
 
     @app.get("/{path:path}", response_class=HTMLResponse)
     def spa_fallback(path: str) -> FileResponse:

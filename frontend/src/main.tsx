@@ -104,6 +104,10 @@ const tabs: Array<{ id: Tab; label: string }> = [
   { id: "products", label: "محصولات" },
 ];
 
+function isAdminPath() {
+  return window.location.pathname === "/admin" || window.location.pathname.startsWith("/admin/");
+}
+
 function formatNumber(value: number | null | undefined) {
   return value === null || value === undefined ? "-" : numberFormatter.format(value);
 }
@@ -171,6 +175,7 @@ async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T
 }
 
 function App() {
+  const isAdmin = isAdminPath();
   const [activeTab, setActiveTab] = React.useState<Tab>("overview");
   const [latest, setLatest] = React.useState<LatestPayload | null>(null);
   const [products, setProducts] = React.useState<ProductRow[]>([]);
@@ -261,7 +266,7 @@ function App() {
   async function runNow() {
     setBusyAction("run");
     try {
-      const result = await requestJson<{ run_id: number; status: RunStatus }>("/run-now", { method: "POST" });
+      const result = await requestJson<{ run_id: number; status: RunStatus }>("/admin/run-now", { method: "POST" });
       showToast(`Run ${numberFormatter.format(result.run_id)} ${statusText(result.status)} شد.`);
       await refreshAll();
     } catch (error) {
@@ -275,7 +280,7 @@ function App() {
     event.preventDefault();
     setBusyAction("add");
     try {
-      const result = await requestJson<{ product_key: string; backup_path: string }>("/config/products", {
+      const result = await requestJson<{ product_key: string; backup_path: string }>("/admin/config/products", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
@@ -315,7 +320,7 @@ function App() {
     setBusyAction(`edit:${editProductKey}`);
     try {
       const result = await requestJson<{ product_key: string; backup_path: string }>(
-        `/config/products/${encodeURIComponent(editProductKey)}`,
+        `/admin/config/products/${encodeURIComponent(editProductKey)}`,
         {
           method: "PUT",
           body: JSON.stringify({
@@ -340,7 +345,7 @@ function App() {
     setBusyAction(`disable:${productKey}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/config/products/${encodeURIComponent(productKey)}/disable`,
+        `/admin/config/products/${encodeURIComponent(productKey)}/disable`,
         { method: "POST" },
       );
       showToast(`محصول ${result.product_key} غیرفعال شد.`);
@@ -357,7 +362,7 @@ function App() {
     setBusyAction(`enable:${productKey}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/config/products/${encodeURIComponent(productKey)}/enable`,
+        `/admin/config/products/${encodeURIComponent(productKey)}/enable`,
         { method: "POST" },
       );
       showToast(`محصول ${result.product_key} فعال شد.`);
@@ -377,7 +382,7 @@ function App() {
     setBusyAction(`delete:${product.key}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/config/products/${encodeURIComponent(product.key)}`,
+        `/admin/config/products/${encodeURIComponent(product.key)}`,
         { method: "DELETE" },
       );
       showToast(`محصول ${result.product_key} حذف شد.`);
@@ -429,9 +434,11 @@ function App() {
             <button className="secondary-button" type="button" onClick={refreshAll} disabled={loading}>
               تازه‌سازی
             </button>
-            <button className="primary-button" type="button" onClick={runNow} disabled={busyAction === "run"}>
-              {busyAction === "run" ? "در حال اجرا" : "اجرای جمع‌آوری"}
-            </button>
+            {isAdmin ? (
+              <button className="primary-button" type="button" onClick={runNow} disabled={busyAction === "run"}>
+                {busyAction === "run" ? "در حال اجرا" : "اجرای جمع‌آوری"}
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -470,6 +477,7 @@ function App() {
             enableProduct={enableProduct}
             deleteProduct={deleteProduct}
             busyAction={busyAction}
+            isAdmin={isAdmin}
           />
         )}
 
@@ -701,6 +709,7 @@ function Products({
   enableProduct,
   deleteProduct,
   busyAction,
+  isAdmin,
 }: {
   products: ProductRow[];
   configuredSources: SourceRow[];
@@ -717,6 +726,7 @@ function Products({
   enableProduct: (productKey: string) => void;
   deleteProduct: (product: ProductRow) => void;
   busyAction: string | null;
+  isAdmin: boolean;
 }) {
   const activeTargetCount = products.reduce((total, product) => total + product.enabled_target_count, 0);
   const targetCount = products.reduce((total, product) => total + product.target_count, 0);
@@ -733,46 +743,48 @@ function Products({
         <Metric label="منبع‌های config" value={formatNumber(configuredSources.length)} />
       </section>
 
-      <div className="product-grid">
-        <section className="panel product-form-panel">
-          <PanelHead title="افزودن محصول" />
-          <form className="product-form" onSubmit={addProduct}>
-            <label>
-              عنوان
-              <input
-                value={form.title}
-                onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                autoComplete="off"
-                required
-              />
-            </label>
-            <label>
-              URL
-              <input
-                value={form.url}
-                onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
-                type="url"
-                required
-              />
-            </label>
-            <label>
-              منبع
-              <select
-                value={form.source_key}
-                onChange={(event) => setForm((current) => ({ ...current, source_key: event.target.value }))}
-              >
-                {configuredSources.map((source) => (
-                  <option key={source.key} value={source.key}>
-                    {source.key} ({source.adapter})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="primary-button product-submit" type="submit" disabled={busyAction === "add"}>
-              {busyAction === "add" ? "در حال افزودن" : "اضافه کردن"}
-            </button>
-          </form>
-        </section>
+      <div className={`product-grid ${isAdmin ? "" : "read-only"}`}>
+        {isAdmin ? (
+          <section className="panel product-form-panel">
+            <PanelHead title="افزودن محصول" />
+            <form className="product-form" onSubmit={addProduct}>
+              <label>
+                عنوان
+                <input
+                  value={form.title}
+                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+                  autoComplete="off"
+                  required
+                />
+              </label>
+              <label>
+                URL
+                <input
+                  value={form.url}
+                  onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
+                  type="url"
+                  required
+                />
+              </label>
+              <label>
+                منبع
+                <select
+                  value={form.source_key}
+                  onChange={(event) => setForm((current) => ({ ...current, source_key: event.target.value }))}
+                >
+                  {configuredSources.map((source) => (
+                    <option key={source.key} value={source.key}>
+                      {source.key} ({source.adapter})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="primary-button product-submit" type="submit" disabled={busyAction === "add"}>
+                {busyAction === "add" ? "در حال افزودن" : "اضافه کردن"}
+              </button>
+            </form>
+          </section>
+        ) : null}
         <section className="panel product-list-panel">
           <PanelHead title="محصول‌های config" meta={`${formatNumber(configuredProductCount)} محصول`} />
           <div className="product-list">
@@ -853,32 +865,36 @@ function Products({
                       </div>
                       <div className="product-meta">
                         <span>{formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)} هدف فعال</span>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={() => startEditProduct(product)}
-                          disabled={!product.primary_target || busyAction !== null}
-                        >
-                          ویرایش
-                        </button>
-                        <button
-                          className={isActive ? "danger-button" : "secondary-button"}
-                          type="button"
-                          onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
-                          disabled={!canToggle || actionBusy || busyAction === `delete:${product.key}`}
-                        >
-                          {actionBusy
-                            ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
-                            : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
-                        </button>
-                        <button
-                          className="danger-button"
-                          type="button"
-                          onClick={() => deleteProduct(product)}
-                          disabled={!canDelete || deleteBusy || busyAction !== null}
-                        >
-                          {deleteBusy ? "در حال حذف" : "حذف"}
-                        </button>
+                        {isAdmin ? (
+                          <>
+                            <button
+                              className="secondary-button"
+                              type="button"
+                              onClick={() => startEditProduct(product)}
+                              disabled={!product.primary_target || busyAction !== null}
+                            >
+                              ویرایش
+                            </button>
+                            <button
+                              className={isActive ? "danger-button" : "secondary-button"}
+                              type="button"
+                              onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
+                              disabled={!canToggle || actionBusy || busyAction === `delete:${product.key}`}
+                            >
+                              {actionBusy
+                                ? isActive ? "در حال غیرفعال‌سازی" : "در حال فعال‌سازی"
+                                : isActive ? "غیرفعال کردن" : canToggle ? "فعال کردن" : "بدون هدف"}
+                            </button>
+                            <button
+                              className="danger-button"
+                              type="button"
+                              onClick={() => deleteProduct(product)}
+                              disabled={!canDelete || deleteBusy || busyAction !== null}
+                            >
+                              {deleteBusy ? "در حال حذف" : "حذف"}
+                            </button>
+                          </>
+                        ) : null}
                       </div>
                     </>
                   )}

@@ -5,13 +5,34 @@ Read this when changing the local dashboard or its JSON API.
 ## Backend
 
 - FastAPI app factory: `src/price_getter/ui.py:create_app`
-- API endpoints: `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, `/run-now`, `/config/products...`
+- Routes/endpoints: `/`, `/admin`, public reads under `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, and admin writes under `/admin/run-now` and `/admin/config/products...`
 - Payload helpers: `_products_payload`, `_sources_payload`
 - Serializers: `_serialize_price`, `_serialize_error`, `_serialize_run`
 - History price rows include `price_toman`, `price_usd`, and `usd_rate_toman`; `price_usd` is calculated from the configured `usd` product history.
 - UI tests: `tests/test_ui.py`
 
 Use `rg` for the endpoint or helper name before reading the whole file.
+
+## Production Access Model
+
+- `/` serves the public read-only dashboard.
+- `/admin` serves the admin dashboard. Put this path behind Nginx Basic Auth in production.
+- `/api/*` exposes read-only JSON APIs publicly. Public users can view latest prices, history, products, runs, and errors.
+- Mutating routes are admin-only at the reverse proxy: `/admin/run-now` and `/admin/config/products...`.
+- Admin users can run collection manually and add, edit, delete, enable, or disable products.
+- Authentication is handled by Nginx Basic Auth for `/admin`, `/admin/run-now`, and `/admin/config/products...`.
+- Do not add application user accounts, sessions, or cookies in this phase.
+
+Minimal Nginx boundary:
+
+```nginx
+location /admin {
+    auth_basic "Price Getter Admin";
+    auth_basic_user_file /etc/nginx/.htpasswd-price-getter;
+    proxy_pass http://127.0.0.1:8000;
+}
+
+```
 
 ## Frontend
 

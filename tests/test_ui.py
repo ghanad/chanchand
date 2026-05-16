@@ -76,6 +76,7 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     client = TestClient(create_app(config_path=config_path, db_url=db_url))
 
     page = client.get("/")
+    admin_page = client.get("/admin")
     latest = client.get("/api/latest")
     products = client.get("/api/products")
     history = client.get("/api/history", params={"product_key": "chair"})
@@ -84,9 +85,16 @@ def test_ui_serves_dashboard_and_json_endpoints(tmp_path) -> None:
     font = client.get("/font-assets/Webfonts/fonts/woff2/IRANSansX-Regular.woff2")
 
     assert page.status_code == 200
+    assert admin_page.status_code == 200
     assert "Price Getter" in page.text
+    assert "Price Getter" in admin_page.text
     assert "/assets/" in page.text
     assert font.status_code == 200
+    assert latest.status_code == 200
+    assert products.status_code == 200
+    assert history.status_code == 200
+    assert runs.status_code == 200
+    assert errors.status_code == 200
     latest_chair = next(row for row in latest.json()["rows"] if row["product_key"] == "chair")
     assert latest_chair["price_toman"] == 1200
     assert products.json()["products"][0]["key"] == "chair"
@@ -112,7 +120,37 @@ def test_ui_serves_built_frontend_assets(tmp_path) -> None:
     assert "Price Getter" in page.text
 
 
-def test_ui_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
+def test_ui_write_endpoints_are_not_public(tmp_path) -> None:
+    config_path = tmp_path / "config.yml"
+    db_url = f"sqlite:///{tmp_path / 'prices.db'}"
+    write_config(config_path)
+    app = create_app(config_path=config_path, db_url=db_url)
+    client = TestClient(app)
+    payload = {"title": "New Phone", "url": "https://www.digikala.com/product/dkp-2/", "source_key": "digikala_api"}
+    public_write_routes = {
+        ("POST", "/run-now"),
+        ("POST", "/config/products"),
+        ("PUT", "/config/products/{product_key}"),
+        ("DELETE", "/config/products/{product_key}"),
+        ("POST", "/config/products/{product_key}/disable"),
+        ("POST", "/config/products/{product_key}/enable"),
+    }
+    registered_routes = {
+        (method, route.path)
+        for route in app.routes
+        for method in getattr(route, "methods", set())
+    }
+
+    assert public_write_routes.isdisjoint(registered_routes)
+    assert client.post("/run-now").status_code in {404, 405}
+    assert client.post("/config/products", json=payload).status_code in {404, 405}
+    assert client.put("/config/products/chair", json=payload).status_code in {404, 405}
+    assert client.delete("/config/products/chair").status_code in {404, 405}
+    assert client.post("/config/products/chair/disable").status_code in {404, 405}
+    assert client.post("/config/products/chair/enable").status_code in {404, 405}
+
+
+def test_ui_admin_endpoints_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "config.yml"
     db_url = f"sqlite:///{tmp_path / 'prices.db'}"
     write_config(config_path)
@@ -128,33 +166,45 @@ def test_ui_can_edit_config_and_run_now(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr("price_getter.ui.PriceRunner", FakeRunner)
 
     added = client.post(
-        "/config/products",
+        "/admin/config/products",
         json={"title": "New Phone", "url": "https://www.digikala.com/product/dkp-2/", "source_key": "digikala_api"},
     )
     updated = client.put(
-        "/config/products/new-phone",
+        "/admin/config/products/new-phone",
         json={"title": "Updated Phone", "url": "https://www.digikala.com/product/dkp-3/", "source_key": "digikala_api"},
     )
     config_after_update = load_config(config_path)
-    disabled = client.post("/config/products/new-phone/disable")
-    enabled = client.post("/config/products/new-phone/enable")
-    deleted = client.delete("/config/products/new-phone")
-    run = client.post("/run-now")
+    disabled = client.post("/admin/config/products/new-phone/disable")
+    enabled = client.post("/admin/config/products/new-phone/enable")
+    deleted = client.delete("/admin/config/products/new-phone")
+    run = client.post("/admin/run-now")
     config = load_config(config_path)
 
     assert added.status_code == 200
     assert added.json()["product_key"] == "new-phone"
+    assert "backup_path" in added.json()
     assert updated.status_code == 200
+    assert updated.json()["product_key"] == "new-phone"
+    assert "backup_path" in updated.json()
     assert config_after_update.products["new-phone"].title == "Updated Phone"
     edited_target = next(target for target in config_after_update.targets if target.product_key == "new-phone")
     assert edited_target.url == "https://www.digikala.com/product/dkp-3/"
     assert disabled.status_code == 200
+    assert disabled.json()["product_key"] == "new-phone"
+    assert "backup_path" in disabled.json()
     assert enabled.status_code == 200
+    assert enabled.json()["product_key"] == "new-phone"
+    assert "backup_path" in enabled.json()
     assert deleted.status_code == 200
     assert deleted.json()["product_key"] == "new-phone"
+    assert "backup_path" in deleted.json()
     assert "new-phone" not in config.products
     assert all(target.product_key != "new-phone" for target in config.targets)
     assert run.json()["run_id"] == 42
+    assert run.json()["target_count"] == 1
+    assert run.json()["success_count"] == 1
+    assert run.json()["error_count"] == 0
+    assert run.json()["status"] == "success"
 
 
 def test_ui_datetime_serialization_treats_sqlite_naive_values_as_utc() -> None:

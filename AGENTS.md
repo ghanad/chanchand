@@ -64,7 +64,7 @@ Task routing:
 
 Useful anchors:
 - CLI commands live in `cli.py` as Typer functions: `init_db`, `validate_config`, `run`, `latest`, `history`, `errors`, `ui`.
-- UI endpoints in `ui.py`: `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, `/run-now`, and `/config/products...`.
+- UI routes/endpoints in `ui.py`: `/`, `/admin`, public reads under `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, and admin writes under `/admin/run-now` and `/admin/config/products...`.
 - UI serialization helpers in `ui.py`: `_products_payload`, `_sources_payload`, `_serialize_price`, `_serialize_error`, `_serialize_run`.
 - Adapter tests are grouped by name prefix: `test_generic_html_*`, `test_digikala_web_*`, `test_digikala_api_*`, `test_brsapi_*`.
 
