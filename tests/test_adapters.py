@@ -2,7 +2,7 @@ import pytest
 
 from price_getter.adapters import get_adapter
 from price_getter.adapters.base import AdapterError, FetchContext
-from price_getter.adapters.brsapi_market import BrsapiMarketAdapter
+from price_getter.adapters.brsapi_market import BrsapiMarketAdapter, _resolve_api_key
 from price_getter.adapters.digikala import DigikalaAdapter, DigikalaApiAdapter, DigikalaWebAdapter
 from price_getter.adapters.generic_html import GenericHtmlAdapter
 from price_getter.config import SourceConfig, TargetConfig
@@ -369,6 +369,14 @@ def test_brsapi_market_adapter_fetch_uses_env_key_and_browser_user_agent(monkeyp
     assert client.calls[0]["headers"]["User-Agent"].startswith("Mozilla/5.0")
     assert "Python" not in client.calls[0]["headers"]["User-Agent"]
     assert get_adapter("brsapi_market").name == "brsapi_market"
+
+
+def test_brsapi_market_adapter_resolves_api_key_from_env_file(monkeypatch, tmp_path) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text("brsapi_api='file-secret'\n", encoding="utf-8")
+    monkeypatch.delenv("brsapi_api", raising=False)
+
+    assert _resolve_api_key("brsapi_api", env_file=env_path) == "file-secret"
 
 
 class FakeJsonResponse:

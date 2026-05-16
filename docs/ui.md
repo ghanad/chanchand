@@ -5,6 +5,7 @@ Read this when changing the local dashboard or its JSON API.
 ## Backend
 
 - FastAPI app factory: `src/price_getter/ui.py:create_app`
+- Runtime env defaults: `src/price_getter/runtime.py`
 - Routes/endpoints: `/`, `/admin`, public reads under `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, `/api/errors`, and admin writes under `/admin/run-now` and `/admin/config/products...`
 - Payload helpers: `_products_payload`, `_sources_payload`
 - Serializers: `_serialize_price`, `_serialize_error`, `_serialize_run`
@@ -22,6 +23,7 @@ Use `rg` for the endpoint or helper name before reading the whole file.
 - Admin users can run collection manually and add, edit, delete, enable, or disable products.
 - Authentication is handled by Nginx Basic Auth for `/admin`, `/admin/run-now`, and `/admin/config/products...`.
 - Do not add application user accounts, sessions, or cookies in this phase.
+- Container-friendly startup can rely on `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_HOST`, and `PRICE_GETTER_PORT`; explicit CLI flags still override these env vars.
 
 Minimal Nginx boundary:
 

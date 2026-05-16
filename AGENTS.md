@@ -30,6 +30,7 @@ Core flow:
 - Config/database guidance: `docs/storage-config.md`
 - Local dashboard/API guidance: `docs/ui.md`
 - CLI or command behavior: `src/price_getter/cli.py`
+- Runtime env defaults: `src/price_getter/runtime.py`
 - YAML schema or validation: `src/price_getter/config.py` and `config/example.yml`
 - Run orchestration, HTTP client lifecycle, rate limiting: `src/price_getter/runner.py`
 - Database schema: `src/price_getter/models.py`
@@ -81,6 +82,7 @@ Use the project virtualenv when present:
 .venv/bin/price-getter run --config config/example.yml
 .venv/bin/price-getter latest
 .venv/bin/price-getter ui --config config/example.yml --db-url sqlite:///price_getter.db
+PRICE_GETTER_CONFIG=/data/config.yml PRICE_GETTER_DB_URL=sqlite:////data/price_getter.db PRICE_GETTER_HOST=0.0.0.0 PRICE_GETTER_PORT=8000 .venv/bin/price-getter ui --no-browser
 cd frontend && npm install
 cd frontend && npm run build
 ```
@@ -88,6 +90,7 @@ cd frontend && npm run build
 ## Config Notes
 
 - Source adapter names currently allowed by config: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`.
+- Runtime env defaults for CLI/UI live in `runtime.py`: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_HOST`, `PRICE_GETTER_PORT`; explicit CLI options override them.
 - `digikala` is a backward-compatible alias for `digikala_api`.
 - `brsapi_market` targets select one item with `adapter_settings.symbol` or `adapter_settings.name`; default API key env name is `brsapi_api`.
 - Prices are stored as `price_irr`.

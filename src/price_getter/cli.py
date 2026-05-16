@@ -6,8 +6,18 @@ from typing import Any
 import typer
 
 from price_getter.config import ConfigLoadError, load_config
-from price_getter.db import DEFAULT_DB_URL, init_database, session_scope
+from price_getter.db import init_database, session_scope
 from price_getter.repository import latest_snapshots, product_history, recent_errors
+from price_getter.runtime import (
+    CONFIG_ENV,
+    DB_URL_ENV,
+    DEFAULT_DB_URL,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_UI_HOST,
+    DEFAULT_UI_PORT,
+    HOST_ENV,
+    PORT_ENV,
+)
 from price_getter.runner import PriceRunner
 
 app = typer.Typer(no_args_is_help=True, help="Collect ecommerce price snapshots into SQLite.")
@@ -15,7 +25,7 @@ app = typer.Typer(no_args_is_help=True, help="Collect ecommerce price snapshots 
 
 @app.command("init-db")
 def init_db(
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
 ) -> None:
     init_database(db_url)
     typer.echo(f"Database initialized: {db_url}")
@@ -23,7 +33,13 @@ def init_db(
 
 @app.command("validate-config")
 def validate_config(
-    config_path: Path = typer.Option(Path("config/example.yml"), "--config", "-c", help="YAML config path."),
+    config_path: Path = typer.Option(
+        DEFAULT_CONFIG_PATH,
+        "--config",
+        "-c",
+        envvar=CONFIG_ENV,
+        help="YAML config path.",
+    ),
 ) -> None:
     try:
         config = load_config(config_path)
@@ -40,8 +56,14 @@ def validate_config(
 
 @app.command("run")
 def run(
-    config_path: Path = typer.Option(Path("config/example.yml"), "--config", "-c", help="YAML config path."),
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    config_path: Path = typer.Option(
+        DEFAULT_CONFIG_PATH,
+        "--config",
+        "-c",
+        envvar=CONFIG_ENV,
+        help="YAML config path.",
+    ),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
 ) -> None:
     try:
         summary = PriceRunner(db_url=db_url).run_config_file(config_path)
@@ -56,7 +78,7 @@ def run(
 
 @app.command("latest")
 def latest(
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
     limit: int = typer.Option(100, "--limit", min=1, help="Maximum product/source rows."),
 ) -> None:
     init_database(db_url)
@@ -86,7 +108,7 @@ def latest(
 def history(
     product_key: str = typer.Argument(..., help="Product key from config."),
     source_key: str | None = typer.Option(None, "--source", help="Optional source key filter."),
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
     limit: int = typer.Option(50, "--limit", min=1, help="Maximum rows."),
 ) -> None:
     init_database(db_url)
@@ -114,7 +136,7 @@ def history(
 
 @app.command("errors")
 def errors(
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
     limit: int = typer.Option(50, "--limit", min=1, help="Maximum rows."),
 ) -> None:
     init_database(db_url)
@@ -131,10 +153,23 @@ def errors(
 
 @app.command("ui")
 def ui(
-    config_path: Path = typer.Option(Path("config/example.yml"), "--config", "-c", help="YAML config path."),
-    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", help="SQLAlchemy database URL."),
-    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind the local web UI."),
-    port: int = typer.Option(8000, "--port", min=1, max=65535, help="Port to bind the local web UI."),
+    config_path: Path = typer.Option(
+        DEFAULT_CONFIG_PATH,
+        "--config",
+        "-c",
+        envvar=CONFIG_ENV,
+        help="YAML config path.",
+    ),
+    db_url: str = typer.Option(DEFAULT_DB_URL, "--db-url", envvar=DB_URL_ENV, help="SQLAlchemy database URL."),
+    host: str = typer.Option(DEFAULT_UI_HOST, "--host", envvar=HOST_ENV, help="Host to bind the local web UI."),
+    port: int = typer.Option(
+        DEFAULT_UI_PORT,
+        "--port",
+        envvar=PORT_ENV,
+        min=1,
+        max=65535,
+        help="Port to bind the local web UI.",
+    ),
     no_browser: bool = typer.Option(False, "--no-browser", help="Do not open a browser tab automatically."),
 ) -> None:
     _launch_ui(config_path=config_path, db_url=db_url, host=host, port=port, open_browser=not no_browser)

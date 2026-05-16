@@ -20,7 +20,7 @@ from price_getter.config_editor import (
     enable_product,
     update_product_target,
 )
-from price_getter.db import DEFAULT_DB_URL, init_database, session_scope
+from price_getter.db import init_database, session_scope
 from price_getter.models import FetchError, PriceSnapshot, ProductSnapshot, Run, SourceSnapshot
 from price_getter.repository import (
     latest_snapshots,
@@ -30,6 +30,7 @@ from price_getter.repository import (
     recent_runs,
     sources_from_latest_run,
 )
+from price_getter.runtime import runtime_config_path, runtime_db_url, runtime_host, runtime_port
 from price_getter.runner import PriceRunner
 
 USD_PRODUCT_KEY = "usd"
@@ -50,10 +51,11 @@ class UpdateProductRequest(BaseModel):
 
 def create_app(
     *,
-    config_path: str | Path = Path("config/example.yml"),
-    db_url: str = DEFAULT_DB_URL,
+    config_path: str | Path | None = None,
+    db_url: str | None = None,
 ) -> FastAPI:
-    config_path = Path(config_path)
+    config_path = runtime_config_path(config_path)
+    db_url = runtime_db_url(db_url)
     package_dir = Path(__file__).parent
     ui_dist_dir = package_dir / "ui_dist"
     ui_assets_dir = ui_dist_dir / "assets"
@@ -214,14 +216,16 @@ def create_app(
 
 def run_ui(
     *,
-    config_path: str | Path = Path("config/example.yml"),
-    db_url: str = DEFAULT_DB_URL,
-    host: str = "127.0.0.1",
-    port: int = 8000,
+    config_path: str | Path | None = None,
+    db_url: str | None = None,
+    host: str | None = None,
+    port: int | str | None = None,
     open_browser: bool = True,
 ) -> None:
     import uvicorn
 
+    host = runtime_host(host)
+    port = runtime_port(port)
     app = create_app(config_path=config_path, db_url=db_url)
     url = f"http://{host}:{port}"
     if open_browser:

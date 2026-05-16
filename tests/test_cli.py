@@ -40,6 +40,33 @@ targets:
     assert "0/1 active targets" in validate_result.output
 
 
+def test_cli_uses_runtime_env_defaults(monkeypatch, tmp_path) -> None:
+    db_url = f"sqlite:///{tmp_path / 'env-prices.db'}"
+    config_path = tmp_path / "env-config.yml"
+    config_path.write_text(
+        """
+sources:
+  demo:
+    adapter: generic_html
+products:
+  phone:
+    title: Phone
+targets: []
+""",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("PRICE_GETTER_CONFIG", str(config_path))
+    monkeypatch.setenv("PRICE_GETTER_DB_URL", db_url)
+
+    init_result = runner.invoke(app, ["init-db"])
+    validate_result = runner.invoke(app, ["validate-config"])
+
+    assert init_result.exit_code == 0
+    assert f"Database initialized: {db_url}" in init_result.output
+    assert validate_result.exit_code == 0
+    assert "0/0 active targets" in validate_result.output
+
+
 def test_cli_reports_latest_history_and_errors(tmp_path) -> None:
     db_url = f"sqlite:///{tmp_path / 'prices.db'}"
     init_database(db_url)
@@ -120,3 +147,48 @@ def test_cli_ui_launches_local_dashboard(monkeypatch, tmp_path) -> None:
     assert calls["host"] == "0.0.0.0"
     assert calls["port"] == 9000
     assert calls["open_browser"] is False
+
+
+def test_cli_ui_uses_env_defaults_and_preserves_cli_overrides(monkeypatch, tmp_path) -> None:
+    calls = {}
+
+    def fake_launch(**kwargs):
+        calls.update(kwargs)
+
+    monkeypatch.setattr("price_getter.cli._launch_ui", fake_launch)
+    monkeypatch.setenv("PRICE_GETTER_CONFIG", str(tmp_path / "env-config.yml"))
+    monkeypatch.setenv("PRICE_GETTER_DB_URL", f"sqlite:///{tmp_path / 'env-prices.db'}")
+    monkeypatch.setenv("PRICE_GETTER_HOST", "0.0.0.0")
+    monkeypatch.setenv("PRICE_GETTER_PORT", "8001")
+
+    env_result = runner.invoke(app, ["ui", "--no-browser"])
+
+    assert env_result.exit_code == 0
+    assert calls["config_path"] == tmp_path / "env-config.yml"
+    assert calls["db_url"] == f"sqlite:///{tmp_path / 'env-prices.db'}"
+    assert calls["host"] == "0.0.0.0"
+    assert calls["port"] == 8001
+    assert calls["open_browser"] is False
+
+    calls.clear()
+    explicit_result = runner.invoke(
+        app,
+        [
+            "ui",
+            "--config",
+            str(tmp_path / "cli-config.yml"),
+            "--db-url",
+            f"sqlite:///{tmp_path / 'cli-prices.db'}",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "9000",
+            "--no-browser",
+        ],
+    )
+
+    assert explicit_result.exit_code == 0
+    assert calls["config_path"] == tmp_path / "cli-config.yml"
+    assert calls["db_url"] == f"sqlite:///{tmp_path / 'cli-prices.db'}"
+    assert calls["host"] == "127.0.0.1"
+    assert calls["port"] == 9000

@@ -7,7 +7,7 @@ from price_getter.config import AppConfig, ProductConfig, SourceConfig, TargetCo
 from price_getter.db import init_database, session_scope
 from price_getter.repository import finish_run, record_error, record_price, start_run
 from price_getter.runner import RunSummary
-from price_getter.ui import _datetime, create_app
+from price_getter.ui import _datetime, create_app, run_ui
 
 
 def write_config(path) -> None:
@@ -121,6 +121,34 @@ def test_ui_serves_built_frontend_assets(tmp_path) -> None:
 
     assert asset.status_code == 200
     assert "Price Getter" in page.text
+
+
+def test_ui_startup_uses_runtime_env_defaults(monkeypatch, tmp_path) -> None:
+    calls = {}
+    config_path = tmp_path / "env-config.yml"
+    db_url = f"sqlite:///{tmp_path / 'env-prices.db'}"
+    write_config(config_path)
+    monkeypatch.setenv("PRICE_GETTER_CONFIG", str(config_path))
+    monkeypatch.setenv("PRICE_GETTER_DB_URL", db_url)
+    monkeypatch.setenv("PRICE_GETTER_HOST", "0.0.0.0")
+    monkeypatch.setenv("PRICE_GETTER_PORT", "8001")
+
+    def fake_run(app, *, host, port):
+        calls["app"] = app
+        calls["host"] = host
+        calls["port"] = port
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    app = create_app()
+    run_ui(open_browser=False)
+
+    assert app.state.config_path == config_path
+    assert app.state.db_url == db_url
+    assert calls["app"].state.config_path == config_path
+    assert calls["app"].state.db_url == db_url
+    assert calls["host"] == "0.0.0.0"
+    assert calls["port"] == 8001
 
 
 def test_ui_write_endpoints_are_not_public(tmp_path) -> None:
