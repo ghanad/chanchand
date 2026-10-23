@@ -18,6 +18,7 @@ const navItems: NavItem[] = [
   { id: "history", label: "تاریخچه", subpath: "/history" },
   { id: "runs", label: "اجرا و خطا", subpath: "/runs" },
   { id: "products", label: "محصولات", subpath: "/products" },
+  { id: "sources", label: "منابع قیمت‌گیری", subpath: "/sources" },
   { id: "users", label: "مدیریت کاربران", subpath: "/users", adminOnly: true },
 ];
 

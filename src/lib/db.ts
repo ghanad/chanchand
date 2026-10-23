@@ -515,6 +515,15 @@ export function deleteManagedSource(db: Database.Database, key: string): { sourc
     throw new Error(`unknown source: ${key}`);
   }
 
+  const linkedTargets = db
+    .prepare('SELECT COUNT(*) as count FROM managed_targets WHERE source_key = ?')
+    .get(key) as { count: number };
+  if (linkedTargets && linkedTargets.count > 0) {
+    throw new Error(
+      `امکان حذف این منبع وجود ندارد زیرا در ${linkedTargets.count} هدف قیمت‌گیری متصل به محصولات استفاده شده است.`
+    );
+  }
+
   db.prepare('DELETE FROM managed_sources WHERE key = ?').run(key);
   return { source_key: key };
 }

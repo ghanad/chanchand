@@ -1250,3 +1250,177 @@ tbody tr:last-child td {
   }
 }
 
+/* ==========================================================================
+   Sources Management Styles
+   ========================================================================== */
+.sources-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+  margin-top: 14px;
+}
+
+.source-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 6px rgba(24, 36, 38, 0.04);
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+  position: relative;
+}
+
+.source-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 20px rgba(24, 36, 38, 0.07);
+}
+
+.source-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.source-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.source-icon-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+}
+
+.source-title-group strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: left;
+}
+
+.adapter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  direction: ltr;
+  letter-spacing: 0.2px;
+  border: 1px solid transparent;
+}
+
+.adapter-badge.digikala_api,
+.adapter-badge.digikala_web {
+  background: #fdf2f2;
+  color: #ef394e;
+  border-color: #fbcfe8;
+}
+
+.adapter-badge.brsapi_market {
+  background: #fefce8;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.adapter-badge.generic_html {
+  background: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+}
+
+.adapter-badge.default {
+  background: var(--surface-soft);
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.source-card-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--surface-soft);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 12px;
+}
+
+.source-card-stats .stat-label {
+  color: var(--muted);
+}
+
+.source-card-stats .stat-val {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.source-params-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+
+.source-param-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.source-param-item .param-title {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.source-param-item .param-value {
+  font-weight: 600;
+  color: var(--text);
+  direction: ltr;
+  text-align: right;
+}
+
+.source-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.source-card-actions button {
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.form-hint {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: -3px;
+}
+
+

@@ -12,6 +12,7 @@ function getPageTitle(pathname: string): string {
   if (cleanPath.startsWith("/history")) return "تاریخچه";
   if (cleanPath.startsWith("/runs")) return "اجرا و خطا";
   if (cleanPath.startsWith("/products")) return "محصولات";
+  if (cleanPath.startsWith("/sources")) return "منابع قیمت‌گیری";
   if (cleanPath.startsWith("/users")) return "مدیریت کاربران";
   return "داشبورد";
 }

@@ -40,6 +40,9 @@ export interface SourceRow {
   rate_limit_seconds?: number;
   currency?: string;
   price_multiplier?: number;
+  target_count?: number;
+  enabled_target_count?: number;
+  product_count?: number;
 }
 
 export interface RunRow {
@@ -78,6 +81,6 @@ export interface ProductsPayload {
   sources: SourceRow[];
 }
 
-export type Tab = "overview" | "prices" | "history" | "runs" | "products";
+export type Tab = "overview" | "prices" | "history" | "runs" | "products" | "sources";
 export type HistoryMetric = "toman" | "usd";
 export type AppMode = "public" | "admin";

@@ -157,7 +157,19 @@ describe('db module', () => {
     const updatedMap = getSourcesMap(db);
     expect(updatedMap['custom_source'].rate_limit_seconds).toBe(1);
 
-    // Delete source
+    // Test deletion prevention when source is in use
+    addManagedSource(db, {
+      key: 'in_use_source',
+      adapter: 'generic_html',
+    });
+    addManagedProduct(db, {
+      title: 'محصول تست',
+      url: 'https://example.com',
+      source_key: 'in_use_source',
+    });
+    expect(() => deleteManagedSource(db, 'in_use_source')).toThrow(/امکان حذف این منبع وجود ندارد/);
+
+    // Delete unused source
     deleteManagedSource(db, 'custom_source');
     expect(getSourcesMap(db)['custom_source']).toBeUndefined();
 

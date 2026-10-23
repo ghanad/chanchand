@@ -26,7 +26,7 @@ Core flow:
 
 ## Read These First
 
-- UI Dashboard: `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/page.tsx` (`/`), `src/app/prices/page.tsx`, `src/app/history/page.tsx`, `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/admin/*`, `src/components/views/*`, `src/components/layout/*`, `src/components/common/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
+- UI Dashboard: `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/page.tsx` (`/`), `src/app/prices/page.tsx`, `src/app/history/page.tsx`, `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/sources/page.tsx`, `src/app/admin/*`, `src/components/views/*`, `src/components/layout/*`, `src/components/common/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
 - API Route Handlers: `src/app/api/auth/*`, `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/sources/route.ts`, `src/app/api/admin/sources/*`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
 - Authentication & RBAC: `src/lib/auth.ts`, `src/middleware.ts`
 - Database schema & CRUD: `src/lib/db.ts` (manages `managed_products`, `managed_targets` & `managed_sources`)
