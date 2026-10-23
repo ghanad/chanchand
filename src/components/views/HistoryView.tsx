@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, Suspense } from "react";
+import React, { useEffect, useState, useCallback, useMemo, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Area,
@@ -86,7 +87,8 @@ function HistoryContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { setLoading, showToast, refreshTick } = useDashboard();
+  const { isAdmin, setLoading, showToast, refreshTick } = useDashboard();
+  const basePath = isAdmin ? "/admin" : "";
 
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
@@ -96,10 +98,19 @@ function HistoryContent() {
   const initialSource = searchParams.get("source") || "";
   const initialLimit = searchParams.get("limit") || "200";
 
+  const [productSearch, setProductSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(initialProduct);
   const [selectedSource, setSelectedSource] = useState(initialSource);
   const [historyLimit, setHistoryLimit] = useState(initialLimit);
   const [historyMetric, setHistoryMetric] = useState<HistoryMetric>("toman");
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return products;
+    const q = productSearch.trim().toLowerCase();
+    return products.filter(
+      (p) => p.title.toLowerCase().includes(q) || p.key.toLowerCase().includes(q),
+    );
+  }, [products, productSearch]);
 
   // Load products and sources
   const loadProducts = useCallback(async () => {
@@ -208,17 +219,58 @@ function HistoryContent() {
     <div className="page-stack">
       <section className="panel">
         <PanelHead title="فیلتر تاریخچه" meta={`${formatNumber(history.length)} مشاهده`} />
-        <div className="toolbar">
+        <div className="toolbar history-toolbar">
+          <label className="history-search-label">
+            جستجوی نام یا شناسه
+            <div className="history-search-input-wrap">
+              <input
+                type="text"
+                className="history-search-input"
+                placeholder="تایپ برای فیلتر لیست..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                aria-label="جستجوی محصول"
+              />
+              {productSearch && (
+                <button
+                  type="button"
+                  className="product-search-clear"
+                  onClick={() => setProductSearch("")}
+                  title="پاک کردن"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </label>
           <label>
-            محصول
-            <select value={selectedProduct} onChange={(e) => handleProductChange(e.target.value)}>
-              {products.map((product) => (
+            محصول ({formatNumber(filteredProducts.length)})
+            <select
+              value={selectedProduct}
+              onChange={(e) => handleProductChange(e.target.value)}
+            >
+              {filteredProducts.map((product) => (
                 <option key={product.key} value={product.key}>
                   {product.title} ({product.key})
                 </option>
               ))}
+              {selectedProduct &&
+                !filteredProducts.some((p) => p.key === selectedProduct) && (
+                  <option value={selectedProduct}>
+                    {products.find((p) => p.key === selectedProduct)?.title || selectedProduct} ({selectedProduct})
+                  </option>
+                )}
             </select>
           </label>
+          {selectedProduct && (
+            <Link
+              href={`${basePath}/products/${encodeURIComponent(selectedProduct)}`}
+              className="secondary-button compact-btn history-detail-link"
+              title="مشاهده صفحه اختصاصی جزئیات این محصول"
+            >
+              صفحه جزئیات محصول &rarr;
+            </Link>
+          )}
           <label>
             منبع
             <select value={selectedSource} onChange={(e) => handleSourceChange(e.target.value)}>

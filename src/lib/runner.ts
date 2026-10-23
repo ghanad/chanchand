@@ -12,6 +12,7 @@ import {
 } from './db';
 import { getAdapter } from './adapters';
 import { loadConfig } from './config';
+import { USD_PRODUCT_KEY } from './serializers';
 
 export interface RunSummary {
   run_id: number;
@@ -62,7 +63,12 @@ export class PriceRunner {
     return this.executeRun(config, runId, targetsToRun);
   }
 
-  async executeRun(config: AppConfig | null | undefined, runId: number, targets?: TargetConfig[]): Promise<RunSummary> {
+  async executeRun(
+    config: AppConfig | null | undefined,
+    runId: number,
+    targets?: TargetConfig[],
+    options?: { force?: boolean }
+  ): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
     let successCount = 0;
     let errorCount = 0;
@@ -91,6 +97,11 @@ export class PriceRunner {
     }
 
     const activeTargets = candidateTargets.filter((t) => t.enabled);
+    activeTargets.sort((a, b) => {
+      const aIsUsd = a.product_key === USD_PRODUCT_KEY ? 0 : 1;
+      const bIsUsd = b.product_key === USD_PRODUCT_KEY ? 0 : 1;
+      return aIsUsd - bIsUsd;
+    });
     console.log(`[Runner] run ${runId} started: ${activeTargets.length} active targets`);
 
     const sources = config?.sources || getSourcesMap(db);
@@ -103,7 +114,7 @@ export class PriceRunner {
           continue;
         }
 
-        if (source.adapter !== 'brsapi_market' && hasSuccessfulPriceToday(db, target.product_key)) {
+        if (!options?.force && source.adapter !== 'brsapi_market' && hasSuccessfulPriceToday(db, target.product_key)) {
           console.log(`[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`);
           continue;
         }

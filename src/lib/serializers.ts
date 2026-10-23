@@ -222,15 +222,23 @@ export function sourcesPayload(
 
 export function serializeHistoryPrices(
   rows: PriceSnapshotRow[],
-  usdRows: PriceSnapshotRow[]
+  usdRows: PriceSnapshotRow[],
+  maxToleranceMs?: number
 ): Array<Record<string, any>> {
-  const usdRates = usdRows.filter((r) => r.price_irr && r.price_irr > 0 && r.observed_at);
-  return rows.map((row) => serializePrice(row, usdRateFor(row, usdRates)));
+  const usdRates = usdRows
+    .filter((r) => r.price_irr && r.price_irr > 0 && r.observed_at)
+    .sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime());
+  return rows.map((row) => serializePrice(row, usdRateFor(row, usdRates, maxToleranceMs)));
 }
 
-export function usdRateFor(row: PriceSnapshotRow, usdRates: PriceSnapshotRow[]): number | null {
+export function usdRateFor(
+  row: PriceSnapshotRow,
+  usdRates: PriceSnapshotRow[],
+  maxToleranceMs?: number
+): number | null {
   if (!usdRates.length || !row.observed_at) return null;
   const targetTime = new Date(row.observed_at).getTime();
+  if (Number.isNaN(targetTime)) return null;
 
   let latestBefore: PriceSnapshotRow | null = null;
   let firstAfter: PriceSnapshotRow | null = null;
@@ -238,6 +246,8 @@ export function usdRateFor(row: PriceSnapshotRow, usdRates: PriceSnapshotRow[]):
   for (const usd of usdRates) {
     if (!usd.observed_at) continue;
     const usdTime = new Date(usd.observed_at).getTime();
+    if (Number.isNaN(usdTime)) continue;
+
     if (usdTime <= targetTime) {
       latestBefore = usd;
     } else {
@@ -246,6 +256,23 @@ export function usdRateFor(row: PriceSnapshotRow, usdRates: PriceSnapshotRow[]):
     }
   }
 
-  const selected = latestBefore || firstAfter;
-  return selected?.price_irr ?? null;
+  let selected: PriceSnapshotRow | null = null;
+  if (latestBefore && firstAfter) {
+    const diffBefore = Math.abs(targetTime - new Date(latestBefore.observed_at).getTime());
+    const diffAfter = Math.abs(new Date(firstAfter.observed_at).getTime() - targetTime);
+    selected = diffBefore <= diffAfter ? latestBefore : firstAfter;
+  } else {
+    selected = latestBefore || firstAfter;
+  }
+
+  if (!selected || !selected.observed_at) return null;
+
+  if (maxToleranceMs !== undefined && maxToleranceMs > 0) {
+    const selectedTime = new Date(selected.observed_at).getTime();
+    if (Math.abs(selectedTime - targetTime) > maxToleranceMs) {
+      return null;
+    }
+  }
+
+  return selected.price_irr ?? null;
 }

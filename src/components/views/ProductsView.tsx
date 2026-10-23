@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import Link from "next/link";
 import { ProductRow, SourceRow, ProductsPayload } from "../../types/dashboard";
 import { requestJson } from "../../lib/api-client";
 import { formatNumber } from "../../lib/formatters";
@@ -12,6 +13,7 @@ import { EmptyState } from "../common/EmptyState";
 
 export function ProductsView() {
   const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
+  const basePath = isAdmin ? "/admin" : "";
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -401,9 +403,13 @@ export function ProductsView() {
                         {/* 1. Title & Slug (bold title + small muted slug) */}
                         <td className="col-title">
                           <div className="product-title-cell product-info-text">
-                            <strong className="product-row-title" title={product.title}>
-                              {product.title}
-                            </strong>
+                            <Link
+                              href={`${basePath}/products/${encodeURIComponent(product.key)}`}
+                              className="product-row-title-link"
+                              title={`مشاهده جزئیات و تاریخچه ${product.title}`}
+                            >
+                              <strong className="product-row-title">{product.title}</strong>
+                            </Link>
                             <span className="product-row-slug" title={product.key}>
                               {product.key}
                             </span>
@@ -531,117 +537,143 @@ export function ProductsView() {
                           </div>
                         </td>
 
-                        {/* 6. Actions: Edit icon button & Kebab (⋯) menu */}
+                        {/* 6. Actions: Details icon button, Edit icon button & Kebab (⋯) menu */}
                         <td className="col-actions">
-                          {isAdmin ? (
-                            <div className="product-actions-cell">
-                              {/* Edit Icon Button */}
-                              <button
-                                type="button"
-                                className="action-icon-button"
-                                onClick={() => startEditProduct(product)}
-                                disabled={!hasPrimaryTarget || busyAction !== null}
-                                aria-label={`ویرایش ${product.title}`}
-                                title="ویرایش محصول"
+                          <div className="product-actions-cell">
+                            {/* Detail / Analytics Button */}
+                            <Link
+                              href={`${basePath}/products/${encodeURIComponent(product.key)}`}
+                              className="action-icon-button"
+                              title="مشاهده جزئیات و تاریخچه قیمت"
+                              aria-label={`مشاهده جزئیات ${product.title}`}
+                            >
+                              <svg
+                                width="15"
+                                height="15"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                aria-hidden="true"
                               >
-                                <svg
-                                  width="15"
-                                  height="15"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                </svg>
-                              </button>
+                                <line x1="18" y1="20" x2="18" y2="10" />
+                                <line x1="12" y1="20" x2="12" y2="4" />
+                                <line x1="6" y1="20" x2="6" y2="14" />
+                              </svg>
+                            </Link>
 
-                              {/* Kebab (⋯) Menu */}
-                              <div className="kebab-container">
+                            {isAdmin ? (
+                              <>
+                                {/* Edit Icon Button */}
                                 <button
                                   type="button"
-                                  ref={(el) => {
-                                    kebabTriggerRefs.current[product.key] = el;
-                                  }}
-                                  className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
-                                  onClick={() =>
-                                    setActiveKebabKey((current) =>
-                                      current === product.key ? null : product.key,
-                                    )
-                                  }
-                                  aria-label={`عملیات بیشتر برای ${product.title}`}
-                                  aria-haspopup="menu"
-                                  aria-expanded={isKebabOpen}
-                                  title="عملیات بیشتر"
-                                  onKeyDown={(e) => {
-                                    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-                                      setActiveKebabKey(product.key);
-                                    }
-                                  }}
+                                  className="action-icon-button"
+                                  onClick={() => startEditProduct(product)}
+                                  disabled={!hasPrimaryTarget || busyAction !== null}
+                                  aria-label={`ویرایش ${product.title}`}
+                                  title="ویرایش محصول"
                                 >
                                   <svg
-                                    width="16"
-                                    height="16"
+                                    width="15"
+                                    height="15"
                                     viewBox="0 0 24 24"
-                                    fill="currentColor"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
                                     aria-hidden="true"
                                   >
-                                    <circle cx="12" cy="12" r="2" />
-                                    <circle cx="19" cy="12" r="2" />
-                                    <circle cx="5" cy="12" r="2" />
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                                   </svg>
                                 </button>
 
-                                {isKebabOpen && (
-                                  <div
-                                    className="kebab-menu-dropdown"
-                                    role="menu"
-                                    aria-orientation="vertical"
-                                    tabIndex={-1}
+                                {/* Kebab (⋯) Menu */}
+                                <div className="kebab-container">
+                                  <button
+                                    type="button"
+                                    ref={(el) => {
+                                      kebabTriggerRefs.current[product.key] = el;
+                                    }}
+                                    className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
+                                    onClick={() =>
+                                      setActiveKebabKey((current) =>
+                                        current === product.key ? null : product.key,
+                                      )
+                                    }
+                                    aria-label={`عملیات بیشتر برای ${product.title}`}
+                                    aria-haspopup="menu"
+                                    aria-expanded={isKebabOpen}
+                                    title="عملیات بیشتر"
+                                    onKeyDown={(e) => {
+                                      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+                                        setActiveKebabKey(product.key);
+                                      }
+                                    }}
                                   >
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="kebab-menu-item danger"
-                                      onClick={() => {
-                                        setActiveKebabKey(null);
-                                        setProductToDelete(product);
-                                      }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Escape") {
-                                          setActiveKebabKey(null);
-                                          kebabTriggerRefs.current[product.key]?.focus();
-                                        }
-                                      }}
-                                      autoFocus
+                                    <svg
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="currentColor"
+                                      aria-hidden="true"
                                     >
-                                      <svg
-                                        width="14"
-                                        height="14"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
+                                      <circle cx="12" cy="12" r="2" />
+                                      <circle cx="19" cy="12" r="2" />
+                                      <circle cx="5" cy="12" r="2" />
+                                    </svg>
+                                  </button>
+
+                                  {isKebabOpen && (
+                                    <div
+                                      className="kebab-menu-dropdown"
+                                      role="menu"
+                                      aria-orientation="vertical"
+                                      tabIndex={-1}
+                                    >
+                                      <button
+                                        type="button"
+                                        role="menuitem"
+                                        className="kebab-menu-item danger"
+                                        onClick={() => {
+                                          setActiveKebabKey(null);
+                                          setProductToDelete(product);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Escape") {
+                                            setActiveKebabKey(null);
+                                            kebabTriggerRefs.current[product.key]?.focus();
+                                          }
+                                        }}
+                                        autoFocus
                                       >
-                                        <polyline points="3 6 5 6 21 6" />
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                        <line x1="10" y1="11" x2="10" y2="17" />
-                                        <line x1="14" y1="11" x2="14" y2="17" />
-                                      </svg>
-                                      <span>حذف محصول</span>
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
+                                        <svg
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          aria-hidden="true"
+                                        >
+                                          <polyline points="3 6 5 6 21 6" />
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                          <line x1="10" y1="11" x2="10" y2="17" />
+                                          <line x1="14" y1="11" x2="14" y2="17" />
+                                        </svg>
+                                        <span>حذف محصول</span>
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                     );
