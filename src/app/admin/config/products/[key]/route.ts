@@ -24,11 +24,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ key:
     }
 
     const db = getDatabase();
-    const result = updateManagedProduct(db, key, {
-      title: body.title,
-      url: body.url,
-      source_key: body.source_key,
-    });
+    const result = updateManagedProduct(
+      db,
+      key,
+      {
+        title: body.title,
+        url: body.url,
+        source_key: body.source_key,
+        is_public: body.is_public !== undefined ? Boolean(body.is_public) : undefined,
+      },
+      auth.user
+    );
 
     return NextResponse.json(result);
   } catch (err: any) {
@@ -45,7 +51,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ k
 
     const { key } = await params;
     const db = getDatabase();
-    const result = deleteManagedProduct(db, key);
+    const result = deleteManagedProduct(db, key, auth.user);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 400 });

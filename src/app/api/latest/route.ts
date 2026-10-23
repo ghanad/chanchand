@@ -1,17 +1,23 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, getManagedProducts, getManagedTargets, latestSnapshots, recentRuns } from '@/lib/db';
 import { productsPayload, serializePrice, serializeRun } from '@/lib/serializers';
+import { getAuthUserFromRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const user = await getAuthUserFromRequest(req);
     const db = getDatabase();
-    const rows = latestSnapshots(db);
+
+    const filter = user ? { userId: user.id, isAdmin: user.role === 'admin' } : undefined;
+    const dbProducts = getManagedProducts(db, filter);
+    const allowedKeys = user && user.role !== 'admin' ? new Set(dbProducts.map((p) => p.key)) : undefined;
+
+    const rows = latestSnapshots(db, 100, allowedKeys);
     const runs = recentRuns(db, 1);
-    const dbProducts = getManagedProducts(db);
     const dbTargets = getManagedTargets(db);
-    const products = productsPayload(null, dbProducts, dbTargets);
+    const products = productsPayload(null, dbProducts, dbTargets, user);
 
     const latestRunRow = runs.length > 0 ? serializeRun(runs[0]) : null;
     let latestObservedAt: string | null = null;

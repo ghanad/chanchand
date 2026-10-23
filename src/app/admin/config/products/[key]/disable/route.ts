@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ key
 
     const { key } = await params;
     const db = getDatabase();
-    const result = setManagedProductEnabled(db, key, false);
+    const result = setManagedProductEnabled(db, key, false, auth.user);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 400 });

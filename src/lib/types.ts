@@ -37,6 +37,9 @@ export interface AppConfig {
 export interface ManagedProductRow {
   key: string;
   title: string;
+  user_id?: number | null;
+  is_public?: number;
+  owner_username?: string | null;
   created_at: string;
   updated_at: string;
 }

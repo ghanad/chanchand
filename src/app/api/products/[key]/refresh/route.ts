@@ -21,6 +21,17 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const productKey = decodeURIComponent(key);
 
     const db = getDatabase();
+    const prod = db.prepare('SELECT user_id, is_public FROM managed_products WHERE key = ?').get(productKey) as
+      | { user_id: number | null; is_public: number }
+      | undefined;
+
+    if (prod && auth.user.role !== 'admin' && prod.user_id !== auth.user.id && prod.is_public !== 1) {
+      return NextResponse.json(
+        { error: 'دسترسی غیرمجاز: شما فقط امکان استعلام محصولات خود یا آیتم‌های عمومی را دارید.' },
+        { status: 403 }
+      );
+    }
+
     const managedTargets = getManagedTargets(db);
     const candidateTargets = managedTargets.filter((t) => t.product_key === productKey);
 

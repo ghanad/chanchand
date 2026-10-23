@@ -70,20 +70,38 @@ export function serializeRun(row: RunRow): Record<string, any> {
 
 export function productsPayload(
   config?: AppConfig | null,
-  dbProducts: Array<{ id?: number; run_id?: number; key: string; title: string }> = [],
+  dbProducts: Array<{
+    id?: number;
+    run_id?: number;
+    key: string;
+    title: string;
+    user_id?: number | null;
+    owner_username?: string | null;
+    is_public?: number | boolean;
+  }> = [],
   managedTargets?: Array<{
     product_key: string;
     source_key: string;
     url: string;
     enabled: number | boolean;
-  }>
+  }>,
+  currentUser?: { id: number; role: string } | null
 ): Array<Record<string, any>> {
   const products: Record<string, any> = {};
 
   for (const dbProduct of dbProducts) {
+    const isPublic = Boolean(dbProduct.is_public);
+    const isOwner = currentUser?.id != null && dbProduct.user_id === currentUser.id;
+    const isAdmin = currentUser?.role === 'admin';
+    const canEdit = isAdmin || (isOwner && !isPublic);
+
     products[dbProduct.key] = {
       key: dbProduct.key,
       title: dbProduct.title,
+      user_id: dbProduct.user_id ?? null,
+      owner_username: dbProduct.owner_username ?? null,
+      is_public: isPublic,
+      can_edit: canEdit,
       configured: true,
       target_count: 0,
       enabled_target_count: 0,
@@ -97,6 +115,10 @@ export function productsPayload(
       products[key] = {
         key,
         title: prod.title,
+        user_id: null,
+        owner_username: null,
+        is_public: true,
+        can_edit: currentUser?.role === 'admin',
         configured: true,
         target_count: 0,
         enabled_target_count: 0,

@@ -23,9 +23,9 @@ export function ProductsView() {
   const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
 
   // Forms state
-  const [form, setForm] = useState({ title: "", url: "", source_key: "" });
+  const [form, setForm] = useState({ title: "", url: "", source_key: "", is_public: false });
   const [editProductKey, setEditProductKey] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "" });
+  const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "", is_public: false });
 
   // Filtering & search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -118,19 +118,19 @@ export function ProductsView() {
 
   async function addProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isAdmin) return;
     setBusyAction("add");
     try {
-      const result = await requestJson<{ product_key: string }>("/admin/config/products", {
+      const result = await requestJson<{ product_key: string }>("/api/products", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
           url: form.url.trim(),
           source_key: form.source_key || null,
+          is_public: isAdmin ? form.is_public : false,
         }),
       });
       showToast(`محصول ${result.product_key} اضافه شد.`);
-      setForm((current) => ({ title: "", url: "", source_key: current.source_key }));
+      setForm((current) => ({ title: "", url: "", source_key: current.source_key, is_public: false }));
       setShowAddProductModal(false);
       triggerRefresh();
     } catch (error) {
@@ -141,33 +141,35 @@ export function ProductsView() {
   }
 
   function startEditProduct(product: ProductRow) {
-    if (!isAdmin || !product.primary_target) return;
+    if ((!product.can_edit && !isAdmin) || !product.primary_target) return;
     setEditProductKey(product.key);
     setEditForm({
       title: product.title,
       url: product.primary_target.url,
       source_key: product.primary_target.source_key,
+      is_public: Boolean(product.is_public),
     });
   }
 
   function cancelEditProduct() {
     setEditProductKey(null);
-    setEditForm({ title: "", url: "", source_key: "" });
+    setEditForm({ title: "", url: "", source_key: "", is_public: false });
   }
 
   async function updateProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!isAdmin || !editProductKey) return;
+    if (!editProductKey) return;
     setBusyAction(`edit:${editProductKey}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(editProductKey)}`,
+        `/api/products/${encodeURIComponent(editProductKey)}`,
         {
           method: "PUT",
           body: JSON.stringify({
             title: editForm.title.trim(),
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
+            is_public: isAdmin ? editForm.is_public : undefined,
           }),
         },
       );
@@ -182,7 +184,7 @@ export function ProductsView() {
   }
 
   async function handleToggleProduct(product: ProductRow) {
-    if (!isAdmin || !product.key || product.target_count === 0) return;
+    if ((!product.can_edit && !isAdmin) || !product.key || product.target_count === 0) return;
     const wasActive = product.enabled_target_count > 0;
     const nextActive = !wasActive;
     const nextEnabledCount = nextActive ? (product.target_count || 1) : 0;
@@ -203,7 +205,7 @@ export function ProductsView() {
 
     // 2. Perform API request
     try {
-      const endpoint = `/admin/config/products/${encodeURIComponent(product.key)}/${
+      const endpoint = `/api/products/${encodeURIComponent(product.key)}/${
         nextActive ? "enable" : "disable"
       }`;
       const result = await requestJson<{ product_key: string }>(endpoint, { method: "POST" });
@@ -233,12 +235,12 @@ export function ProductsView() {
   }
 
   async function handleConfirmDelete() {
-    if (!isAdmin || !productToDelete?.key) return;
+    if ((!productToDelete?.can_edit && !isAdmin) || !productToDelete?.key) return;
     const key = productToDelete.key;
     setBusyAction(`delete:${key}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(key)}`,
+        `/api/products/${encodeURIComponent(key)}`,
         { method: "DELETE" },
       );
       showToast(`محصول ${result.product_key} حذف شد.`);
@@ -292,15 +294,13 @@ export function ProductsView() {
                 >
                   مشاهده کاتالوگ کالاها &rarr;
                 </Link>
-                {isAdmin ? (
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => setShowAddProductModal(true)}
-                  >
-                    + افزودن محصول
-                  </button>
-                ) : null}
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => setShowAddProductModal(true)}
+                >
+                  + افزودن محصول
+                </button>
               </div>
             }
           />
@@ -412,13 +412,25 @@ export function ProductsView() {
                         {/* 1. Title & Slug (bold title + small muted slug) */}
                         <td className="col-title">
                           <div className="product-title-cell product-info-text">
-                            <Link
-                              href={`${basePath}/products/${encodeURIComponent(product.key)}`}
-                              className="product-row-title-link"
-                              title={`مشاهده جزئیات و تاریخچه ${product.title}`}
-                            >
-                              <strong className="product-row-title">{product.title}</strong>
-                            </Link>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <Link
+                                href={`${basePath}/products/${encodeURIComponent(product.key)}`}
+                                className="product-row-title-link"
+                                title={`مشاهده جزئیات و تاریخچه ${product.title}`}
+                              >
+                                <strong className="product-row-title">{product.title}</strong>
+                              </Link>
+                              {product.is_public ? (
+                                <span className="adapter-badge brsapi_market" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
+                                  عمومی / بازار
+                                </span>
+                              ) : null}
+                              {isAdmin && product.owner_username ? (
+                                <span className="adapter-badge generic_html" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
+                                  کاربر: {product.owner_username}
+                                </span>
+                              ) : null}
+                            </div>
                             <span className="product-row-slug" title={product.key}>
                               {product.key}
                             </span>
@@ -521,7 +533,7 @@ export function ProductsView() {
                                   ? `غیرفعال کردن ${product.title}`
                                   : `فعال کردن ${product.title}`
                               }
-                              disabled={!canToggle || isToggling || !isAdmin}
+                              disabled={!canToggle || isToggling || (!product.can_edit && !isAdmin)}
                               className={`status-toggle-btn ${isActive ? "is-active" : ""} ${
                                 isToggling ? "is-loading" : ""
                               }`}
@@ -529,6 +541,8 @@ export function ProductsView() {
                               title={
                                 !canToggle
                                   ? "بدون هدف فعال"
+                                  : (!product.can_edit && !isAdmin)
+                                  ? "محصول عمومی فقط توسط مدیر قابل تغییر وضعیت است"
                                   : isActive
                                   ? "کلیک برای غیرفعال‌سازی"
                                   : "کلیک برای فعال‌سازی"
@@ -573,7 +587,7 @@ export function ProductsView() {
                               </svg>
                             </Link>
 
-                            {isAdmin ? (
+                            {(product.can_edit || isAdmin) ? (
                               <>
                                 {/* Edit Icon Button */}
                                 <button
@@ -736,6 +750,16 @@ export function ProductsView() {
               ))}
             </select>
           </label>
+          {isAdmin ? (
+            <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+              <input
+                type="checkbox"
+                checked={form.is_public}
+                onChange={(event) => setForm((current) => ({ ...current, is_public: event.target.checked }))}
+              />
+              <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
+            </label>
+          ) : null}
           <div className="modal-form-actions">
             <button
               className="secondary-button"
@@ -803,6 +827,16 @@ export function ProductsView() {
               required
             />
           </label>
+          {isAdmin ? (
+            <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+              <input
+                type="checkbox"
+                checked={editForm.is_public}
+                onChange={(event) => setEditForm((current) => ({ ...current, is_public: event.target.checked }))}
+              />
+              <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
+            </label>
+          ) : null}
           <div className="modal-form-actions">
             <button
               className="secondary-button"

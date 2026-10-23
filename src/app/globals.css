@@ -86,6 +86,19 @@ select {
   padding: 0 12px;
 }
 
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  min-width: auto;
+  min-height: auto;
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
 input[type="url"],
 input[type="email"],
 input[type="password"],
@@ -1956,7 +1969,7 @@ tbody tr:last-child td {
 .modal-checkbox-row {
   display: flex !important;
   flex-direction: row !important;
-  align-items: center;
+  align-items: center !important;
   gap: 10px;
   cursor: pointer;
   user-select: none;
@@ -1967,10 +1980,16 @@ tbody tr:last-child td {
 }
 
 .modal-checkbox-row input[type="checkbox"] {
-  width: 17px;
-  height: 17px;
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px !important;
+  min-height: 18px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
   accent-color: var(--accent);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 

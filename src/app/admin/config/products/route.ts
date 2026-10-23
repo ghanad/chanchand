@@ -27,6 +27,8 @@ export async function POST(req: NextRequest) {
       title: body.title,
       url: body.url,
       source_key: body.source_key,
+      user_id: auth.user.id,
+      is_public: body.is_public !== undefined ? Boolean(body.is_public) : true,
     });
 
     return NextResponse.json(result);

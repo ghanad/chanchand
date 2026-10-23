@@ -155,7 +155,8 @@ describe('Next.js API Route Handlers Integration', () => {
       });
       db.close();
 
-      const res = await getProducts();
+      const req = new NextRequest('https://example.com/api/products');
+      const res = await getProducts(req);
       expect(res.status).toBe(200);
 
       const json = await res.json();

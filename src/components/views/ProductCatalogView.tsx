@@ -102,15 +102,13 @@ export function ProductCatalogView() {
           title="محصولات"
           meta={`${formatNumber(totalCount)} محصول`}
           action={
-            isAdmin ? (
-              <Link
-                href={`${basePath}/manage-products`}
-                className="primary-button compact-btn"
-                title="رفتن به جدول تنظیمات، افزودن و لینک‌های محصولات"
-              >
-                + مدیریت و افزودن محصول
-              </Link>
-            ) : null
+            <Link
+              href={basePath ? `${basePath}/manage-products` : "/manage-products"}
+              className="primary-button compact-btn"
+              title="رفتن به جدول تنظیمات، افزودن و لینک‌های محصولات"
+            >
+              + مدیریت و افزودن محصول
+            </Link>
           }
         />
 
@@ -222,13 +220,25 @@ export function ProductCatalogView() {
                       {/* 1. Title & Slug (bold clickable title + small muted slug) */}
                       <td className="col-title">
                         <div className="product-title-cell product-info-text">
-                          <Link
-                            href={detailHref}
-                            className="product-row-title-link"
-                            title={`مشاهده جزئیات و تاریخچه ${item.title}`}
-                          >
-                            <strong className="product-row-title">{item.title}</strong>
-                          </Link>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                            <Link
+                              href={detailHref}
+                              className="product-row-title-link"
+                              title={`مشاهده جزئیات و تاریخچه ${item.title}`}
+                            >
+                              <strong className="product-row-title">{item.title}</strong>
+                            </Link>
+                            {item.is_public ? (
+                              <span className="adapter-badge brsapi_market" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
+                                عمومی / بازار
+                              </span>
+                            ) : null}
+                            {isAdmin && item.owner_username ? (
+                              <span className="adapter-badge generic_html" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
+                                کاربر: {item.owner_username}
+                              </span>
+                            ) : null}
+                          </div>
                           <span className="product-row-slug" title={item.key}>
                             {item.key}
                           </span>

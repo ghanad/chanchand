@@ -21,6 +21,10 @@ export interface PriceRow {
 export interface ProductRow {
   key: string;
   title: string;
+  user_id?: number | null;
+  owner_username?: string | null;
+  is_public?: boolean;
+  can_edit?: boolean;
   configured: boolean;
   target_count: number;
   enabled_target_count: number;

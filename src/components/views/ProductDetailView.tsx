@@ -55,7 +55,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isRunningNow, setIsRunningNow] = useState(false);
-  const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "" });
+  const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "", is_public: false });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -75,6 +75,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           title: matched.title,
           url: matched.primary_target?.url || "",
           source_key: matched.primary_target?.source_key || "",
+          is_public: Boolean(matched.is_public),
         });
       } else {
         setProduct(null);
@@ -150,7 +151,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     setIsToggling(true);
 
     try {
-      const endpoint = `/admin/config/products/${encodeURIComponent(product.key)}/${
+      const endpoint = `/api/products/${encodeURIComponent(product.key)}/${
         nextActive ? "enable" : "disable"
       }`;
       await requestJson<{ product_key: string }>(endpoint, { method: "POST" });
@@ -206,17 +207,18 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
   // Edit product
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAdmin || !product) return;
+    if ((!product?.can_edit && !isAdmin) || !product) return;
     setIsSavingEdit(true);
     try {
       await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(product.key)}`,
+        `/api/products/${encodeURIComponent(product.key)}`,
         {
           method: "PUT",
           body: JSON.stringify({
             title: editForm.title.trim(),
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
+            is_public: isAdmin ? editForm.is_public : undefined,
           }),
         },
       );
@@ -232,11 +234,11 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
 
   // Delete product
   const handleDeleteProduct = async () => {
-    if (!isAdmin || !product) return;
+    if ((!product?.can_edit && !isAdmin) || !product) return;
     setIsDeleting(true);
     try {
       await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(product.key)}`,
+        `/api/products/${encodeURIComponent(product.key)}`,
         { method: "DELETE" },
       );
       showToast(`محصول «${product.title}» حذف شد.`);
@@ -358,6 +360,16 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
               <span className="product-slug-pill" title="شناسه یکتای محصول">
                 {product.key}
               </span>
+              {product.is_public ? (
+                <span className="adapter-badge brsapi_market" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                  عمومی / بازار
+                </span>
+              ) : null}
+              {isAdmin && product.owner_username ? (
+                <span className="adapter-badge generic_html" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
+                  کاربر: {product.owner_username}
+                </span>
+              ) : null}
               {product.sources.map((s) => (
                 <span className="product-source-badge" key={s}>
                   {s}
@@ -428,8 +440,8 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
               {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
             </button>
 
-            {/* Admin-only actions: Status toggle, Edit, Delete */}
-            {isAdmin && (
+            {/* Actions for owner or admin: Status toggle, Edit, Delete */}
+            {(isAdmin || product.can_edit) && (
               <>
                 <div className="status-toggle-wrapper">
                   <button
@@ -608,7 +620,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
       </section>
 
       {/* Modal: Edit Product */}
-      {isAdmin && (
+      {(isAdmin || product.can_edit) && (
         <Modal
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
@@ -647,6 +659,16 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
                 required
               />
             </label>
+            {isAdmin ? (
+              <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+                <input
+                  type="checkbox"
+                  checked={editForm.is_public}
+                  onChange={(e) => setEditForm((c) => ({ ...c, is_public: e.target.checked }))}
+                />
+                <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
+              </label>
+            ) : null}
             <div className="modal-form-actions">
               <button
                 type="button"
@@ -669,7 +691,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
       )}
 
       {/* Modal: Delete Confirmation */}
-      {isAdmin && (
+      {(isAdmin || product.can_edit) && (
         <Modal
           isOpen={showDeleteModal}
           onClose={() => setShowDeleteModal(false)}
