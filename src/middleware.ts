@@ -6,10 +6,10 @@ const PUBLIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.woff
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Ignore static assets and Next.js internal files
+  // Ignore static assets and Next.js internal static assets
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/IranSansX') ||
+    pathname.startsWith('/_next/static') ||
+    pathname.startsWith('/_next/image') ||
     pathname === '/favicon.ico' ||
     PUBLIC_FILE_EXTENSIONS.some((ext) => pathname.endsWith(ext))
   ) {
@@ -36,9 +36,16 @@ export async function middleware(req: NextRequest) {
 
   // If unauthenticated:
   if (!session) {
-    if (pathname.startsWith('/api/')) {
+    const isApiRequest =
+      pathname.startsWith('/api/') ||
+      pathname.startsWith('/admin/run-now') ||
+      pathname.startsWith('/admin/config/') ||
+      req.headers.get('accept')?.includes('application/json');
+
+    if (isApiRequest) {
       return NextResponse.json({ error: 'برای دسترسی ابتدا باید وارد شوید.' }, { status: 401 });
     }
+
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
@@ -47,7 +54,13 @@ export async function middleware(req: NextRequest) {
   // Role check: /admin/* or /api/admin/* require 'admin' role
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   if (isAdminPath && session.role !== 'admin') {
-    if (pathname.startsWith('/api/')) {
+    const isApiRequest =
+      pathname.startsWith('/api/') ||
+      pathname.startsWith('/admin/run-now') ||
+      pathname.startsWith('/admin/config/') ||
+      req.headers.get('accept')?.includes('application/json');
+
+    if (isApiRequest) {
       return NextResponse.json({ error: 'دسترسی فقط برای مدیر سیستم مجاز است.' }, { status: 403 });
     }
     return NextResponse.redirect(new URL('/', req.url));
