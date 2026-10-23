@@ -2,10 +2,9 @@
 
 This guide covers deploying Price Getter on a public VPS (Ubuntu/Debian) using Docker Compose with user management and role-based access control.
 
-It runs three isolated container services:
+It runs two isolated container services:
 - `app`: Next.js web application and API on port `8000` (Node.js 22 runtime).
 - `scheduler`: background worker that runs price collection periodically.
-- `nginx`: public reverse proxy handling gzip, SSL termination, and security headers.
 
 ---
 
@@ -155,13 +154,12 @@ When hosting on a public VPS, HTTPS is essential to protect login credentials an
 
 If your VPS has a public domain (e.g., `prices.example.com` pointing to your server's IP):
 
-1. Stop Compose Nginx temporarily or change `PRICE_GETTER_PUBLIC_PORT=8080` in `.env`.
-2. Install Certbot on the host:
+1. Install Certbot on the host:
    ```bash
    sudo apt install -y certbot python3-certbot-nginx
    sudo certbot --nginx -d prices.example.com
    ```
-3. Proxy traffic to `http://127.0.0.1:8080` (or `8000`).
+2. Configure host Nginx to proxy traffic to `http://127.0.0.1:8000`.
 
 ### Option B: Cloudflare Proxied DNS (Recommended & Easiest)
 

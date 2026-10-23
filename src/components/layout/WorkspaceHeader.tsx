@@ -3,6 +3,7 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "../../context/DashboardContext";
+import { UserMenu } from "./UserMenu";
 
 function getPageTitle(pathname: string): string {
   const cleanPath = pathname.replace(/^\/admin/, "") || "/";
@@ -17,7 +18,7 @@ function getPageTitle(pathname: string): string {
 
 export function WorkspaceHeader() {
   const pathname = usePathname();
-  const { isAdmin, currentUser, logout, runNow, isCollecting } = useDashboard();
+  const { isAdmin, runNow, isCollecting } = useDashboard();
   const title = getPageTitle(pathname);
 
   return (
@@ -36,22 +37,7 @@ export function WorkspaceHeader() {
             {isCollecting ? "در حال اجرا" : "اجرای جمع‌آوری"}
           </button>
         ) : null}
-        {currentUser ? (
-          <div className="user-profile-badge">
-            <span className="user-name">{currentUser.username}</span>
-            <span className={`role-pill ${currentUser.role}`}>
-              {currentUser.role === "admin" ? "مدیر" : "بیننده"}
-            </span>
-            <button
-              className="ghost-button logout-button"
-              type="button"
-              onClick={logout}
-              title="خروج از حساب کاربری"
-            >
-              خروج
-            </button>
-          </div>
-        ) : null}
+        <UserMenu />
       </div>
     </header>
   );

@@ -33,9 +33,12 @@ const DashboardContext = createContext<DashboardContextType | null>(null);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
-
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+
+  const isRoleAdmin = currentUser?.role === "admin";
+  const isOnAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdmin = isRoleAdmin || isOnAdminPath;
+
   const [toast, setToast] = useState("");
   const [summary, setSummary] = useState<LatestPayload["summary"] | null>(null);
   const [loading, setLoading] = useState(false);

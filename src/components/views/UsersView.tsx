@@ -7,6 +7,7 @@ import { useDashboard } from "@/context/DashboardContext";
 import { Metric } from "@/components/common/Metric";
 import { PanelHead } from "@/components/common/PanelHead";
 import { StatusPill } from "@/components/common/StatusPill";
+import { Modal } from "@/components/common/Modal";
 
 interface UserItem {
   id: number;
@@ -21,6 +22,8 @@ export function UsersView() {
   const { currentUser, showToast, setLoading, refreshTick, triggerRefresh } = useDashboard();
   const [users, setUsers] = useState<UserItem[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
+
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
 
   // New user form state
   const [newUsername, setNewUsername] = useState("");
@@ -70,6 +73,7 @@ export function UsersView() {
       setNewPassword("");
       setNewEmail("");
       setNewRole("viewer");
+      setShowAddUserModal(false);
       triggerRefresh();
     } catch (err: any) {
       showToast(err instanceof Error ? err.message : "خطا در ساخت کاربر");
@@ -161,66 +165,22 @@ export function UsersView() {
       </section>
 
       <div className="product-grid">
-        {/* Create user form panel */}
-        <section className="panel product-form-panel">
-          <PanelHead title="افزودن کاربر جدید" />
-          <form className="product-form" onSubmit={handleCreateUser}>
-            <label>
-              نام کاربری
-              <input
-                value={newUsername}
-                onChange={(e) => setNewUsername(e.target.value)}
-                autoComplete="off"
-                placeholder="مثلاً: ali_manager"
-                required
-                minLength={3}
-              />
-            </label>
-            <label>
-              کلمه عبور
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="حداقل ۶ کاراکتر"
-                required
-                minLength={6}
-              />
-            </label>
-            <label>
-              ایمیل (اختیاری)
-              <input
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="user@example.com"
-              />
-            </label>
-            <label>
-              نقش دسترسی
-              <select
-                value={newRole}
-                onChange={(e) => setNewRole(e.target.value as "admin" | "viewer")}
-              >
-                <option value="viewer">بیننده (مشاهده بدون امکان تغییر)</option>
-                <option value="admin">مدیر (دسترسی کامل و تغییر تنظیمات)</option>
-              </select>
-            </label>
-            <button
-              className="primary-button product-submit"
-              type="submit"
-              disabled={busyAction === "create"}
-            >
-              {busyAction === "create" ? "در حال ایجاد..." : "افزودن کاربر"}
-            </button>
-          </form>
-        </section>
-
         {/* Users list panel */}
         <section className="panel product-list-panel">
           <PanelHead
             title="کاربران ثبت‌شده در پایگاه داده"
             meta={`${formatNumber(users.length)} کاربر`}
+            action={
+              currentUser?.role === "admin" ? (
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => setShowAddUserModal(true)}
+                >
+                  + افزودن کاربر جدید
+                </button>
+              ) : null
+            }
           />
           <div className="product-list">
             {users.map((user) => {
@@ -310,6 +270,78 @@ export function UsersView() {
           </div>
         </section>
       </div>
+
+      {/* Modal: Add User */}
+      <Modal
+        isOpen={showAddUserModal}
+        onClose={() => setShowAddUserModal(false)}
+        title="افزودن کاربر جدید"
+      >
+        <form className="modal-form" onSubmit={handleCreateUser}>
+          <label>
+            نام کاربری
+            <input
+              value={newUsername}
+              onChange={(e) => setNewUsername(e.target.value)}
+              autoComplete="off"
+              placeholder="مثلاً: ali_manager"
+              dir="ltr"
+              required
+              minLength={3}
+              autoFocus
+            />
+          </label>
+          <label>
+            کلمه عبور
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="حداقل ۶ کاراکتر"
+              dir="ltr"
+              required
+              minLength={6}
+            />
+          </label>
+          <label>
+            ایمیل (اختیاری)
+            <input
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="user@example.com"
+              dir="ltr"
+            />
+          </label>
+          <label>
+            نقش دسترسی
+            <select
+              value={newRole}
+              onChange={(e) => setNewRole(e.target.value as "admin" | "viewer")}
+            >
+              <option value="viewer">بیننده (مشاهده بدون امکان تغییر)</option>
+              <option value="admin">مدیر (دسترسی کامل و تغییر تنظیمات)</option>
+            </select>
+          </label>
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setShowAddUserModal(false)}
+              disabled={busyAction === "create"}
+            >
+              انصراف
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={busyAction === "create"}
+            >
+              {busyAction === "create" ? "در حال ایجاد..." : "افزودن کاربر"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

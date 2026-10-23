@@ -51,6 +51,11 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // If authenticated admin visits root '/', redirect to '/admin' so they land directly on admin dashboard
+  if (pathname === '/' && session.role === 'admin') {
+    return NextResponse.redirect(new URL('/admin', req.url));
+  }
+
   // Role check: /admin/* or /api/admin/* require 'admin' role
   const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
   if (isAdminPath && session.role !== 'admin') {

@@ -31,7 +31,7 @@ export function Sidebar() {
       <div className="brand-block">
         <span className="brand-mark">PG</span>
         <div>
-          <p>داشبورد قیمت</p>
+          <p>{isAdmin ? "پنل مدیریت سیستم" : "داشبورد قیمت"}</p>
           <h1>Price Getter</h1>
         </div>
       </div>
@@ -42,19 +42,21 @@ export function Sidebar() {
             const href = `${basePath}${item.subpath}` || "/";
             const isActive =
               item.subpath === ""
-                ? pathname === (basePath || "/")
-                : pathname === href || pathname.startsWith(`${href}/`);
+                ? pathname === (basePath || "/") || (basePath === "/admin" && pathname === "/")
+                : pathname === href ||
+                  pathname.startsWith(`${href}/`) ||
+                  (basePath === "/admin" && (pathname === item.subpath || pathname.startsWith(`${item.subpath}/`)));
 
-          return (
-            <Link
-              key={item.id}
-              href={href}
-              className={`nav-link ${isActive ? "active" : ""}`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
+            return (
+              <Link
+                key={item.id}
+                href={href}
+                className={`nav-link ${isActive ? "active" : ""}`}
+              >
+                {item.label}
+              </Link>
+            );
+          })}
       </nav>
     </aside>
   );

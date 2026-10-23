@@ -8,6 +8,7 @@ import { useDashboard } from "../../context/DashboardContext";
 import { Metric } from "../common/Metric";
 import { PanelHead } from "../common/PanelHead";
 import { StatusPill } from "../common/StatusPill";
+import { Modal } from "../common/Modal";
 
 export function ProductsView() {
   const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
@@ -15,11 +16,13 @@ export function ProductsView() {
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showAddSourceModal, setShowAddSourceModal] = useState(false);
+
   const [form, setForm] = useState({ title: "", url: "", source_key: "" });
   const [editProductKey, setEditProductKey] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "" });
 
-  const [showSourceForm, setShowSourceForm] = useState(false);
   const [sourceForm, setSourceForm] = useState({
     key: "",
     adapter: "digikala_api",
@@ -73,6 +76,7 @@ export function ProductsView() {
       });
       showToast(`محصول ${result.product_key} اضافه شد.`);
       setForm((current) => ({ title: "", url: "", source_key: current.source_key }));
+      setShowAddProductModal(false);
       triggerRefresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "خطا در افزودن محصول");
@@ -204,7 +208,7 @@ export function ProductsView() {
         currency: "IRR",
         price_multiplier: 1,
       });
-      setShowSourceForm(false);
+      setShowAddSourceModal(false);
       triggerRefresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "خطا در افزودن منبع");
@@ -242,50 +246,22 @@ export function ProductsView() {
       </section>
 
       <div className={`product-grid ${isAdmin ? "" : "read-only"}`}>
-        {isAdmin ? (
-          <section className="panel product-form-panel">
-            <PanelHead title="افزودن محصول" />
-            <form className="product-form" onSubmit={addProduct}>
-              <label>
-                عنوان
-                <input
-                  value={form.title}
-                  onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
-                  autoComplete="off"
-                  required
-                />
-              </label>
-              <label>
-                URL
-                <input
-                  value={form.url}
-                  onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
-                  type="url"
-                  required
-                />
-              </label>
-              <label>
-                منبع
-                <select
-                  value={form.source_key}
-                  onChange={(event) => setForm((current) => ({ ...current, source_key: event.target.value }))}
-                >
-                  {configuredSources.map((source) => (
-                    <option key={source.key} value={source.key}>
-                      {source.key} ({source.adapter})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="primary-button product-submit" type="submit" disabled={busyAction === "add"}>
-                {busyAction === "add" ? "در حال افزودن" : "اضافه کردن"}
-              </button>
-            </form>
-          </section>
-        ) : null}
-
         <section className="panel product-list-panel">
-          <PanelHead title="محصولات" meta={`${formatNumber(configuredProductCount)} محصول`} />
+          <PanelHead
+            title="محصولات"
+            meta={`${formatNumber(configuredProductCount)} محصول`}
+            action={
+              isAdmin ? (
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={() => setShowAddProductModal(true)}
+                >
+                  + افزودن محصول
+                </button>
+              ) : null
+            }
+          />
           <div className="product-list">
             {configProducts.map((product) => {
               const isActive = product.enabled_target_count > 0;
@@ -337,6 +313,8 @@ export function ProductsView() {
                             value={editForm.url}
                             onChange={(event) => setEditForm((current) => ({ ...current, url: event.target.value }))}
                             type="url"
+                            dir="ltr"
+                            placeholder="https://..."
                             required
                           />
                         </label>
@@ -429,78 +407,23 @@ export function ProductsView() {
       </div>
 
       <section className="panel" style={{ marginTop: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-          <PanelHead title="منابع قیمت‌گیری" meta={`${formatNumber(configuredSources.length)} منبع`} />
-          {isAdmin && (
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => setShowSourceForm((prev) => !prev)}
-            >
-              {showSourceForm ? "بستن فرم" : "+ افزودن منبع"}
-            </button>
-          )}
-        </div>
-
-        {showSourceForm && isAdmin && (
-          <form className="product-form" onSubmit={addSource} style={{ marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-            <label>
-              شناسه منبع (Key)
-              <input
-                value={sourceForm.key}
-                onChange={(e) => setSourceForm((c) => ({ ...c, key: e.target.value }))}
-                placeholder="e.g. digikala_market"
-                required
-              />
-            </label>
-            <label>
-              نوع آداپتور
-              <select
-                value={sourceForm.adapter}
-                onChange={(e) => setSourceForm((c) => ({ ...c, adapter: e.target.value }))}
+        <PanelHead
+          title="منابع قیمت‌گیری"
+          meta={`${formatNumber(configuredSources.length)} منبع`}
+          action={
+            isAdmin ? (
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setShowAddSourceModal(true)}
               >
-                <option value="digikala_api">digikala_api</option>
-                <option value="digikala_web">digikala_web</option>
-                <option value="generic_html">generic_html</option>
-                <option value="brsapi_market">brsapi_market</option>
-              </select>
-            </label>
-            <label>
-              محدودیت نرخ (ثانیه)
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={sourceForm.rate_limit_seconds}
-                onChange={(e) => setSourceForm((c) => ({ ...c, rate_limit_seconds: Number(e.target.value) }))}
-              />
-            </label>
-            <label>
-              واحد پول
-              <select
-                value={sourceForm.currency}
-                onChange={(e) => setSourceForm((c) => ({ ...c, currency: e.target.value }))}
-              >
-                <option value="IRR">IRR (ریال)</option>
-                <option value="TOMAN">TOMAN (تومان)</option>
-              </select>
-            </label>
-            <label>
-              ضریب ارز
-              <input
-                type="number"
-                min="1"
-                value={sourceForm.price_multiplier}
-                onChange={(e) => setSourceForm((c) => ({ ...c, price_multiplier: Number(e.target.value) }))}
-              />
-            </label>
-            <button className="primary-button" type="submit" disabled={busyAction === "add_source"}>
-              {busyAction === "add_source" ? "در حال افزودن..." : "ثبت منبع"}
-            </button>
-          </form>
-        )}
+                + افزودن منبع
+              </button>
+            ) : null
+          }
+        />
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
           {configuredSources.map((source) => (
             <div
               key={source.key}
@@ -539,6 +462,163 @@ export function ProductsView() {
           ))}
         </div>
       </section>
+
+      {/* Modal: Add Product */}
+      <Modal
+        isOpen={showAddProductModal}
+        onClose={() => setShowAddProductModal(false)}
+        title="افزودن محصول جدید"
+      >
+        <form className="modal-form" onSubmit={addProduct}>
+          <label>
+            عنوان محصول
+            <input
+              value={form.title}
+              onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))}
+              placeholder="مثلاً: تلویزیون ۵۵ اینچ سامسونگ"
+              autoComplete="off"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            آدرس اینترنتی (URL)
+            <input
+              value={form.url}
+              onChange={(event) => setForm((current) => ({ ...current, url: event.target.value }))}
+              placeholder="https://..."
+              type="url"
+              dir="ltr"
+              required
+            />
+          </label>
+          <label>
+            منبع قیمت‌گیری
+            <select
+              value={form.source_key}
+              onChange={(event) => setForm((current) => ({ ...current, source_key: event.target.value }))}
+            >
+              {configuredSources.map((source) => (
+                <option key={source.key} value={source.key}>
+                  {source.key} ({source.adapter})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setShowAddProductModal(false)}
+              disabled={busyAction === "add"}
+            >
+              انصراف
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={busyAction === "add"}
+            >
+              {busyAction === "add" ? "در حال افزودن..." : "افزودن محصول"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Add Source */}
+      <Modal
+        isOpen={showAddSourceModal}
+        onClose={() => setShowAddSourceModal(false)}
+        title="افزودن منبع قیمت‌گیری جدید"
+        maxWidth="600px"
+      >
+        <form className="modal-form" onSubmit={addSource}>
+          <div className="modal-grid-2">
+            <label>
+              شناسه منبع (Key)
+              <input
+                value={sourceForm.key}
+                onChange={(e) => setSourceForm((c) => ({ ...c, key: e.target.value }))}
+                placeholder="مثلاً: digikala_market"
+                dir="ltr"
+                required
+                autoFocus
+              />
+            </label>
+            <label>
+              نوع آداپتور
+              <select
+                value={sourceForm.adapter}
+                onChange={(e) => setSourceForm((c) => ({ ...c, adapter: e.target.value }))}
+              >
+                <option value="digikala_api">digikala_api</option>
+                <option value="digikala_web">digikala_web</option>
+                <option value="generic_html">generic_html</option>
+                <option value="brsapi_market">brsapi_market</option>
+              </select>
+            </label>
+          </div>
+          <div className="modal-grid-2">
+            <label>
+              محدودیت نرخ (ثانیه)
+              <input
+                type="number"
+                min="0"
+                step="0.5"
+                value={sourceForm.rate_limit_seconds}
+                onChange={(e) => setSourceForm((c) => ({ ...c, rate_limit_seconds: Number(e.target.value) }))}
+              />
+            </label>
+            <label>
+              مهلت زمانی (ثانیه)
+              <input
+                type="number"
+                min="1"
+                value={sourceForm.timeout_seconds}
+                onChange={(e) => setSourceForm((c) => ({ ...c, timeout_seconds: Number(e.target.value) }))}
+              />
+            </label>
+          </div>
+          <div className="modal-grid-2">
+            <label>
+              واحد پول
+              <select
+                value={sourceForm.currency}
+                onChange={(e) => setSourceForm((c) => ({ ...c, currency: e.target.value }))}
+              >
+                <option value="IRR">IRR (ریال)</option>
+                <option value="TOMAN">TOMAN (تومان)</option>
+              </select>
+            </label>
+            <label>
+              ضریب ارز
+              <input
+                type="number"
+                min="1"
+                value={sourceForm.price_multiplier}
+                onChange={(e) => setSourceForm((c) => ({ ...c, price_multiplier: Number(e.target.value) }))}
+              />
+            </label>
+          </div>
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setShowAddSourceModal(false)}
+              disabled={busyAction === "add_source"}
+            >
+              انصراف
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={busyAction === "add_source"}
+            >
+              {busyAction === "add_source" ? "در حال افزودن..." : "ثبت منبع"}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
