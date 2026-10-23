@@ -14,6 +14,30 @@ export function UserMenu() {
   // در صورت اضافه شدن این صفحات در آینده، مقدار این متغیر به true تغییر می‌یابد
   const hasExtraNav = false;
 
+  // بستن با کلید Escape و بازگشت فوکوس به دکمه اصلی
+  const closeMenu = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
+  // باز کردن منو و انتقال فوکوس به آیتم اول یا آخر برای دسترسی‌پذیری صفحه‌خوان و کیبورد
+  const openMenuAndFocus = useCallback((target: "first" | "last" = "first") => {
+    setIsOpen(true);
+    requestAnimationFrame(() => {
+      const menu = menuRef.current;
+      if (!menu) return;
+      const items = Array.from(
+        menu.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>(
+          '[role="menuitem"]:not([disabled])'
+        )
+      );
+      if (items.length > 0) {
+        const itemToFocus = target === "last" ? items[items.length - 1] : items[0];
+        itemToFocus?.focus();
+      }
+    });
+  }, []);
+
   // بستن منو با کلیک در بیرون از کامپوننت
   useEffect(() => {
     if (!isOpen) return;
@@ -35,13 +59,7 @@ export function UserMenu() {
     };
   }, [isOpen]);
 
-  // بستن با کلید Escape و بازگشت فوکوس به دکمه اصلی
-  const closeMenu = useCallback(() => {
-    setIsOpen(false);
-    triggerRef.current?.focus();
-  }, []);
-
-  // مدیریت کلیدهای کیبورد (Escape, Tab, Arrows, Home, End)
+  // مدیریت کلیدهای کیبورد (Escape, Tab, Arrows, Home, End, Enter, Space)
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       e.preventDefault();
@@ -49,15 +67,14 @@ export function UserMenu() {
       return;
     }
 
+    // اگر منو بسته است و کلید بازکننده زده شد
     if (!isOpen) {
-      if (
-        e.key === "ArrowDown" ||
-        e.key === "ArrowUp" ||
-        e.key === "Enter" ||
-        e.key === " "
-      ) {
+      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        setIsOpen(true);
+        openMenuAndFocus("first");
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        openMenuAndFocus("last");
       }
       return;
     }
@@ -89,7 +106,7 @@ export function UserMenu() {
       e.preventDefault();
       items[items.length - 1]?.focus();
     } else if (e.key === "Tab") {
-      // بستن منو در صورت جابجایی فوکوس به بیرون
+      // بستن منو در صورت جابجایی فوکوس با Tab به بیرون منو
       setIsOpen(false);
     }
   };
@@ -115,11 +132,17 @@ export function UserMenu() {
         id="user-menu-button"
         type="button"
         className={`user-menu-trigger ${isOpen ? "is-open" : ""}`}
-        onClick={() => setIsOpen((prev) => !prev)}
+        onClick={() => {
+          if (isOpen) {
+            setIsOpen(false);
+          } else {
+            openMenuAndFocus("first");
+          }
+        }}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls="user-dropdown-menu"
-        aria-label={`منوی حساب کاربری ${currentUser.username}`}
+        aria-label={`منوی حساب کاربری ${currentUser.username} (${roleLabel})`}
       >
         <span className="user-avatar user-avatar-sm" aria-hidden="true">
           {initialLetter}
@@ -151,7 +174,7 @@ export function UserMenu() {
           className="user-dropdown-menu"
           tabIndex={-1}
         >
-          {/* بخش بالای منو: آواتار بزرگتر، نام کاربر و نشان نقش */}
+          {/* بخش بالای منو: آواتار بزرگتر، نام کاربر و نشان نقش با سایز ارتقایافته */}
           <div className="user-dropdown-header">
             <span className="user-avatar user-avatar-lg" aria-hidden="true">
               {initialLetter}
@@ -234,7 +257,7 @@ export function UserMenu() {
             </>
           )}
 
-          {/* گزینه خروج با آیکون و رنگ قرمز ملایم */}
+          {/* گزینه خروج با آیکون اشاره‌کننده به چپ در RTL و رنگ قرمز ملایم */}
           <button
             type="button"
             role="menuitem"
@@ -243,6 +266,7 @@ export function UserMenu() {
             onClick={handleLogout}
           >
             <svg
+              className="user-logout-icon"
               width="16"
               height="16"
               viewBox="0 0 24 24"

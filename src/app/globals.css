@@ -1044,12 +1044,7 @@ tbody tr:last-child td {
   color: currentColor;
 }
 
-/* آیکون خروج در RTL با اشاره به سمت چپ */
-.user-dropdown-logout svg,
-.user-logout-icon {
-  transform: scaleX(-1);
-  transform-origin: center;
-}
+
 
 .user-dropdown-item.user-dropdown-logout {
   color: var(--danger);
