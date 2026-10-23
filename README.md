@@ -1,6 +1,6 @@
-# Price Getter
+# چن چند (chanchand) — Price Getter
 
-Price Getter is a fullstack price collection and analytics service built with **Next.js**, **React**, **TypeScript**, and **SQLite**. It collects prices from ecommerce pages (e.g. Digikala) and financial markets (e.g. gold, currency from BRSAPI) and displays price history with USD conversion.
+**چن چند (chanchand)** (قبلاً Price Getter) یک سرویس جامع برای دریافت، مقایسه و تحلیل لحظه‌ای قیمت کالاها و بازارهای مالی است که با **Next.js**، **React**، **TypeScript** و **SQLite** ساخته شده است. این سامانه قیمت‌ها را از فروشگاه‌های آنلاین (مانند دیجی‌کالا) و بازارهای مالی (طلا و ارز) جمع‌آوری و با نرخ‌های معادل تحلیل می‌کند.
 
 ## Quick Start
 

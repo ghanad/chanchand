@@ -4,8 +4,8 @@ import { DashboardProvider } from "../context/DashboardContext";
 import { AppShell } from "../components/layout/AppShell";
 
 export const metadata: Metadata = {
-  title: "سامانه پایش قیمت | Price Getter",
-  description: "سرویس دریافت و تحلیل قیمت کالاها و بازارهای مالی",
+  title: "چن چند | سامانه پایش قیمت (chanchand)",
+  description: "سامانه پایش و تحلیل قیمت کالاها و بازارهای مالی — چن چند (chanchand)",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

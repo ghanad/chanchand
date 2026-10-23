@@ -53,8 +53,7 @@ function LoginForm() {
   return (
     <div className="login-card">
       <div className="login-brand">
-        <div className="brand-mark large">PG</div>
-        <h1>سامانه پایش قیمت</h1>
+        <h1>چن چند</h1>
         <p className="login-subtitle">ورود به حساب کاربری</p>
       </div>
 
@@ -73,6 +72,8 @@ function LoginForm() {
             placeholder="نام کاربری خود را وارد کنید"
             disabled={loading}
             autoComplete="username"
+            dir="ltr"
+            className="ltr-input"
           />
         </div>
 
@@ -88,6 +89,7 @@ function LoginForm() {
               placeholder="••••••••"
               disabled={loading}
               autoComplete="current-password"
+              dir="ltr"
               className="ltr-input password-input"
             />
             <button
@@ -119,7 +121,7 @@ function LoginForm() {
       </form>
 
       <div className="login-footer">
-        <span>سیستم امن پایش و تحلیل قیمت بازارهای آنلاین</span>
+        <span>چن چند — سامانه پایش و تحلیل قیمت بازارهای آنلاین</span>
       </div>
     </div>
   );
@@ -132,8 +134,7 @@ export default function LoginPage() {
         fallback={
           <div className="login-card">
             <div className="login-brand">
-              <div className="brand-mark large">PG</div>
-              <h1>سامانه پایش قیمت</h1>
+              <h1>چن چند</h1>
               <p className="login-subtitle">در حال بارگذاری فرم ورود...</p>
             </div>
           </div>

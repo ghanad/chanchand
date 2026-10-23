@@ -31,10 +31,9 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand-block">
-        <span className="brand-mark">PG</span>
         <div>
           <p>{isAdmin ? "پنل مدیریت سیستم" : "داشبورد قیمت"}</p>
-          <h1>Price Getter</h1>
+          <h1>چن چند</h1>
         </div>
       </div>
       <nav className="nav-list" aria-label="بخش‌های داشبورد">

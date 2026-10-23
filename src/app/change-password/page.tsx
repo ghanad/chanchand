@@ -54,7 +54,6 @@ export default function ChangePasswordPage() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-brand">
-          <div className="brand-mark large">PG</div>
           <h1>تغییر کلمه عبور</h1>
         </div>
 
@@ -75,6 +74,7 @@ export default function ChangePasswordPage() {
                 disabled={loading}
                 autoComplete="new-password"
                 minLength={6}
+                dir="ltr"
                 className="ltr-input password-input"
               />
               <button
@@ -113,6 +113,7 @@ export default function ChangePasswordPage() {
                 disabled={loading}
                 autoComplete="new-password"
                 minLength={6}
+                dir="ltr"
                 className="ltr-input password-input"
               />
               <button
@@ -154,7 +155,7 @@ export default function ChangePasswordPage() {
         </form>
 
         <div className="login-footer">
-          <span>سامانه پایش قیمت — حفظ امنیت دسترسی</span>
+          <span>چن چند — حفظ امنیت دسترسی</span>
         </div>
       </div>
     </div>

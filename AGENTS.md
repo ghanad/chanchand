@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file is the low-token map for LLMs working on Price Getter. Keep it short, accurate, and updated.
+This file is the low-token map for LLMs working on چن چند (chanchand / Price Getter). Keep it short, accurate, and updated.
 
 ## Maintenance Rule
 
@@ -11,7 +11,7 @@ Update this file in the same change whenever you:
 
 ## Project Shape
 
-Price Getter is a fullstack Next.js/React/TypeScript app that collects ecommerce and market prices and stores snapshots/errors in SQLite.
+چن چند (chanchand - formerly Price Getter) is a fullstack Next.js/React/TypeScript app that collects ecommerce and market prices and stores snapshots/errors in SQLite.
 
 Core flow:
 1. `src/cli/index.ts` parses Commander CLI commands (including `price-getter user ...`).

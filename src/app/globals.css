@@ -89,6 +89,7 @@ select {
 input[type="url"],
 input[type="email"],
 input[type="password"],
+input[dir="ltr"],
 .ltr-input {
   direction: ltr;
   text-align: left;
