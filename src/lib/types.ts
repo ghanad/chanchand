@@ -110,6 +110,7 @@ export interface UserRow {
   email: string | null;
   password_hash: string;
   role: UserRole;
+  must_change_password: number;
   created_at: string;
   updated_at: string;
 }
@@ -119,7 +120,9 @@ export interface SafeUser {
   username: string;
   email: string | null;
   role: UserRole;
+  must_change_password: boolean;
   created_at: string;
   updated_at: string;
 }
+
 

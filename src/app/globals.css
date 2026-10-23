@@ -1901,6 +1901,36 @@ tbody tr:last-child td {
   font-weight: 700;
 }
 
+.status-toggle-btn.is-active.warning {
+  background: #f59e0b;
+}
+
+.status-toggle-label.warning-label {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.modal-checkbox-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 6px 0;
+}
+
+.modal-checkbox-row input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+
 /* Actions cell: Edit icon button & Kebab menu */
 .product-actions-cell {
   display: flex;

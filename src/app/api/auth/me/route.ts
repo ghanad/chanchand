@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
         username: user.username,
         email: user.email,
         role: user.role,
+        must_change_password: Boolean(user.must_change_password),
         created_at: user.created_at,
         updated_at: user.updated_at,
       },

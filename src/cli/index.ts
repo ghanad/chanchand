@@ -244,6 +244,7 @@ userCmd
   .requiredOption('-p, --password <password>', 'Password')
   .option('-r, --role <role>', 'Role (admin or viewer)', 'viewer')
   .option('-e, --email <email>', 'Email address')
+  .option('--must-change-password', 'Force user to change password on next login', false)
   .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
   .action(async (options) => {
     try {
@@ -255,9 +256,10 @@ userCmd
         password_hash: passwordHash,
         role,
         email: options.email || null,
+        must_change_password: Boolean(options.mustChangePassword),
       });
       db.close();
-      console.log(`User created successfully: ID=${user.id}, Username=${user.username}, Role=${user.role}`);
+      console.log(`User created successfully: ID=${user.id}, Username=${user.username}, Role=${user.role}, MustChangePassword=${user.must_change_password}`);
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
       process.exit(1);
@@ -269,6 +271,7 @@ userCmd
   .description('Reset a user password')
   .requiredOption('-u, --username <username>', 'Username')
   .requiredOption('-p, --password <password>', 'New password')
+  .option('--must-change-password', 'Force user to change password on next login', false)
   .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
   .action(async (options) => {
     try {
@@ -279,7 +282,11 @@ userCmd
         process.exit(1);
       }
       const passwordHash = await hashPassword(options.password);
-      updateUser(db, user.id, { password_hash: passwordHash });
+      const updateParams: { password_hash: string; must_change_password?: boolean } = { password_hash: passwordHash };
+      if (options.mustChangePassword) {
+        updateParams.must_change_password = true;
+      }
+      updateUser(db, user.id, updateParams);
       db.close();
       console.log(`Password reset successfully for user: ${options.username}`);
     } catch (err: any) {

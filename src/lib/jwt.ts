@@ -37,6 +37,7 @@ export interface SessionTokenPayload {
   id: number;
   username: string;
   role: UserRole;
+  must_change_password?: boolean;
 }
 
 export async function signAuthToken(payload: SessionTokenPayload): Promise<string> {
@@ -57,6 +58,7 @@ export async function verifyAuthToken(token: string): Promise<SessionTokenPayloa
       id: Number(payload.id),
       username: String(payload.username),
       role: payload.role as UserRole,
+      must_change_password: Boolean(payload.must_change_password),
     };
   } catch {
     return null;

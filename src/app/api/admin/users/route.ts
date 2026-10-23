@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const password = body?.password;
     const role = body?.role === 'admin' ? 'admin' : 'viewer';
     const email = body?.email ? String(body.email).trim() : null;
+    const mustChangePassword = Boolean(body?.must_change_password);
 
     if (!username || username.length < 3) {
       return NextResponse.json({ error: 'نام کاربری باید حداقل ۳ کاراکتر باشد.' }, { status: 400 });
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
       password_hash: passwordHash,
       role,
       email,
+      must_change_password: mustChangePassword,
     });
 
     return NextResponse.json({ success: true, user: newUser }, { status: 201 });

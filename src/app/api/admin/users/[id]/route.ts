@@ -28,7 +28,12 @@ export async function PUT(
       return NextResponse.json({ error: 'کاربر مورد نظر یافت نشد.' }, { status: 404 });
     }
 
-    const updateParams: { password_hash?: string; role?: 'admin' | 'viewer'; email?: string | null } = {};
+    const updateParams: {
+      password_hash?: string;
+      role?: 'admin' | 'viewer';
+      email?: string | null;
+      must_change_password?: boolean;
+    } = {};
 
     if (body.role && (body.role === 'admin' || body.role === 'viewer')) {
       updateParams.role = body.role;
@@ -36,6 +41,10 @@ export async function PUT(
 
     if (body.email !== undefined) {
       updateParams.email = body.email ? String(body.email).trim() : null;
+    }
+
+    if (body.must_change_password !== undefined) {
+      updateParams.must_change_password = Boolean(body.must_change_password);
     }
 
     if (body.password) {

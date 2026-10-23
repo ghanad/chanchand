@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       id: user.id,
       username: user.username,
       role: user.role,
+      must_change_password: Boolean(user.must_change_password),
     });
 
     const isProduction = process.env.NODE_ENV === 'production';
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
         username: user.username,
         email: user.email,
         role: user.role,
+        must_change_password: Boolean(user.must_change_password),
       },
     });
 

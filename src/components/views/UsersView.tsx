@@ -14,6 +14,7 @@ interface UserItem {
   username: string;
   email: string | null;
   role: "admin" | "viewer";
+  must_change_password?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -30,10 +31,12 @@ export function UsersView() {
   const [newPassword, setNewPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "viewer">("viewer");
+  const [newMustChangePassword, setNewMustChangePassword] = useState(false);
 
   // Reset password modal state
   const [resetUser, setResetUser] = useState<UserItem | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
+  const [resetMustChangePassword, setResetMustChangePassword] = useState(true);
 
   // Delete user modal state
   const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
@@ -113,6 +116,7 @@ export function UsersView() {
           password: newPassword,
           email: newEmail || null,
           role: newRole,
+          must_change_password: newMustChangePassword,
         }),
       });
 
@@ -121,6 +125,7 @@ export function UsersView() {
       setNewPassword("");
       setNewEmail("");
       setNewRole("viewer");
+      setNewMustChangePassword(false);
       setShowAddUserModal(false);
       triggerRefresh();
     } catch (err: any) {
@@ -165,6 +170,36 @@ export function UsersView() {
     }
   };
 
+  const handleToggleMustChangePassword = async (user: UserItem) => {
+    const nextVal = !user.must_change_password;
+    // Optimistic update
+    setUsers((prev) =>
+      prev.map((u) => (u.id === user.id ? { ...u, must_change_password: nextVal } : u))
+    );
+    setBusyAction(`forcepass:${user.id}`);
+
+    try {
+      await requestJson(`/api/admin/users/${user.id}`, {
+        method: "PUT",
+        body: JSON.stringify({ must_change_password: nextVal }),
+      });
+      showToast(
+        nextVal
+          ? `الزام تغییر کلمه عبور برای «${user.username}» فعال شد.`
+          : `الزام تغییر کلمه عبور برای «${user.username}» غیرفعال شد.`
+      );
+      triggerRefresh();
+    } catch (err: any) {
+      // Revert on failure
+      setUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, must_change_password: user.must_change_password } : u))
+      );
+      showToast(err instanceof Error ? err.message : "خطا در تغییر وضعیت الزام کلمه عبور");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!resetUser || resetPasswordValue.length < 6) {
@@ -176,11 +211,16 @@ export function UsersView() {
     try {
       await requestJson(`/api/admin/users/${resetUser.id}`, {
         method: "PUT",
-        body: JSON.stringify({ password: resetPasswordValue }),
+        body: JSON.stringify({
+          password: resetPasswordValue,
+          must_change_password: resetMustChangePassword,
+        }),
       });
       showToast(`کلمه عبور کاربر «${resetUser.username}» با موفقیت به‌روزرسانی شد.`);
       setResetUser(null);
       setResetPasswordValue("");
+      setResetMustChangePassword(true);
+      triggerRefresh();
     } catch (err: any) {
       showToast(err instanceof Error ? err.message : "خطا در تغییر کلمه عبور");
     } finally {
@@ -328,6 +368,7 @@ export function UsersView() {
                     <th scope="col">کاربر و مشخصات</th>
                     <th scope="col">نقش کاربری</th>
                     <th scope="col">دسترسی مدیریت</th>
+                    <th scope="col">الزام تغییر رمز</th>
                     <th scope="col">تاریخ عضویت</th>
                     <th scope="col" className="th-actions">عملیات</th>
                   </tr>
@@ -413,7 +454,42 @@ export function UsersView() {
                           </div>
                         </td>
 
-                        {/* ۴. تاریخ عضویت */}
+                        {/* ۴. الزام تغییر رمز */}
+                        <td className="user-col-forcepass">
+                          <div className="status-toggle-wrapper">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={Boolean(user.must_change_password)}
+                              aria-label={`تغییر الزام تغییر کلمه عبور برای ${user.username}`}
+                              disabled={isBusy}
+                              className={`status-toggle-btn ${
+                                user.must_change_password ? "is-active warning" : ""
+                              } ${busyAction === `forcepass:${user.id}` ? "is-loading" : ""}`}
+                              onClick={() => handleToggleMustChangePassword(user)}
+                              title={
+                                user.must_change_password
+                                  ? "الزام تغییر کلمه عبور فعال است (کلیک برای غیرفعال‌سازی)"
+                                  : "الزام تغییر کلمه عبور غیرفعال است (کلیک برای فعال‌سازی)"
+                              }
+                            >
+                              <span className="status-toggle-thumb">
+                                {busyAction === `forcepass:${user.id}` && (
+                                  <span className="status-toggle-spinner" aria-hidden="true" />
+                                )}
+                              </span>
+                            </button>
+                            <span
+                              className={`status-toggle-label ${
+                                user.must_change_password ? "warning-label" : ""
+                              }`}
+                            >
+                              {user.must_change_password ? "اجباری" : "اختیاری"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* ۵. تاریخ عضویت */}
                         <td className="user-col-date">
                           <div className="product-info-text">
                             <span className="user-date-text">
@@ -432,6 +508,7 @@ export function UsersView() {
                               onClick={() => {
                                 setResetUser(user);
                                 setResetPasswordValue("");
+                                setResetMustChangePassword(true);
                               }}
                               disabled={isBusy}
                               aria-label={`تغییر کلمه عبور ${user.username}`}
@@ -605,6 +682,14 @@ export function UsersView() {
               <option value="admin">مدیر (دسترسی کامل و تغییر تنظیمات)</option>
             </select>
           </label>
+          <label className="modal-checkbox-row">
+            <input
+              type="checkbox"
+              checked={newMustChangePassword}
+              onChange={(e) => setNewMustChangePassword(e.target.checked)}
+            />
+            <span>اجبار به تغییر کلمه عبور در اولین ورود</span>
+          </label>
           <div className="modal-form-actions">
             <button
               className="secondary-button"
@@ -631,6 +716,7 @@ export function UsersView() {
         onClose={() => {
           setResetUser(null);
           setResetPasswordValue("");
+          setResetMustChangePassword(true);
         }}
         title={`تغییر کلمه عبور کاربر «${resetUser?.username}»`}
         maxWidth="460px"
@@ -649,6 +735,14 @@ export function UsersView() {
               autoFocus
             />
           </label>
+          <label className="modal-checkbox-row">
+            <input
+              type="checkbox"
+              checked={resetMustChangePassword}
+              onChange={(e) => setResetMustChangePassword(e.target.checked)}
+            />
+            <span>اجبار به تغییر کلمه عبور در ورود بعدی</span>
+          </label>
           <div className="modal-form-actions">
             <button
               className="secondary-button"
@@ -656,6 +750,7 @@ export function UsersView() {
               onClick={() => {
                 setResetUser(null);
                 setResetPasswordValue("");
+                setResetMustChangePassword(true);
               }}
               disabled={busyAction?.startsWith("pass:")}
             >

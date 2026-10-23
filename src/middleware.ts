@@ -24,10 +24,14 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifyAuthToken(token) : null;
 
-  // If already authenticated and visits /login, redirect to dashboard
+  // If already authenticated and visits /login, redirect to dashboard or change-password
   if (isLoginPage && session) {
     const rawRedirect = req.nextUrl.searchParams.get('redirect');
-    const defaultTarget = session.role === 'admin' ? '/admin' : '/';
+    const defaultTarget = session.must_change_password
+      ? '/change-password'
+      : session.role === 'admin'
+      ? '/admin'
+      : '/';
     const redirectUrl = sanitizeInternalRedirect(rawRedirect, defaultTarget);
     return NextResponse.redirect(new URL(redirectUrl, req.url));
   }
@@ -52,6 +56,38 @@ export async function middleware(req: NextRequest) {
     const loginUrl = new URL('/login', req.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // If user must change password, restrict access strictly to change-password endpoints
+  if (session.must_change_password) {
+    const isAllowed =
+      pathname === '/change-password' ||
+      pathname === '/api/auth/change-password' ||
+      pathname === '/api/auth/logout' ||
+      pathname === '/api/auth/me';
+
+    if (!isAllowed) {
+      const isApiRequest =
+        pathname.startsWith('/api/') ||
+        pathname.startsWith('/admin/run-now') ||
+        pathname.startsWith('/admin/config/') ||
+        req.headers.get('accept')?.includes('application/json');
+
+      if (isApiRequest) {
+        return NextResponse.json(
+          { error: 'الزام تغییر کلمه عبور: لطفاً ابتدا کلمه عبور خود را تغییر دهید.' },
+          { status: 403 }
+        );
+      }
+      return NextResponse.redirect(new URL('/change-password', req.url));
+    }
+    return NextResponse.next();
+  }
+
+  // If user without must_change_password visits /change-password, redirect to dashboard
+  if (pathname === '/change-password') {
+    const defaultTarget = session.role === 'admin' ? '/admin' : '/';
+    return NextResponse.redirect(new URL(defaultTarget, req.url));
   }
 
   // If authenticated admin visits root '/', redirect to '/admin' so they land directly on admin dashboard

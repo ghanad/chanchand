@@ -163,11 +163,21 @@ export function initDatabase(db: Database.Database): void {
       email VARCHAR(128) UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       role VARCHAR(32) NOT NULL DEFAULT 'viewer',
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_users_username ON users(username);
   `);
+
+  try {
+    const userColumns = db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
+    if (userColumns.length > 0 && !userColumns.some((col) => col.name === 'must_change_password')) {
+      db.prepare('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0').run();
+    }
+  } catch {
+    // Migration skipped if already present or table not yet accessible
+  }
 
   seedDefaultSourcesIfEmpty(db);
   seedManagedProductsIfEmpty(db);
@@ -980,11 +990,14 @@ export function getUserById(db: Database.Database, id: number): UserRow | null {
 
 export function listUsers(db: Database.Database): SafeUser[] {
   const rows = db.prepare(`
-    SELECT id, username, email, role, created_at, updated_at
+    SELECT id, username, email, role, must_change_password, created_at, updated_at
     FROM users
     ORDER BY id ASC
-  `).all() as SafeUser[];
-  return rows;
+  `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number })[];
+  return rows.map((r) => ({
+    ...r,
+    must_change_password: Boolean(r.must_change_password),
+  }));
 }
 
 export function countUsers(db: Database.Database): number {
@@ -999,18 +1012,19 @@ export function countAdmins(db: Database.Database): number {
 
 export function createUser(
   db: Database.Database,
-  params: { username: string; password_hash: string; email?: string | null; role?: UserRole }
+  params: { username: string; password_hash: string; email?: string | null; role?: UserRole; must_change_password?: boolean }
 ): SafeUser {
   const now = new Date().toISOString();
   const role = params.role || 'viewer';
   const email = params.email || null;
   const username = params.username.trim();
+  const mustChange = params.must_change_password ? 1 : 0;
 
   const stmt = db.prepare(`
-    INSERT INTO users (username, email, password_hash, role, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, password_hash, role, must_change_password, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(username, email, params.password_hash, role, now, now);
+  const result = stmt.run(username, email, params.password_hash, role, mustChange, now, now);
   const id = Number(result.lastInsertRowid);
 
   return {
@@ -1018,6 +1032,7 @@ export function createUser(
     username,
     email,
     role,
+    must_change_password: Boolean(mustChange),
     created_at: now,
     updated_at: now,
   };
@@ -1026,7 +1041,7 @@ export function createUser(
 export function updateUser(
   db: Database.Database,
   id: number,
-  params: { password_hash?: string; role?: UserRole; email?: string | null }
+  params: { password_hash?: string; role?: UserRole; email?: string | null; must_change_password?: boolean }
 ): SafeUser {
   const existing = getUserById(db, id);
   if (!existing) {
@@ -1037,6 +1052,9 @@ export function updateUser(
   const nextPasswordHash = params.password_hash !== undefined ? params.password_hash : existing.password_hash;
   const nextRole = params.role !== undefined ? params.role : existing.role;
   const nextEmail = params.email !== undefined ? params.email : existing.email;
+  const nextMustChange = params.must_change_password !== undefined
+    ? (params.must_change_password ? 1 : 0)
+    : (existing.must_change_password ?? 0);
 
   if (existing.role === 'admin' && nextRole !== 'admin') {
     const adminCount = countAdmins(db);
@@ -1047,15 +1065,16 @@ export function updateUser(
 
   db.prepare(`
     UPDATE users
-    SET password_hash = ?, role = ?, email = ?, updated_at = ?
+    SET password_hash = ?, role = ?, email = ?, must_change_password = ?, updated_at = ?
     WHERE id = ?
-  `).run(nextPasswordHash, nextRole, nextEmail, now, id);
+  `).run(nextPasswordHash, nextRole, nextEmail, nextMustChange, now, id);
 
   return {
     id,
     username: existing.username,
     email: nextEmail,
     role: nextRole,
+    must_change_password: Boolean(nextMustChange),
     created_at: existing.created_at,
     updated_at: now,
   };

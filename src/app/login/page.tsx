@@ -24,11 +24,17 @@ function LoginForm() {
     try {
       const response = await requestJson<{
         success: boolean;
-        user: { id: number; username: string; role: "admin" | "viewer" };
+        user: { id: number; username: string; role: "admin" | "viewer"; must_change_password?: boolean };
       }>("/api/auth/login", {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
+
+      if (response.user.must_change_password) {
+        showToast("لطفاً کلمه عبور جدید خود را تعیین نمایید.");
+        window.location.href = "/change-password";
+        return;
+      }
 
       showToast(`خوش آمدید، ${response.user.username}`);
 
