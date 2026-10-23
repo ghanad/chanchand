@@ -40,7 +40,7 @@ Core flow:
   - Generic HTML: `src/lib/adapters/genericHtml.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
-- Deployment & Packaging: `Dockerfile`, `docker-compose.yml`, `nginx/price-getter.conf`, `docs/deploy.md`
+- Deployment & Packaging: `Dockerfile`, `docker-compose.yml`, `docs/deploy.md`
 
 ## Local Commands
 
