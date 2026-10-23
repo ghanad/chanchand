@@ -1,0 +1,190 @@
+import { AppConfig, FetchErrorRow, PriceSnapshotRow, RunRow } from './types';
+
+export const USD_PRODUCT_KEY = 'usd';
+export const USD_HISTORY_LIMIT = 10000;
+
+export function priceToman(priceIrr: number | null | undefined): number | null {
+  if (priceIrr === null || priceIrr === undefined) return null;
+  if (priceIrr % 10 === 0) return priceIrr / 10;
+  return Math.round((priceIrr / 10) * 10) / 10;
+}
+
+export function priceUsd(priceIrr: number | null | undefined, usdRateIrr: number | null | undefined): number | null {
+  if (priceIrr === null || priceIrr === undefined || !usdRateIrr || usdRateIrr <= 0) {
+    return null;
+  }
+  return Math.round((priceIrr / usdRateIrr) * 100) / 100;
+}
+
+export function serializePrice(
+  row: PriceSnapshotRow,
+  usdRateIrr?: number | null
+): Record<string, any> {
+  const تومان = priceToman(row.price_irr);
+  const دلار = priceUsd(row.price_irr, usdRateIrr);
+  const usdRateToman = priceToman(usdRateIrr);
+
+  return {
+    id: row.id,
+    run_id: row.run_id,
+    product_key: row.product_key,
+    source_key: row.source_key,
+    url: row.url,
+    title: row.title,
+    seller: row.seller,
+    price_irr: row.price_irr,
+    price_toman: تومان,
+    price_usd: دلار,
+    usd_rate_irr: usdRateIrr ?? null,
+    usd_rate_toman: usdRateToman,
+    availability: row.availability,
+    observed_at: row.observed_at,
+  };
+}
+
+export function serializeError(row: FetchErrorRow): Record<string, any> {
+  return {
+    id: row.id,
+    run_id: row.run_id,
+    product_key: row.product_key,
+    source_key: row.source_key,
+    url: row.url,
+    error_type: row.error_type,
+    message: row.message,
+    observed_at: row.observed_at,
+  };
+}
+
+export function serializeRun(row: RunRow): Record<string, any> {
+  return {
+    id: row.id,
+    started_at: row.started_at,
+    finished_at: row.finished_at,
+    status: row.status,
+    config_path: row.config_path,
+    target_count: row.target_count,
+    success_count: row.success_count,
+    error_count: row.error_count,
+  };
+}
+
+export function productsPayload(
+  config: AppConfig,
+  dbProducts: Array<{ id: number; run_id: number; key: string; title: string }>
+): Array<Record<string, any>> {
+  const products: Record<string, any> = {};
+
+  for (const [key, prod] of Object.entries(config.products)) {
+    products[key] = {
+      key,
+      title: prod.title,
+      configured: true,
+      target_count: 0,
+      enabled_target_count: 0,
+      sources: [],
+      primary_target: null,
+    };
+  }
+
+  for (const target of config.targets) {
+    if (!products[target.product_key]) {
+      products[target.product_key] = {
+        key: target.product_key,
+        title: target.product_key,
+        configured: false,
+        target_count: 0,
+        enabled_target_count: 0,
+        sources: [],
+        primary_target: null,
+      };
+    }
+    const product = products[target.product_key];
+    product.target_count++;
+    if (target.enabled) {
+      product.enabled_target_count++;
+    }
+    if (!product.sources.includes(target.source_key)) {
+      product.sources.push(target.source_key);
+    }
+    if (!product.primary_target) {
+      product.primary_target = {
+        source_key: target.source_key,
+        url: target.url,
+        enabled: target.enabled,
+      };
+    }
+  }
+
+  for (const dbProduct of dbProducts) {
+    if (!products[dbProduct.key]) {
+      products[dbProduct.key] = {
+        key: dbProduct.key,
+        title: dbProduct.title,
+        configured: false,
+        target_count: 0,
+        enabled_target_count: 0,
+        sources: [],
+        primary_target: null,
+      };
+    }
+  }
+
+  return Object.values(products).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+export function sourcesPayload(
+  config: AppConfig,
+  dbSources: Array<{ id: number; run_id: number; key: string; adapter: string }>
+): Array<Record<string, any>> {
+  const sources: Record<string, any> = {};
+
+  for (const [key, source] of Object.entries(config.sources)) {
+    sources[key] = {
+      key,
+      adapter: source.adapter,
+      configured: true,
+    };
+  }
+
+  for (const dbSource of dbSources) {
+    if (!sources[dbSource.key]) {
+      sources[dbSource.key] = {
+        key: dbSource.key,
+        adapter: dbSource.adapter,
+        configured: false,
+      };
+    }
+  }
+
+  return Object.values(sources).sort((a, b) => a.key.localeCompare(b.key));
+}
+
+export function serializeHistoryPrices(
+  rows: PriceSnapshotRow[],
+  usdRows: PriceSnapshotRow[]
+): Array<Record<string, any>> {
+  const usdRates = usdRows.filter((r) => r.price_irr && r.price_irr > 0 && r.observed_at);
+  return rows.map((row) => serializePrice(row, usdRateFor(row, usdRates)));
+}
+
+export function usdRateFor(row: PriceSnapshotRow, usdRates: PriceSnapshotRow[]): number | null {
+  if (!usdRates.length || !row.observed_at) return null;
+  const targetTime = new Date(row.observed_at).getTime();
+
+  let latestBefore: PriceSnapshotRow | null = null;
+  let firstAfter: PriceSnapshotRow | null = null;
+
+  for (const usd of usdRates) {
+    if (!usd.observed_at) continue;
+    const usdTime = new Date(usd.observed_at).getTime();
+    if (usdTime <= targetTime) {
+      latestBefore = usd;
+    } else {
+      firstAfter = usd;
+      break;
+    }
+  }
+
+  const selected = latestBefore || firstAfter;
+  return selected?.price_irr ?? null;
+}

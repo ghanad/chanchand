@@ -3,6 +3,7 @@ x-price-getter-environment: &price-getter-environment
   PRICE_GETTER_DB_URL: sqlite:////data/price_getter.db
   PRICE_GETTER_HOST: 0.0.0.0
   PRICE_GETTER_PORT: "8000"
+  PORT: "8000"
 
 x-price-getter-volumes: &price-getter-volumes
   - ./data:/data
@@ -23,9 +24,9 @@ services:
       test:
         [
           "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/products', timeout=3).read()",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8000/api/products').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))",
         ]
       interval: 30s
       timeout: 5s
@@ -47,7 +48,7 @@ services:
       - |
         while true; do
           date -Iseconds
-          price-getter run --config /data/config.yml
+          npm run cli -- run --config /data/config.yml
           sleep "$${PRICE_GETTER_RUN_INTERVAL_SECONDS:-3600}"
         done
     restart: unless-stopped

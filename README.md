@@ -1,44 +1,58 @@
 # Price Getter
 
-Price Getter is a CLI-first Python service foundation for collecting prices from public ecommerce pages and storing every observation in SQLite.
+Price Getter is a fullstack price collection and analytics service built with **Next.js**, **React**, **TypeScript**, and **SQLite**. It collects prices from ecommerce pages (e.g. Digikala) and financial markets (e.g. gold, currency from BRSAPI) and displays price history with USD conversion.
 
 ## Quick Start
 
 ```bash
-python -m venv .venv
-. .venv/bin/activate
-pip install -e ".[dev]"
-price-getter init-db
-price-getter validate-config --config config/example.yml
-price-getter run --config config/example.yml
-price-getter latest
-price-getter ui --config config/example.yml --db-url sqlite:///price_getter.db
+# Install dependencies
+npm install
+
+# Initialize database tables
+npm run init-db
+
+# Validate YAML configuration
+npm run validate-config -- -c config/example.yml
+
+# Fetch prices once
+npm run run
+
+# Show latest price snapshots in terminal
+npm run latest
+
+# Start web UI dashboard (development)
+npm run dev
+
+# Or build & start production server
+npm run build
+npm start
 ```
 
-The example config contains a sample Digikala target. Replace it with your own product URLs, or disable targets before running against live sources.
+Open [http://localhost:8000](http://localhost:8000) for the public dashboard, or [http://localhost:8000/admin](http://localhost:8000/admin) for admin controls (adding/editing products and triggering manual collection runs).
 
-For BRSAPI gold/currency targets, keep the API key out of YAML and set it in `.env`:
+## Configuration
+
+Targets are defined in `config/example.yml`.
+For BRSAPI gold/currency targets, store your API key in `.env`:
 
 ```bash
 brsapi_api=your_api_key
 ```
 
-## Deployment
+## CLI Commands
 
-For VPS Docker Compose setup, Basic Auth, logs, one-off collection, database initialization, and SQLite/config backup and restore, see `docs/deploy.md`.
+- `npm run init-db`: initialize SQLite schema (`price_getter.db`).
+- `npm run validate-config`: validate YAML config structure.
+- `npm run run`: execute price collection for all enabled targets.
+- `npm run latest`: print latest snapshot for each product/source pair.
+- `npm run history -- <product-key>`: display price history for a specific product.
+- `npm run errors`: show recent fetch failures.
+- `npm test`: run unit tests with Vitest.
 
-## Commands
+## Docker Deployment
 
-- `price-getter init-db`: create SQLite tables.
-- `price-getter validate-config --config config/example.yml`: validate source, product, and target mappings.
-- `price-getter run --config config/example.yml`: fetch all enabled targets and store snapshots/errors.
-- `price-getter latest`: show the latest snapshot for each product/source pair.
-- `price-getter history <product-key>`: show historical snapshots for one product.
-- `price-getter errors`: show recent fetch failures.
-- `price-getter ui --config config/example.yml`: open a local dashboard for latest prices, history charts, recent runs/errors, manual collection, and YAML-backed product edits.
+Build and start with Docker Compose:
 
-Prices are stored as normalized `price_irr` values. CLI reports also show `price_toman` because Iranian ecommerce sites, including Digikala's UI, commonly display prices in toman.
-
-Supported source adapters are `generic_html`, `digikala_api`, `digikala_web`, `digikala`, and `brsapi_market`. The BRSAPI adapter sends a browser-style User-Agent by default and reads each target item from `adapter_settings.symbol` or `adapter_settings.name`.
-
-For low-token LLM-assisted maintenance, start with `AGENTS.md`.
+```bash
+docker compose up -d
+```

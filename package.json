@@ -1,0 +1,43 @@
+{
+  "name": "price-getter",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "price-getter": "./src/cli/index.ts"
+  },
+  "scripts": {
+    "dev": "next dev -p 8000",
+    "build": "next build",
+    "start": "next start -p 8000",
+    "cli": "tsx src/cli/index.ts",
+    "run": "tsx src/cli/index.ts run",
+    "latest": "tsx src/cli/index.ts latest",
+    "history": "tsx src/cli/index.ts history",
+    "errors": "tsx src/cli/index.ts errors",
+    "validate-config": "tsx src/cli/index.ts validate-config",
+    "init-db": "tsx src/cli/index.ts init-db",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "cheerio": "^1.0.0",
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "next": "^15.2.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.1",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.13.4",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  }
+}
