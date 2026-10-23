@@ -217,11 +217,26 @@ function HistoryContent() {
 
   return (
     <div className="page-stack">
-      <section className="panel">
-        <PanelHead title="فیلتر تاریخچه" meta={`${formatNumber(history.length)} مشاهده`} />
-        <div className="toolbar history-toolbar">
-          <label className="history-search-label">
-            جستجوی نام یا شناسه
+      <section className="panel history-filter-panel">
+        <PanelHead
+          title="فیلتر تاریخچه"
+          meta={`${formatNumber(history.length)} مشاهده`}
+          action={
+            selectedProduct ? (
+              <Link
+                href={`${basePath}/products/${encodeURIComponent(selectedProduct)}`}
+                className="secondary-button compact-btn history-detail-link"
+                title="مشاهده صفحه اختصاصی جزئیات این محصول"
+              >
+                <span>صفحه جزئیات محصول</span>
+                <span aria-hidden="true">&rarr;</span>
+              </Link>
+            ) : null
+          }
+        />
+        <div className="history-toolbar">
+          <label className="history-filter-field history-search-field">
+            <span className="filter-label">جستجوی نام یا شناسه</span>
             <div className="history-search-input-wrap">
               <input
                 type="text"
@@ -243,8 +258,8 @@ function HistoryContent() {
               )}
             </div>
           </label>
-          <label>
-            محصول ({formatNumber(filteredProducts.length)})
+          <label className="history-filter-field history-product-field">
+            <span className="filter-label">محصول ({formatNumber(filteredProducts.length)})</span>
             <select
               value={selectedProduct}
               onChange={(e) => handleProductChange(e.target.value)}
@@ -262,17 +277,8 @@ function HistoryContent() {
                 )}
             </select>
           </label>
-          {selectedProduct && (
-            <Link
-              href={`${basePath}/products/${encodeURIComponent(selectedProduct)}`}
-              className="secondary-button compact-btn history-detail-link"
-              title="مشاهده صفحه اختصاصی جزئیات این محصول"
-            >
-              صفحه جزئیات محصول &rarr;
-            </Link>
-          )}
-          <label>
-            منبع
+          <label className="history-filter-field history-source-field">
+            <span className="filter-label">منبع</span>
             <select value={selectedSource} onChange={(e) => handleSourceChange(e.target.value)}>
               <option value="">همه منابع</option>
               {sources.map((source) => (
@@ -282,8 +288,8 @@ function HistoryContent() {
               ))}
             </select>
           </label>
-          <label>
-            تعداد
+          <label className="history-filter-field history-limit-field">
+            <span className="filter-label">تعداد</span>
             <select value={historyLimit} onChange={(e) => handleLimitChange(e.target.value)}>
               <option value="50">۵۰</option>
               <option value="100">۱۰۰</option>
@@ -291,27 +297,32 @@ function HistoryContent() {
               <option value="500">۵۰۰</option>
             </select>
           </label>
-          <div className="metric-toggle" aria-label="واحد نمودار">
-            <button
-              type="button"
-              className={historyMetric === "toman" ? "active" : ""}
-              onClick={() => setHistoryMetric("toman")}
-            >
-              تومان
-            </button>
-            <button
-              type="button"
-              className={historyMetric === "usd" ? "active" : ""}
-              onClick={() => setHistoryMetric("usd")}
-            >
-              دلار
-            </button>
-          </div>
         </div>
       </section>
 
       <section className="panel chart-panel">
-        <PanelHead title="روند قیمت" meta={metricConfig.label} />
+        <PanelHead
+          title="روند قیمت"
+          meta={`${formatNumber(chartRows.length)} نقطه`}
+          action={
+            <div className="metric-toggle" aria-label="واحد نمودار">
+              <button
+                type="button"
+                className={historyMetric === "toman" ? "active" : ""}
+                onClick={() => setHistoryMetric("toman")}
+              >
+                تومان
+              </button>
+              <button
+                type="button"
+                className={historyMetric === "usd" ? "active" : ""}
+                onClick={() => setHistoryMetric("usd")}
+              >
+                دلار
+              </button>
+            </div>
+          }
+        />
         {chartRows.length ? (
           <ResponsiveContainer width="100%" height={360}>
             <AreaChart data={chartRows} margin={{ top: 24, right: 18, left: 18, bottom: 12 }}>
