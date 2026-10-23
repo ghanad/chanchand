@@ -23,7 +23,6 @@ export function WorkspaceHeader() {
   return (
     <header className="workspace-header">
       <div>
-        <p className="eyebrow">SQLite price intelligence</p>
         <h2>{title}</h2>
       </div>
       <div className="header-actions">
