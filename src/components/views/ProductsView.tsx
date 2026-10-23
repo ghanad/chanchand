@@ -236,42 +236,48 @@ export function ProductsView() {
               const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";
 
               return (
-                <article className="product-row" key={product.key}>
+                <article className={`product-row ${isEditing ? "editing" : ""}`} key={product.key}>
                   {isEditing ? (
                     <form className="product-edit-form" onSubmit={updateProduct}>
-                      <label>
-                        عنوان
-                        <input
-                          value={editForm.title}
-                          onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
-                          autoComplete="off"
-                          required
-                        />
-                      </label>
-                      <label>
-                        URL
-                        <input
-                          value={editForm.url}
-                          onChange={(event) => setEditForm((current) => ({ ...current, url: event.target.value }))}
-                          type="url"
-                          required
-                        />
-                      </label>
-                      <label>
-                        منبع
-                        <select
-                          value={editForm.source_key}
-                          onChange={(event) =>
-                            setEditForm((current) => ({ ...current, source_key: event.target.value }))
-                          }
-                        >
-                          {configuredSources.map((source) => (
-                            <option key={source.key} value={source.key}>
-                              {source.key} ({source.adapter})
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <div className="product-title-row">
+                        <strong>ویرایش محصول: {product.title}</strong>
+                        <span className="product-key">{product.key}</span>
+                      </div>
+                      <div className="product-edit-fields">
+                        <label>
+                          عنوان
+                          <input
+                            value={editForm.title}
+                            onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                            autoComplete="off"
+                            required
+                          />
+                        </label>
+                        <label>
+                          منبع
+                          <select
+                            value={editForm.source_key}
+                            onChange={(event) =>
+                              setEditForm((current) => ({ ...current, source_key: event.target.value }))
+                            }
+                          >
+                            {configuredSources.map((source) => (
+                              <option key={source.key} value={source.key}>
+                                {source.key} ({source.adapter})
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="full-width">
+                          URL
+                          <input
+                            value={editForm.url}
+                            onChange={(event) => setEditForm((current) => ({ ...current, url: event.target.value }))}
+                            type="url"
+                            required
+                          />
+                        </label>
+                      </div>
                       <div className="product-edit-actions">
                         <button className="primary-button" type="submit" disabled={editBusy}>
                           {editBusy ? "در حال ذخیره" : "ذخیره"}
