@@ -1,5 +1,5 @@
-import { ProductsView } from "../../../components/views/ProductsView";
+import { ProductCatalogView } from "../../../components/views/ProductCatalogView";
 
 export default function AdminProductsPage() {
-  return <ProductsView />;
+  return <ProductCatalogView />;
 }

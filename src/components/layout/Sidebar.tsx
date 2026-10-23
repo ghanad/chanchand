@@ -14,11 +14,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: "overview", label: "نمای کلی", subpath: "" },
+  { id: "products", label: "محصولات", subpath: "/products" },
+  { id: "manage_products", label: "مدیریت محصولات", subpath: "/manage-products", adminOnly: true },
   { id: "prices", label: "قیمت‌ها", subpath: "/prices" },
   { id: "history", label: "تاریخچه", subpath: "/history" },
   { id: "runs", label: "اجرا و خطا", subpath: "/runs" },
-  { id: "products", label: "محصولات", subpath: "/products" },
-  { id: "sources", label: "منابع قیمت‌گیری", subpath: "/sources" },
+  { id: "sources", label: "منابع قیمت‌گیری", subpath: "/sources", adminOnly: true },
   { id: "users", label: "مدیریت کاربران", subpath: "/users", adminOnly: true },
 ];
 

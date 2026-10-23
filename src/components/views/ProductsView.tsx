@@ -281,18 +281,27 @@ export function ProductsView() {
       <div className={`product-grid ${isAdmin ? "" : "read-only"}`}>
         <section className="panel product-list-panel">
           <PanelHead
-            title="محصولات"
+            title="مدیریت و پیکربندی محصولات"
             meta={`${formatNumber(configuredProductCount)} محصول`}
             action={
-              isAdmin ? (
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={() => setShowAddProductModal(true)}
+              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <Link
+                  href={`${basePath}/products`}
+                  className="secondary-button compact-btn"
+                  title="مشاهده کاتالوگ و ویترین محصولات"
                 >
-                  + افزودن محصول
-                </button>
-              ) : null
+                  مشاهده کاتالوگ کالاها &rarr;
+                </Link>
+                {isAdmin ? (
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => setShowAddProductModal(true)}
+                  >
+                    + افزودن محصول
+                  </button>
+                ) : null}
+              </div>
             }
           />
 
