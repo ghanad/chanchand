@@ -17,7 +17,7 @@ function getPageTitle(pathname: string): string {
 
 export function WorkspaceHeader() {
   const pathname = usePathname();
-  const { isAdmin, currentUser, logout, loading, triggerRefresh, runNow, isCollecting } = useDashboard();
+  const { isAdmin, currentUser, logout, runNow, isCollecting } = useDashboard();
   const title = getPageTitle(pathname);
 
   return (
@@ -27,14 +27,6 @@ export function WorkspaceHeader() {
         <h2>{title}</h2>
       </div>
       <div className="header-actions">
-        <button
-          className="secondary-button"
-          type="button"
-          onClick={triggerRefresh}
-          disabled={loading}
-        >
-          تازه‌سازی
-        </button>
         {isAdmin ? (
           <button
             className="primary-button"
