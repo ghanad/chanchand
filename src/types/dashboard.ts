@@ -36,6 +36,10 @@ export interface SourceRow {
   key: string;
   adapter: string;
   configured: boolean;
+  timeout_seconds?: number;
+  rate_limit_seconds?: number;
+  currency?: string;
+  price_multiplier?: number;
 }
 
 export interface RunRow {

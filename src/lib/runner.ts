@@ -8,6 +8,7 @@ import {
   recordError,
   hasSuccessfulPriceToday,
   getManagedTargets,
+  getSourcesMap,
 } from './db';
 import { getAdapter } from './adapters';
 import { loadConfig } from './config';
@@ -34,7 +35,7 @@ export class PriceRunner {
     return this.run(config, configPath);
   }
 
-  async run(config: AppConfig, configPath?: string, customTargets?: TargetConfig[]): Promise<RunSummary> {
+  async run(config?: AppConfig | null, configPath?: string, customTargets?: TargetConfig[]): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
     let targetsToRun = customTargets;
     if (!targetsToRun) {
@@ -54,14 +55,14 @@ export class PriceRunner {
           };
         });
       } else {
-        targetsToRun = config.targets || [];
+        targetsToRun = config?.targets || [];
       }
     }
     const runId = startRun(db, configPath || null, config, targetsToRun);
     return this.executeRun(config, runId, targetsToRun);
   }
 
-  async executeRun(config: AppConfig, runId: number, targets?: TargetConfig[]): Promise<RunSummary> {
+  async executeRun(config: AppConfig | null | undefined, runId: number, targets?: TargetConfig[]): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
     let successCount = 0;
     let errorCount = 0;
@@ -85,16 +86,18 @@ export class PriceRunner {
           };
         });
       } else {
-        candidateTargets = config.targets || [];
+        candidateTargets = config?.targets || [];
       }
     }
 
     const activeTargets = candidateTargets.filter((t) => t.enabled);
     console.log(`[Runner] run ${runId} started: ${activeTargets.length} active targets`);
 
+    const sources = config?.sources || getSourcesMap(db);
+
     try {
       for (const target of activeTargets) {
-        const source = config.sources[target.source_key];
+        const source = sources[target.source_key];
         if (!source) {
           console.warn(`[Runner] run ${runId}: source ${target.source_key} not found for target ${target.product_key}`);
           continue;

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { loadConfig } from '@/lib/config';
 import { PriceRunner } from '@/lib/runner';
 import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
 
@@ -22,14 +21,10 @@ export async function POST() {
       });
     }
 
-    const config = loadConfig();
     const db = getDatabase();
     const managedTargets = getManagedTargets(db);
-    const activeTargets =
-      managedTargets.length > 0
-        ? managedTargets.filter((t) => t.enabled)
-        : (config.targets || []).filter((t) => t.enabled);
-    const runId = startRun(db, null, config);
+    const activeTargets = managedTargets.filter((t) => t.enabled);
+    const runId = startRun(db, null);
 
     isRunning = true;
     activeRunId = runId;
@@ -38,7 +33,7 @@ export async function POST() {
     // Execute in background
     const runner = new PriceRunner();
     runner
-      .executeRun(config, runId)
+      .executeRun(null, runId)
       .catch((err) => {
         console.error('[RunNow] background run error:', err);
       })

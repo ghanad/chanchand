@@ -14,6 +14,11 @@ import {
   updateManagedProduct,
   deleteManagedProduct,
   setManagedProductEnabled,
+  addManagedSource,
+  getManagedSources,
+  getSourcesMap,
+  updateManagedSource,
+  deleteManagedSource,
 } from '../src/lib/db';
 import { AppConfig } from '../src/lib/types';
 
@@ -118,6 +123,43 @@ describe('db module', () => {
     deleteManagedProduct(db, added.product_key);
     expect(getManagedProducts(db).length).toBe(0);
     expect(getManagedTargets(db).length).toBe(0);
+
+    db.close();
+  });
+
+  it('manages sources in SQLite', () => {
+    const db = new Database(':memory:');
+    initDatabase(db);
+
+    // Initial default sources seeded
+    const initialSources = getManagedSources(db);
+    expect(initialSources.length).toBeGreaterThan(0);
+    expect(initialSources.some((s) => s.key === 'digikala_api')).toBe(true);
+
+    // Add source
+    const added = addManagedSource(db, {
+      key: 'custom_source',
+      adapter: 'generic_html',
+      rate_limit_seconds: 5,
+      currency: 'TOMAN',
+      price_multiplier: 10,
+    });
+    expect(added.source_key).toBe('custom_source');
+
+    const sourcesMap = getSourcesMap(db);
+    expect(sourcesMap['custom_source']).toBeDefined();
+    expect(sourcesMap['custom_source'].rate_limit_seconds).toBe(5);
+
+    // Update source
+    updateManagedSource(db, 'custom_source', {
+      rate_limit_seconds: 1,
+    });
+    const updatedMap = getSourcesMap(db);
+    expect(updatedMap['custom_source'].rate_limit_seconds).toBe(1);
+
+    // Delete source
+    deleteManagedSource(db, 'custom_source');
+    expect(getSourcesMap(db)['custom_source']).toBeUndefined();
 
     db.close();
   });

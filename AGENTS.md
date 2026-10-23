@@ -20,17 +20,17 @@ Core flow:
 4. `src/middleware.ts` guards public/protected routes and enforces RBAC (admin vs viewer).
 5. `src/lib/runner.ts` loops through active targets (from SQLite `managed_targets`), enforces per-source rate limits, calls adapters, and records results.
 6. `src/lib/adapters/*` fetch and parse source-specific price data into `PriceObservation`.
-7. `src/lib/db.ts` executes SQLite queries and writes with `better-sqlite3` (tables: `runs`, `sources`, `products`, `product_targets`, `managed_products`, `managed_targets`, `price_snapshots`, `fetch_errors`, `users`).
+7. `src/lib/db.ts` executes SQLite queries and writes with `better-sqlite3` (tables: `runs`, `sources`, `products`, `product_targets`, `managed_products`, `managed_targets`, `managed_sources`, `price_snapshots`, `fetch_errors`, `users`).
 8. `src/app/api/*` and `src/app/admin/*` serve JSON endpoints for Next.js App Router.
 9. `src/app/*` renders the modular App Router dashboard pages using `src/components/views/*` and Recharts.
 
 ## Read These First
 
 - UI Dashboard: `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/page.tsx` (`/`), `src/app/prices/page.tsx`, `src/app/history/page.tsx`, `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/admin/*`, `src/components/views/*`, `src/components/layout/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
-- API Route Handlers: `src/app/api/auth/*`, `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
+- API Route Handlers: `src/app/api/auth/*`, `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/sources/route.ts`, `src/app/api/admin/sources/*`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
 - Authentication & RBAC: `src/lib/auth.ts`, `src/middleware.ts`
-- Database schema & product CRUD: `src/lib/db.ts` (manages `managed_products` & `managed_targets`)
-- Configuration validation: `src/lib/config.ts` and `config/example.yml` (sources only)
+- Database schema & CRUD: `src/lib/db.ts` (manages `managed_products`, `managed_targets` & `managed_sources`)
+- Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
 - Runner & orchestrator: `src/lib/runner.ts`
 - Adapters:
@@ -47,7 +47,7 @@ Core flow:
 ```bash
 npm install
 npm test
-npm run validate-config -- -c config/example.yml
+npm run validate-config
 npm run run
 npm run latest
 npm run history -- smart-air-purifier-6
@@ -62,7 +62,7 @@ docker compose up -d
 
 ## Config Notes
 
-- Products and targets are managed entirely in SQLite via UI/API, while YAML config defines sources and adapters.
+- Products, targets, and sources are managed entirely in SQLite via UI/API.
 - Source adapter names allowed: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`.
 - Prices stored as `price_irr`.
 - `price_multiplier`: 10 for TOMAN, 1 for IRR.

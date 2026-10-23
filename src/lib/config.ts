@@ -91,14 +91,15 @@ export const AppConfigSchema = z
   });
 
 export function resolveConfigPath(customPath?: string): string {
-  const p = customPath || process.env.PRICE_GETTER_CONFIG || 'config/example.yml';
+  const p = customPath || process.env.PRICE_GETTER_CONFIG || '';
+  if (!p) return '';
   return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
 }
 
 export function loadConfig(configPath?: string): AppConfig {
   const resolved = resolveConfigPath(configPath);
-  if (!fs.existsSync(resolved)) {
-    throw new Error(`config file not found: ${resolved}`);
+  if (!resolved || !fs.existsSync(resolved)) {
+    throw new Error(`config file not found: ${resolved || '(not specified)'}`);
   }
   const content = fs.readFileSync(resolved, 'utf-8');
   const parsedYaml = YAML.parse(content);

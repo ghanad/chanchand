@@ -5,12 +5,14 @@ import {
   AppConfig,
   FetchErrorRow,
   ManagedProductRow,
+  ManagedSourceRow,
   ManagedTargetRow,
   PriceObservation,
   PriceSnapshotRow,
   ProductConfig,
   RunRow,
   SafeUser,
+  SourceConfig,
   TargetConfig,
   UserRole,
   UserRow,
@@ -142,6 +144,19 @@ export function initDatabase(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS ix_fetch_errors_source_key ON fetch_errors(source_key);
     CREATE INDEX IF NOT EXISTS ix_fetch_errors_observed_at ON fetch_errors(observed_at);
 
+    CREATE TABLE IF NOT EXISTS managed_sources (
+      key VARCHAR(128) PRIMARY KEY,
+      adapter VARCHAR(64) NOT NULL,
+      timeout_seconds REAL NOT NULL DEFAULT 15.0,
+      rate_limit_seconds REAL NOT NULL DEFAULT 2.0,
+      currency VARCHAR(16) NOT NULL DEFAULT 'IRR',
+      price_multiplier INTEGER NOT NULL DEFAULT 1,
+      headers JSON NOT NULL DEFAULT '{}',
+      settings JSON NOT NULL DEFAULT '{}',
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username VARCHAR(64) UNIQUE NOT NULL,
@@ -154,6 +169,7 @@ export function initDatabase(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS ix_users_username ON users(username);
   `);
 
+  seedDefaultSourcesIfEmpty(db);
   seedManagedProductsIfEmpty(db);
 }
 
@@ -251,6 +267,258 @@ export function seedManagedProductsIfEmpty(db: Database.Database, initialConfig?
     console.warn('[DB] seedManagedProductsIfEmpty warning:', err);
   }
 }
+
+export function seedDefaultSourcesIfEmpty(db: Database.Database): void {
+  try {
+    const countRow = db.prepare('SELECT count(*) as cnt FROM managed_sources').get() as { cnt: number } | undefined;
+    if (countRow && countRow.cnt > 0) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO managed_sources (
+        key, adapter, timeout_seconds, rate_limit_seconds, currency, price_multiplier, headers, settings, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    // Check if we can seed from previous sources table
+    const pastSources = db.prepare('SELECT DISTINCT key, adapter, config_json FROM sources').all() as any[];
+    if (pastSources.length > 0) {
+      const txn = db.transaction(() => {
+        for (const s of pastSources) {
+          let timeout = 15;
+          let rateLimit = 2;
+          let currency = 'IRR';
+          let multiplier = 1;
+          let headers = {};
+          let settings = {};
+          try {
+            const conf = JSON.parse(s.config_json);
+            if (conf.timeout_seconds) timeout = conf.timeout_seconds;
+            if (conf.rate_limit_seconds) rateLimit = conf.rate_limit_seconds;
+            if (conf.currency) currency = conf.currency;
+            if (conf.price_multiplier) multiplier = conf.price_multiplier;
+            if (conf.headers) headers = conf.headers;
+            if (conf.settings) settings = conf.settings;
+          } catch {}
+          insert.run(
+            s.key,
+            s.adapter,
+            timeout,
+            rateLimit,
+            currency,
+            multiplier,
+            JSON.stringify(headers),
+            JSON.stringify(settings),
+            now,
+            now
+          );
+        }
+      });
+      txn();
+      return;
+    }
+
+    // Default built-in sources
+    const defaults = [
+      {
+        key: 'digikala_api',
+        adapter: 'digikala_api',
+        timeout_seconds: 20,
+        rate_limit_seconds: 3,
+        currency: 'IRR',
+        price_multiplier: 1,
+        headers: { 'User-Agent': 'price-getter/0.1 (+https://example.local)' },
+        settings: {},
+      },
+      {
+        key: 'digikala_web',
+        adapter: 'digikala_web',
+        timeout_seconds: 20,
+        rate_limit_seconds: 3,
+        currency: 'IRR',
+        price_multiplier: 1,
+        headers: { 'User-Agent': 'price-getter/0.1 (+https://example.local)' },
+        settings: {},
+      },
+      {
+        key: 'generic_demo',
+        adapter: 'generic_html',
+        timeout_seconds: 15,
+        rate_limit_seconds: 2,
+        currency: 'TOMAN',
+        price_multiplier: 10,
+        headers: {},
+        settings: {
+          selectors: {
+            title: 'h1.product-title',
+            price: '.price',
+            seller: '.seller',
+            availability: '.availability',
+          },
+        },
+      },
+      {
+        key: 'brsapi_market',
+        adapter: 'brsapi_market',
+        timeout_seconds: 15,
+        rate_limit_seconds: 2,
+        currency: 'TOMAN',
+        price_multiplier: 10,
+        headers: {},
+        settings: {
+          api_key_env: 'brsapi_api',
+          cache_ttl_seconds: 30,
+        },
+      },
+    ];
+
+    const txn = db.transaction(() => {
+      for (const s of defaults) {
+        insert.run(
+          s.key,
+          s.adapter,
+          s.timeout_seconds,
+          s.rate_limit_seconds,
+          s.currency,
+          s.price_multiplier,
+          JSON.stringify(s.headers),
+          JSON.stringify(s.settings),
+          now,
+          now
+        );
+      }
+    });
+    txn();
+  } catch (err) {
+    console.warn('[DB] seedDefaultSourcesIfEmpty warning:', err);
+  }
+}
+
+export function getManagedSources(db: Database.Database): ManagedSourceRow[] {
+  return db.prepare('SELECT * FROM managed_sources ORDER BY key ASC').all() as ManagedSourceRow[];
+}
+
+export function getSourcesMap(db: Database.Database): Record<string, SourceConfig> {
+  const rows = getManagedSources(db);
+  const map: Record<string, SourceConfig> = {};
+  for (const r of rows) {
+    let headers: Record<string, string> = {};
+    let settings: Record<string, any> = {};
+    try {
+      headers = JSON.parse(r.headers || '{}');
+    } catch {}
+    try {
+      settings = JSON.parse(r.settings || '{}');
+    } catch {}
+    map[r.key] = {
+      adapter: r.adapter,
+      timeout_seconds: r.timeout_seconds,
+      rate_limit_seconds: r.rate_limit_seconds,
+      currency: r.currency,
+      price_multiplier: r.price_multiplier,
+      headers,
+      settings,
+    };
+  }
+  return map;
+}
+
+export function addManagedSource(
+  db: Database.Database,
+  options: {
+    key: string;
+    adapter: string;
+    timeout_seconds?: number;
+    rate_limit_seconds?: number;
+    currency?: string;
+    price_multiplier?: number;
+    headers?: Record<string, string>;
+    settings?: Record<string, any>;
+  }
+): { source_key: string } {
+  const key = options.key.trim();
+  if (!key) throw new Error('source key cannot be empty');
+  const adapter = options.adapter.trim();
+  if (!adapter) throw new Error('adapter cannot be empty');
+
+  const existing = db.prepare('SELECT key FROM managed_sources WHERE key = ?').get(key);
+  if (existing) {
+    throw new Error(`source key already exists: ${key}`);
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO managed_sources (
+      key, adapter, timeout_seconds, rate_limit_seconds, currency, price_multiplier, headers, settings, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    key,
+    adapter,
+    options.timeout_seconds ?? 15,
+    options.rate_limit_seconds ?? 2,
+    options.currency || 'IRR',
+    options.price_multiplier ?? 1,
+    JSON.stringify(options.headers || {}),
+    JSON.stringify(options.settings || {}),
+    now,
+    now
+  );
+
+  return { source_key: key };
+}
+
+export function updateManagedSource(
+  db: Database.Database,
+  key: string,
+  options: {
+    adapter?: string;
+    timeout_seconds?: number;
+    rate_limit_seconds?: number;
+    currency?: string;
+    price_multiplier?: number;
+    headers?: Record<string, string>;
+    settings?: Record<string, any>;
+  }
+): { source_key: string } {
+  const existing = db.prepare('SELECT * FROM managed_sources WHERE key = ?').get(key) as
+    | ManagedSourceRow
+    | undefined;
+  if (!existing) {
+    throw new Error(`unknown source: ${key}`);
+  }
+
+  const now = new Date().toISOString();
+  db.prepare(`
+    UPDATE managed_sources
+    SET adapter = ?, timeout_seconds = ?, rate_limit_seconds = ?, currency = ?, price_multiplier = ?, headers = ?, settings = ?, updated_at = ?
+    WHERE key = ?
+  `).run(
+    options.adapter ?? existing.adapter,
+    options.timeout_seconds ?? existing.timeout_seconds,
+    options.rate_limit_seconds ?? existing.rate_limit_seconds,
+    options.currency ?? existing.currency,
+    options.price_multiplier ?? existing.price_multiplier,
+    options.headers ? JSON.stringify(options.headers) : existing.headers,
+    options.settings ? JSON.stringify(options.settings) : existing.settings,
+    now,
+    key
+  );
+
+  return { source_key: key };
+}
+
+export function deleteManagedSource(db: Database.Database, key: string): { source_key: string } {
+  const existing = db.prepare('SELECT * FROM managed_sources WHERE key = ?').get(key);
+  if (!existing) {
+    throw new Error(`unknown source: ${key}`);
+  }
+
+  db.prepare('DELETE FROM managed_sources WHERE key = ?').run(key);
+  return { source_key: key };
+}
+
 
 export function makeProductKey(
   title: string,
@@ -403,10 +671,15 @@ export function setManagedProductEnabled(
 export function startRun(
   db: Database.Database,
   configPath: string | null,
-  config: AppConfig,
+  config?: AppConfig | null,
   targets?: TargetConfig[],
   products?: Record<string, ProductConfig>
 ): number {
+  let effectiveSources = config?.sources;
+  if (!effectiveSources || Object.keys(effectiveSources).length === 0) {
+    effectiveSources = getSourcesMap(db);
+  }
+
   let effectiveTargets = targets;
   if (!effectiveTargets) {
     const managedTargets = getManagedTargets(db);
@@ -425,7 +698,7 @@ export function startRun(
         };
       });
     } else {
-      effectiveTargets = config.targets || [];
+      effectiveTargets = config?.targets || [];
     }
   }
 
@@ -438,7 +711,7 @@ export function startRun(
         effectiveProducts[p.key] = { title: p.title };
       }
     } else {
-      effectiveProducts = config.products || {};
+      effectiveProducts = config?.products || {};
     }
   }
 
@@ -456,7 +729,7 @@ export function startRun(
     INSERT INTO sources (run_id, key, adapter, config_json)
     VALUES (?, ?, ?, ?)
   `);
-  for (const [key, source] of Object.entries(config.sources)) {
+  for (const [key, source] of Object.entries(effectiveSources)) {
     insertSource.run(runId, key, source.adapter, JSON.stringify(source));
   }
 

@@ -1,19 +1,17 @@
 import { NextResponse } from 'next/server';
 import { getDatabase, getManagedProducts, getManagedTargets, latestSnapshots, recentRuns } from '@/lib/db';
-import { loadConfig } from '@/lib/config';
 import { productsPayload, serializePrice, serializeRun } from '@/lib/serializers';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const config = loadConfig();
     const db = getDatabase();
     const rows = latestSnapshots(db);
     const runs = recentRuns(db, 1);
     const dbProducts = getManagedProducts(db);
     const dbTargets = getManagedTargets(db);
-    const products = productsPayload(config, dbProducts, dbTargets);
+    const products = productsPayload(null, dbProducts, dbTargets);
 
     const latestRunRow = runs.length > 0 ? serializeRun(runs[0]) : null;
     let latestObservedAt: string | null = null;

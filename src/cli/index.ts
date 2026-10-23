@@ -12,6 +12,9 @@ import {
   updateUser,
   deleteUser,
   getUserByUsername,
+  getManagedSources,
+  getManagedTargets,
+  getManagedProducts,
 } from '../lib/db';
 import { PriceRunner } from '../lib/runner';
 import { priceToman } from '../lib/serializers';
@@ -22,20 +25,33 @@ program.name('price-getter').description('Price collection CLI service for publi
 
 program
   .command('validate-config')
-  .description('Validate YAML configuration file')
+  .description('Validate configuration (from YAML file or SQLite database)')
   .option('-c, --config <path>', 'YAML config path')
+  .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
   .action((options) => {
     try {
-      const configPath = resolveConfigPath(options.config);
-      const config = loadConfig(configPath);
-      const activeTargets = (config.targets || []).filter((t) => t.enabled);
-      const productsCount = Object.keys(config.products || {}).length;
-      console.log(
-        `Config is valid: ${Object.keys(config.sources).length} sources` +
-          (productsCount
-            ? `, ${productsCount} products, ${activeTargets.length}/${config.targets?.length || 0} active targets`
-            : '')
-      );
+      if (options.config) {
+        const configPath = resolveConfigPath(options.config);
+        const config = loadConfig(configPath);
+        const activeTargets = (config.targets || []).filter((t) => t.enabled);
+        const productsCount = Object.keys(config.products || {}).length;
+        console.log(
+          `Config is valid: ${Object.keys(config.sources).length} sources` +
+            (productsCount
+              ? `, ${productsCount} products, ${activeTargets.length}/${config.targets?.length || 0} active targets`
+              : '')
+        );
+      } else {
+        const db = getDatabase(options.dbUrl);
+        const sources = getManagedSources(db);
+        const targets = getManagedTargets(db);
+        const products = getManagedProducts(db);
+        const activeTargets = targets.filter((t) => t.enabled);
+        console.log(
+          `Database configuration is valid: ${sources.length} sources, ${products.length} products, ${activeTargets.length}/${targets.length} active targets`
+        );
+        db.close();
+      }
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
       process.exit(1);
@@ -64,9 +80,13 @@ program
   .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
   .action(async (options) => {
     try {
-      const configPath = resolveConfigPath(options.config);
       const runner = new PriceRunner(options.dbUrl);
-      const summary = await runner.runConfigFile(configPath);
+      let summary;
+      if (options.config) {
+        summary = await runner.runConfigFile(options.config);
+      } else {
+        summary = await runner.run();
+      }
       console.log(
         `Run ${summary.run_id} finished with status=${summary.status}; ` +
           `targets=${summary.target_count}, success=${summary.success_count}, errors=${summary.error_count}`

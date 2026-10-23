@@ -52,6 +52,18 @@ export interface ManagedTargetRow {
   updated_at: string;
 }
 
+export interface ManagedSourceRow {
+  key: string;
+  adapter: string;
+  timeout_seconds: number;
+  rate_limit_seconds: number;
+  currency: string;
+  price_multiplier: number;
+  headers: string;
+  settings: string;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface RunRow {
   id: number;

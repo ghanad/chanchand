@@ -69,8 +69,8 @@ export function serializeRun(row: RunRow): Record<string, any> {
 }
 
 export function productsPayload(
-  config: AppConfig,
-  dbProducts: Array<{ id?: number; run_id?: number; key: string; title: string }>,
+  config?: AppConfig | null,
+  dbProducts: Array<{ id?: number; run_id?: number; key: string; title: string }> = [],
   managedTargets?: Array<{
     product_key: string;
     source_key: string;
@@ -92,7 +92,7 @@ export function productsPayload(
     };
   }
 
-  for (const [key, prod] of Object.entries(config.products || {})) {
+  for (const [key, prod] of Object.entries(config?.products || {})) {
     if (!products[key]) {
       products[key] = {
         key,
@@ -137,7 +137,7 @@ export function productsPayload(
   }
 
   if (!managedTargets || managedTargets.length === 0) {
-    for (const target of config.targets || []) {
+    for (const target of config?.targets || []) {
       if (!products[target.product_key]) {
         products[target.product_key] = {
           key: target.product_key,
@@ -171,17 +171,40 @@ export function productsPayload(
 }
 
 export function sourcesPayload(
-  config: AppConfig,
-  dbSources: Array<{ id: number; run_id: number; key: string; adapter: string }>
+  config?: AppConfig | null,
+  dbSources: Array<{ id?: number; run_id?: number; key: string; adapter: string }> = [],
+  managedSources: Array<any> = []
 ): Array<Record<string, any>> {
   const sources: Record<string, any> = {};
 
-  for (const [key, source] of Object.entries(config.sources)) {
-    sources[key] = {
-      key,
-      adapter: source.adapter,
+  for (const s of managedSources) {
+    sources[s.key] = {
+      key: s.key,
+      adapter: s.adapter,
       configured: true,
+      ...(s.timeout_seconds !== undefined
+        ? {
+            timeout_seconds: s.timeout_seconds,
+            rate_limit_seconds: s.rate_limit_seconds,
+            currency: s.currency,
+            price_multiplier: s.price_multiplier,
+          }
+        : {}),
     };
+  }
+
+  for (const [key, source] of Object.entries(config?.sources || {})) {
+    if (!sources[key]) {
+      sources[key] = {
+        key,
+        adapter: source.adapter,
+        configured: true,
+        timeout_seconds: source.timeout_seconds,
+        rate_limit_seconds: source.rate_limit_seconds,
+        currency: source.currency,
+        price_multiplier: source.price_multiplier,
+      };
+    }
   }
 
   for (const dbSource of dbSources) {
