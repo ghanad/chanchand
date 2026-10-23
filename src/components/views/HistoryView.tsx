@@ -30,6 +30,58 @@ import { PanelHead } from "../common/PanelHead";
 import { EmptyState } from "../common/EmptyState";
 import { HistoryTable } from "../tables/HistoryTable";
 
+interface TooltipPayloadItem {
+  payload: {
+    time: string;
+    source: string;
+    price: number;
+    usd_rate_toman?: number | null;
+    price_toman?: number | null;
+  };
+}
+
+interface HistoryChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadItem[];
+  metricSuffix: string;
+  isUsd: boolean;
+}
+
+function HistoryChartTooltip({
+  active,
+  payload,
+  metricSuffix,
+  isUsd,
+}: HistoryChartTooltipProps) {
+  if (!active || !payload || !payload.length) return null;
+  const data = payload[0]?.payload;
+  if (!data) return null;
+
+  return (
+    <div className="chart-tooltip">
+      <div className="chart-tooltip-time">زمان: {data.time}</div>
+      <div className="chart-tooltip-row primary">
+        <span>قیمت:</span>
+        <span>
+          {numberFormatter.format(data.price)} {metricSuffix}
+        </span>
+      </div>
+      {isUsd && data.usd_rate_toman != null && (
+        <div className="chart-tooltip-row secondary">
+          <span>نرخ دلار:</span>
+          <span>{formatNumber(data.usd_rate_toman)} تومان</span>
+        </div>
+      )}
+      {isUsd && data.price_toman != null && (
+        <div className="chart-tooltip-row secondary">
+          <span>قیمت تومانی:</span>
+          <span>{formatNumber(data.price_toman)} تومان</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HistoryContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -144,6 +196,8 @@ function HistoryContent() {
         time: formatDate(row.observed_at),
         source: row.source_key,
         price: Number(price),
+        usd_rate_toman: row.usd_rate_toman,
+        price_toman: row.price_toman,
       },
     ];
   });
@@ -225,8 +279,13 @@ function HistoryContent() {
                 tick={{ fill: "#647174", fontSize: 12, dx: -40 }}
               />
               <Tooltip
-                formatter={(value) => [`${numberFormatter.format(Number(value))} ${metricConfig.suffix}`, "قیمت"]}
-                labelFormatter={(value) => `زمان: ${value}`}
+                wrapperStyle={{ outline: "none" }}
+                content={
+                  <HistoryChartTooltip
+                    metricSuffix={metricConfig.suffix}
+                    isUsd={historyMetric === "usd"}
+                  />
+                }
               />
               <Area type="monotone" dataKey="price" stroke="#0f766e" strokeWidth={3} fill="url(#priceFill)" />
             </AreaChart>
