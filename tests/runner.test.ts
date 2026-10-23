@@ -88,7 +88,7 @@ describe('PriceRunner module', () => {
     const callOrder: string[] = [];
 
     vi.spyOn(adaptersModule, 'getAdapter').mockImplementation(() => ({
-      fetch: async ({ target }) => {
+      fetch: async ({ target }: adaptersModule.FetchContext) => {
         callOrder.push(target.product_key);
         return {
           title: target.product_key,
@@ -194,7 +194,7 @@ describe('PriceRunner module', () => {
   it('records fetch errors and marks run as partial or failed', async () => {
     const db = getDatabase(tempDbUrl);
     vi.spyOn(adaptersModule, 'getAdapter').mockImplementation(() => ({
-      fetch: async ({ target }) => {
+      fetch: async ({ target }: adaptersModule.FetchContext) => {
         if (target.product_key === 'failing_item') {
           throw new Error('Timeout 504 Gateway');
         }
