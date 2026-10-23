@@ -177,16 +177,15 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
 
   // Run Now handler for this specific product
   const handleRunNow = async () => {
-    if (!isAdmin || isRunningNow || !product) return;
+    if (isRunningNow || !product) return;
     setIsRunningNow(true);
     try {
       const res = await requestJson<{
         run_id: number;
         success_count?: number;
         error_count?: number;
-      }>("/admin/run-now", {
+      }>(`/api/products/${encodeURIComponent(product.key)}/refresh`, {
         method: "POST",
-        body: JSON.stringify({ product_key: product.key }),
       });
 
       if (res.error_count && res.error_count > 0 && res.success_count === 0) {
@@ -414,6 +413,22 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
 
           {/* Action Buttons for Header */}
           <div className="product-detail-actions">
+            {/* Re-fetch price button for all authenticated users */}
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleRunNow}
+              disabled={isRunningNow || !isActive}
+              title={isActive ? "استعلام فوری و بروزرسانی قیمت همین محصول" : "محصول غیرفعال است"}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
+            </button>
+
+            {/* Admin-only actions: Status toggle, Edit, Delete */}
             {isAdmin && (
               <>
                 <div className="status-toggle-wrapper">
@@ -445,20 +460,6 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                   ویرایش
-                </button>
-
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={handleRunNow}
-                  disabled={isRunningNow}
-                  title="استعلام فوری و بروزرسانی قیمت همین محصول"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
-                    <polyline points="23 4 23 10 17 10" />
-                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                  </svg>
-                  {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
                 </button>
 
                 <button

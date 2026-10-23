@@ -35,3 +35,22 @@ export async function requireAdmin(req: NextRequest): Promise<AdminAuthResult> {
 
   return { authorized: true, user };
 }
+
+/**
+ * Validates that an incoming API request comes from an authenticated user (viewer or admin).
+ */
+export async function requireAuth(req: NextRequest): Promise<AdminAuthResult> {
+  const user = await getAuthUserFromRequest(req);
+
+  if (!user) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'برای دسترسی ابتدا باید وارد سیستم شوید.' },
+        { status: 401 }
+      ),
+    };
+  }
+
+  return { authorized: true, user };
+}
