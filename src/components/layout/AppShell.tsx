@@ -12,7 +12,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { toast } = useDashboard();
   const pathname = usePathname();
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/change-password") {
     return (
       <main className="login-shell">
         {children}

@@ -58,7 +58,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const fetchSummary = useCallback(async () => {
-    if (pathname === "/login") return;
+    if (pathname === "/login" || pathname === "/change-password") return;
     try {
       const data = await requestJson<LatestPayload>("/api/latest");
       setSummary(data.summary);
