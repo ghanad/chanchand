@@ -20,11 +20,11 @@ Core flow:
 4. `src/lib/adapters/*` fetch and parse source-specific price data into `PriceObservation`.
 5. `src/lib/db.ts` executes SQLite queries and writes with `better-sqlite3`.
 6. `src/app/api/*` and `src/app/admin/*` serve JSON endpoints for Next.js App Router.
-7. `src/app/Dashboard.tsx` renders the React UI dashboard with Recharts.
+7. `src/app/*` renders the modular App Router dashboard pages using `src/components/views/*` and Recharts.
 
 ## Read These First
 
-- UI Dashboard: `src/app/Dashboard.tsx`, `src/app/page.tsx`, `src/app/admin/page.tsx`, `src/app/globals.css`
+- UI Dashboard: `src/app/layout.tsx`, `src/app/page.tsx` (`/`), `src/app/prices/page.tsx`, `src/app/history/page.tsx`, `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/admin/*`, `src/components/views/*`, `src/components/layout/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
 - API Route Handlers: `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`
 - Database schema & queries: `src/lib/db.ts`
 - Configuration validation: `src/lib/config.ts` and `config/example.yml`

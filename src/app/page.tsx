@@ -1,5 +1,5 @@
-import Dashboard from './Dashboard';
+import { OverviewView } from "../components/views/OverviewView";
 
 export default function HomePage() {
-  return <Dashboard initialMode="public" />;
+  return <OverviewView />;
 }

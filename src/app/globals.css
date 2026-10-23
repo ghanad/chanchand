@@ -149,16 +149,29 @@ label {
   margin-top: 22px;
 }
 
-.nav-list button {
+.nav-list button,
+.nav-list a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  font: inherit;
   justify-content: flex-start;
-  border-color: transparent;
   background: transparent;
   color: #dbe8e8;
   text-align: right;
+  box-sizing: border-box;
 }
 
 .nav-list button:hover,
-.nav-list button.active {
+.nav-list a:hover,
+.nav-list button.active,
+.nav-list a.active {
   background: var(--sidebar-soft);
   color: #fff;
 }
