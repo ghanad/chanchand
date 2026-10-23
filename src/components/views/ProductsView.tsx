@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { ProductRow, SourceRow, ProductsPayload } from "../../types/dashboard";
 import { requestJson } from "../../lib/api-client";
 import { formatNumber } from "../../lib/formatters";
 import { useDashboard } from "../../context/DashboardContext";
 import { Metric } from "../common/Metric";
 import { PanelHead } from "../common/PanelHead";
-import { StatusPill } from "../common/StatusPill";
 import { Modal } from "../common/Modal";
+import { EmptyState } from "../common/EmptyState";
 
 export function ProductsView() {
   const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
@@ -16,11 +16,24 @@ export function ProductsView() {
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
+  // Modals state
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
 
+  // Forms state
   const [form, setForm] = useState({ title: "", url: "", source_key: "" });
   const [editProductKey, setEditProductKey] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", url: "", source_key: "" });
+
+  // Filtering & search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+
+  // Interaction feedback state
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [togglingKeys, setTogglingKeys] = useState<Record<string, boolean>>({});
+  const [activeKebabKey, setActiveKebabKey] = useState<string | null>(null);
+  const kebabTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -44,12 +57,62 @@ export function ProductsView() {
     loadData();
   }, [loadData, refreshTick]);
 
-  const configuredSources = sources.filter((source) => source.configured);
+  // Close kebab menu on outside click or Esc
+  useEffect(() => {
+    if (!activeKebabKey) return;
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest(".kebab-container")) {
+        setActiveKebabKey(null);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        const lastKey = activeKebabKey;
+        setActiveKebabKey(null);
+        if (lastKey && kebabTriggerRefs.current[lastKey]) {
+          kebabTriggerRefs.current[lastKey]?.focus();
+        }
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [activeKebabKey]);
+
+  const configuredSources = useMemo(() => sources.filter((source) => source.configured), [sources]);
   const activeTargetCount = products.reduce((total, p) => total + p.enabled_target_count, 0);
   const targetCount = products.reduce((total, p) => total + p.target_count, 0);
   const activeProducts = products.filter((p) => p.enabled_target_count > 0).length;
-  const configProducts = products.filter((p) => p.configured);
+  const configProducts = useMemo(() => products.filter((p) => p.configured), [products]);
   const configuredProductCount = configProducts.length;
+
+  const totalActive = useMemo(
+    () => configProducts.filter((p) => p.enabled_target_count > 0).length,
+    [configProducts],
+  );
+  const totalInactive = configProducts.length - totalActive;
+
+  // Filtered products list
+  const filteredProducts = useMemo(() => {
+    return configProducts.filter((product) => {
+      const isActive = product.enabled_target_count > 0;
+      if (statusFilter === "active" && !isActive) return false;
+      if (statusFilter === "inactive" && isActive) return false;
+
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.trim().toLowerCase();
+      const matchTitle = product.title.toLowerCase().includes(q);
+      const matchKey = product.key.toLowerCase().includes(q);
+      const matchUrl = product.primary_target?.url.toLowerCase().includes(q);
+      const matchSource = product.sources.some((s) => s.toLowerCase().includes(q));
+
+      return matchTitle || matchKey || matchUrl || matchSource;
+    });
+  }, [configProducts, statusFilter, searchQuery]);
 
   async function addProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,60 +179,89 @@ export function ProductsView() {
     }
   }
 
-  async function disableProduct(productKey: string) {
-    if (!isAdmin || !productKey) return;
-    setBusyAction(`disable:${productKey}`);
+  async function handleToggleProduct(product: ProductRow) {
+    if (!isAdmin || !product.key || product.target_count === 0) return;
+    const wasActive = product.enabled_target_count > 0;
+    const nextActive = !wasActive;
+    const nextEnabledCount = nextActive ? (product.target_count || 1) : 0;
+
+    // 1. Optimistic update
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.key === product.key
+          ? {
+              ...p,
+              enabled_target_count: nextEnabledCount,
+              primary_target: p.primary_target ? { ...p.primary_target, enabled: nextActive } : null,
+            }
+          : p,
+      ),
+    );
+    setTogglingKeys((prev) => ({ ...prev, [product.key]: true }));
+
+    // 2. Perform API request
     try {
-      const result = await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(productKey)}/disable`,
-        { method: "POST" },
-      );
-      showToast(`محصول ${result.product_key} غیرفعال شد.`);
+      const endpoint = `/admin/config/products/${encodeURIComponent(product.key)}/${
+        nextActive ? "enable" : "disable"
+      }`;
+      const result = await requestJson<{ product_key: string }>(endpoint, { method: "POST" });
+      showToast(nextActive ? `محصول ${result.product_key} فعال شد.` : `محصول ${result.product_key} غیرفعال شد.`);
       triggerRefresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "خطا در غیرفعال‌سازی");
+      // 3. Revert on failure
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.key === product.key
+            ? {
+                ...p,
+                enabled_target_count: product.enabled_target_count,
+                primary_target: product.primary_target,
+              }
+            : p,
+        ),
+      );
+      showToast(error instanceof Error ? error.message : "خطا در تغییر وضعیت محصول");
     } finally {
-      setBusyAction(null);
+      setTogglingKeys((prev) => {
+        const next = { ...prev };
+        delete next[product.key];
+        return next;
+      });
     }
   }
 
-  async function enableProduct(productKey: string) {
-    if (!isAdmin || !productKey) return;
-    setBusyAction(`enable:${productKey}`);
+  async function handleConfirmDelete() {
+    if (!isAdmin || !productToDelete?.key) return;
+    const key = productToDelete.key;
+    setBusyAction(`delete:${key}`);
     try {
       const result = await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(productKey)}/enable`,
-        { method: "POST" },
-      );
-      showToast(`محصول ${result.product_key} فعال شد.`);
-      triggerRefresh();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "خطا در فعال‌سازی");
-    } finally {
-      setBusyAction(null);
-    }
-  }
-
-  async function deleteProduct(product: ProductRow) {
-    if (!isAdmin || !product.key) return;
-    const confirmed = window.confirm(`محصول «${product.title}» حذف شود؟`);
-    if (!confirmed) return;
-
-    setBusyAction(`delete:${product.key}`);
-    try {
-      const result = await requestJson<{ product_key: string }>(
-        `/admin/config/products/${encodeURIComponent(product.key)}`,
+        `/admin/config/products/${encodeURIComponent(key)}`,
         { method: "DELETE" },
       );
       showToast(`محصول ${result.product_key} حذف شد.`);
-      if (editProductKey === product.key) {
+      if (editProductKey === key) {
         cancelEditProduct();
       }
+      setProductToDelete(null);
       triggerRefresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "خطا در حذف محصول");
     } finally {
       setBusyAction(null);
+    }
+  }
+
+  async function copyToClipboard(url: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedKey(key);
+      showToast("آدرس اینترنتی با موفقیت کپی شد.");
+      setTimeout(() => {
+        setCopiedKey((curr) => (curr === key ? null : curr));
+      }, 2000);
+    } catch {
+      showToast("خطا در کپی آدرس اینترنتی");
     }
   }
 
@@ -201,146 +293,362 @@ export function ProductsView() {
               ) : null
             }
           />
-          <div className="product-list">
-            {configProducts.map((product) => {
-              const isActive = product.enabled_target_count > 0;
-              const canToggle = product.target_count > 0;
-              const actionBusy = busyAction === `disable:${product.key}` || busyAction === `enable:${product.key}`;
-              const editBusy = busyAction === `edit:${product.key}`;
-              const deleteBusy = busyAction === `delete:${product.key}`;
-              const canDelete = product.configured;
-              const isEditing = editProductKey === product.key;
-              const status = product.target_count === 0 ? "بدون هدف" : isActive ? "فعال" : "غیرفعال";
-              const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";
 
-              return (
-                <article className={`product-row ${isEditing ? "editing" : ""}`} key={product.key}>
-                  {isEditing ? (
-                    <form className="product-edit-form" onSubmit={updateProduct}>
-                      <div className="product-title-row">
-                        <strong>ویرایش محصول: {product.title}</strong>
-                        <span className="product-key">{product.key}</span>
-                      </div>
-                      <div className="product-edit-fields">
-                        <label>
-                          عنوان
-                          <input
-                            value={editForm.title}
-                            onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
-                            autoComplete="off"
-                            required
-                          />
-                        </label>
-                        <label>
-                          منبع
-                          <select
-                            value={editForm.source_key}
-                            onChange={(event) =>
-                              setEditForm((current) => ({ ...current, source_key: event.target.value }))
-                            }
-                          >
-                            {configuredSources.map((source) => (
-                              <option key={source.key} value={source.key}>
-                                {source.key} ({source.adapter})
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="full-width">
-                          URL
-                          <input
-                            value={editForm.url}
-                            onChange={(event) => setEditForm((current) => ({ ...current, url: event.target.value }))}
-                            type="url"
-                            dir="ltr"
-                            placeholder="https://..."
-                            required
-                          />
-                        </label>
-                      </div>
-                      <div className="product-edit-actions">
-                        <button className="primary-button" type="submit" disabled={editBusy}>
-                          {editBusy ? "در حال ذخیره" : "ذخیره"}
-                        </button>
-                        <button
-                          className="secondary-button"
-                          type="button"
-                          onClick={cancelEditProduct}
-                          disabled={editBusy}
-                        >
-                          انصراف
-                        </button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <div className="product-main">
-                        <div className="product-title-row">
-                          <strong>{product.title}</strong>
-                          <StatusPill text={status} tone={statusTone} />
-                        </div>
-                        <span className="product-key">{product.key}</span>
-                        {product.primary_target ? (
-                          <span className="product-url">{product.primary_target.url}</span>
-                        ) : null}
-                        <div className="source-chip-row">
-                          {product.sources.length ? (
-                            product.sources.map((source) => (
-                              <span className="source-chip" key={`${product.key}:${source}`}>
-                                {source}
+          {/* Search & Filter Toolbar */}
+          <div className="product-table-toolbar">
+            <div className="product-search-wrapper">
+              <span className="product-search-icon" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                className="product-search-input"
+                placeholder="جستجو در عنوان، شناسه، آدرس یا منبع..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="جستجوی محصولات"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="product-search-clear"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="پاک کردن متن جستجو"
+                  title="پاک کردن"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            <div className="status-filter-pills" role="radiogroup" aria-label="فیلتر وضعیت محصول">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={statusFilter === "all"}
+                className={`filter-pill-btn ${statusFilter === "all" ? "is-active" : ""}`}
+                onClick={() => setStatusFilter("all")}
+              >
+                همه ({formatNumber(configuredProductCount)})
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={statusFilter === "active"}
+                className={`filter-pill-btn ${statusFilter === "active" ? "is-active" : ""}`}
+                onClick={() => setStatusFilter("active")}
+              >
+                فعال ({formatNumber(totalActive)})
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={statusFilter === "inactive"}
+                className={`filter-pill-btn ${statusFilter === "inactive" ? "is-active" : ""}`}
+                onClick={() => setStatusFilter("inactive")}
+              >
+                غیرفعال ({formatNumber(totalInactive)})
+              </button>
+            </div>
+          </div>
+
+          {/* Compact Product Table */}
+          <div className="product-table-wrap">
+            {configProducts.length === 0 ? (
+              <EmptyState text="هنوز هیچ محصولی ثبت نشده است." />
+            ) : filteredProducts.length === 0 ? (
+              <div className="empty-filter-container">
+                <p>هیچ محصولی با معیارهای جستجو یا فیلتر فعلی یافت نشد.</p>
+                <button
+                  type="button"
+                  className="secondary-button compact-btn"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setStatusFilter("all");
+                  }}
+                >
+                  پاک کردن فیلترها
+                </button>
+              </div>
+            ) : (
+              <table className="product-compact-table" aria-label="جدول محصولات">
+                <thead>
+                  <tr>
+                    <th scope="col">عنوان و شناسه</th>
+                    <th scope="col">منبع</th>
+                    <th scope="col">آدرس اینترنتی (URL)</th>
+                    <th scope="col">اهداف فعال</th>
+                    <th scope="col">وضعیت</th>
+                    <th scope="col" className="th-actions">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => {
+                    const isActive = product.enabled_target_count > 0;
+                    const canToggle = product.target_count > 0;
+                    const isToggling = !!togglingKeys[product.key];
+                    const isKebabOpen = activeKebabKey === product.key;
+                    const hasPrimaryTarget = !!product.primary_target;
+
+                    return (
+                      <tr
+                        key={product.key}
+                        className={`product-table-row ${isActive ? "is-active" : "is-inactive"}`}
+                      >
+                        {/* 1. Title & Slug (bold title + small muted slug) */}
+                        <td className="col-title">
+                          <div className="product-title-cell product-info-text">
+                            <strong className="product-row-title" title={product.title}>
+                              {product.title}
+                            </strong>
+                            <span className="product-row-slug" title={product.key}>
+                              {product.key}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 2. Source Badge */}
+                        <td className="col-source">
+                          <div className="product-info-text">
+                            {product.sources.length ? (
+                              product.sources.map((source) => (
+                                <span className="product-source-badge" key={`${product.key}:${source}`}>
+                                  {source}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="product-source-badge muted">بدون منبع</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 3. URL (truncated with ellipsis, full URL in tooltip, copy button, dir="ltr") */}
+                        <td className="col-url">
+                          <div className="product-info-text">
+                            {product.primary_target ? (
+                              <div className="product-url-wrapper">
+                                <button
+                                  type="button"
+                                  className="product-copy-btn"
+                                  onClick={() => copyToClipboard(product.primary_target!.url, product.key)}
+                                  aria-label={`کپی آدرس اینترنتی ${product.title}`}
+                                  title={copiedKey === product.key ? "کپی شد!" : "کپی لینک"}
+                                >
+                                  {copiedKey === product.key ? (
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="var(--ok)"
+                                      strokeWidth="2.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <polyline points="20 6 9 17 4 12" />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                    </svg>
+                                  )}
+                                </button>
+                                <a
+                                  href={product.primary_target.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="product-url-link"
+                                  dir="ltr"
+                                  title={product.primary_target.url}
+                                >
+                                  {product.primary_target.url}
+                                </a>
+                              </div>
+                            ) : (
+                              <span className="muted-text">-</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 4. Active Targets Count (e.g. 1 / 1) */}
+                        <td className="col-targets">
+                          <div className="product-info-text">
+                            <span className="product-targets-text">
+                              {formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 5. Status Toggle Switch */}
+                        <td className="col-status">
+                          <div className="status-toggle-wrapper">
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={isActive}
+                              aria-label={
+                                isActive
+                                  ? `غیرفعال کردن ${product.title}`
+                                  : `فعال کردن ${product.title}`
+                              }
+                              disabled={!canToggle || isToggling || !isAdmin}
+                              className={`status-toggle-btn ${isActive ? "is-active" : ""} ${
+                                isToggling ? "is-loading" : ""
+                              }`}
+                              onClick={() => handleToggleProduct(product)}
+                              title={
+                                !canToggle
+                                  ? "بدون هدف فعال"
+                                  : isActive
+                                  ? "کلیک برای غیرفعال‌سازی"
+                                  : "کلیک برای فعال‌سازی"
+                              }
+                            >
+                              <span className="status-toggle-thumb">
+                                {isToggling && (
+                                  <span className="status-toggle-spinner" aria-hidden="true" />
+                                )}
                               </span>
-                            ))
-                          ) : (
-                            <span className="source-chip muted-chip">بدون منبع</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="product-meta">
-                        <span>
-                          {formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)} هدف فعال
-                        </span>
-                        {isAdmin ? (
-                          <>
-                            <button
-                              className="secondary-button"
-                              type="button"
-                              onClick={() => startEditProduct(product)}
-                              disabled={!product.primary_target || busyAction !== null}
-                            >
-                              ویرایش
                             </button>
-                            <button
-                              className={isActive ? "danger-button" : "secondary-button"}
-                              type="button"
-                              onClick={() => (isActive ? disableProduct(product.key) : enableProduct(product.key))}
-                              disabled={!canToggle || actionBusy || busyAction === `delete:${product.key}`}
-                            >
-                              {actionBusy
-                                ? isActive
-                                  ? "در حال غیرفعال‌سازی"
-                                  : "در حال فعال‌سازی"
-                                : isActive
-                                  ? "غیرفعال کردن"
-                                  : canToggle
-                                    ? "فعال کردن"
-                                    : "بدون هدف"}
-                            </button>
-                            <button
-                              className="danger-button"
-                              type="button"
-                              onClick={() => deleteProduct(product)}
-                              disabled={!canDelete || deleteBusy || busyAction !== null}
-                            >
-                              {deleteBusy ? "در حال حذف" : "حذف"}
-                            </button>
-                          </>
-                        ) : null}
-                      </div>
-                    </>
-                  )}
-                </article>
-              );
-            })}
+                            <span className={`status-toggle-label ${isActive ? "active" : ""}`}>
+                              {isActive ? "فعال" : "غیرفعال"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* 6. Actions: Edit icon button & Kebab (⋯) menu */}
+                        <td className="col-actions">
+                          {isAdmin ? (
+                            <div className="product-actions-cell">
+                              {/* Edit Icon Button */}
+                              <button
+                                type="button"
+                                className="action-icon-button"
+                                onClick={() => startEditProduct(product)}
+                                disabled={!hasPrimaryTarget || busyAction !== null}
+                                aria-label={`ویرایش ${product.title}`}
+                                title="ویرایش محصول"
+                              >
+                                <svg
+                                  width="15"
+                                  height="15"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              </button>
+
+                              {/* Kebab (⋯) Menu */}
+                              <div className="kebab-container">
+                                <button
+                                  type="button"
+                                  ref={(el) => {
+                                    kebabTriggerRefs.current[product.key] = el;
+                                  }}
+                                  className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
+                                  onClick={() =>
+                                    setActiveKebabKey((current) =>
+                                      current === product.key ? null : product.key,
+                                    )
+                                  }
+                                  aria-label={`عملیات بیشتر برای ${product.title}`}
+                                  aria-haspopup="menu"
+                                  aria-expanded={isKebabOpen}
+                                  title="عملیات بیشتر"
+                                  onKeyDown={(e) => {
+                                    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+                                      setActiveKebabKey(product.key);
+                                    }
+                                  }}
+                                >
+                                  <svg
+                                    width="16"
+                                    height="16"
+                                    viewBox="0 0 24 24"
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                  >
+                                    <circle cx="12" cy="12" r="2" />
+                                    <circle cx="19" cy="12" r="2" />
+                                    <circle cx="5" cy="12" r="2" />
+                                  </svg>
+                                </button>
+
+                                {isKebabOpen && (
+                                  <div
+                                    className="kebab-menu-dropdown"
+                                    role="menu"
+                                    aria-orientation="vertical"
+                                    tabIndex={-1}
+                                  >
+                                    <button
+                                      type="button"
+                                      role="menuitem"
+                                      className="kebab-menu-item danger"
+                                      onClick={() => {
+                                        setActiveKebabKey(null);
+                                        setProductToDelete(product);
+                                      }}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Escape") {
+                                          setActiveKebabKey(null);
+                                          kebabTriggerRefs.current[product.key]?.focus();
+                                        }
+                                      }}
+                                      autoFocus
+                                    >
+                                      <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                      >
+                                        <polyline points="3 6 5 6 21 6" />
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                        <line x1="10" y1="11" x2="10" y2="17" />
+                                        <line x1="14" y1="11" x2="14" y2="17" />
+                                      </svg>
+                                      <span>حذف محصول</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
       </div>
@@ -405,6 +713,108 @@ export function ProductsView() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal: Edit Product */}
+      <Modal
+        isOpen={editProductKey !== null}
+        onClose={cancelEditProduct}
+        title={`ویرایش محصول: ${editForm.title || editProductKey}`}
+      >
+        <form className="modal-form" onSubmit={updateProduct}>
+          <label>
+            عنوان محصول
+            <input
+              value={editForm.title}
+              onChange={(event) =>
+                setEditForm((current) => ({ ...current, title: event.target.value }))
+              }
+              autoComplete="off"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            منبع قیمت‌گیری
+            <select
+              value={editForm.source_key}
+              onChange={(event) =>
+                setEditForm((current) => ({ ...current, source_key: event.target.value }))
+              }
+            >
+              {configuredSources.map((source) => (
+                <option key={source.key} value={source.key}>
+                  {source.key} ({source.adapter})
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            آدرس اینترنتی (URL)
+            <input
+              value={editForm.url}
+              onChange={(event) =>
+                setEditForm((current) => ({ ...current, url: event.target.value }))
+              }
+              type="url"
+              dir="ltr"
+              placeholder="https://..."
+              required
+            />
+          </label>
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={cancelEditProduct}
+              disabled={busyAction === `edit:${editProductKey}`}
+            >
+              انصراف
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={busyAction === `edit:${editProductKey}`}
+            >
+              {busyAction === `edit:${editProductKey}` ? "در حال ذخیره..." : "ذخیره تغییرات"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Delete Confirmation Dialog */}
+      <Modal
+        isOpen={productToDelete !== null}
+        onClose={() => setProductToDelete(null)}
+        title="تأیید حذف محصول"
+        maxWidth="460px"
+      >
+        <div className="confirm-delete-box">
+          <p>
+            آیا از حذف محصول <strong>«{productToDelete?.title}»</strong> اطمینان دارید؟
+          </p>
+          <p className="confirm-delete-hint">
+            این عملیات برگشت‌پذیر نیست و اهداف و داده‌های مرتبط با این محصول حذف خواهند شد.
+          </p>
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setProductToDelete(null)}
+              disabled={busyAction === `delete:${productToDelete?.key}`}
+            >
+              انصراف
+            </button>
+            <button
+              className="danger-button"
+              type="button"
+              onClick={handleConfirmDelete}
+              disabled={busyAction === `delete:${productToDelete?.key}`}
+            >
+              {busyAction === `delete:${productToDelete?.key}` ? "در حال حذف..." : "حذف محصول"}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
