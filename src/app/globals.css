@@ -897,12 +897,13 @@ tbody tr:last-child td {
 
 .password-input-wrapper input.password-input {
   width: 100%;
-  padding-left: 38px !important;
+  padding-right: 38px !important;
+  padding-left: 12px !important;
 }
 
 .password-toggle-btn {
   position: absolute;
-  left: 8px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   background: transparent;
