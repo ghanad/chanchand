@@ -1,5 +1,5 @@
-import { ProductCatalogView } from "../../components/views/ProductCatalogView";
+import { ProductsView } from "../../components/views/ProductsView";
 
 export default function ProductsPage() {
-  return <ProductCatalogView />;
+  return <ProductsView />;
 }
