@@ -3,6 +3,7 @@ import { DigikalaApiAdapter } from '../src/lib/adapters/digikalaApi';
 import { DigikalaWebAdapter } from '../src/lib/adapters/digikalaWeb';
 import { GenericHtmlAdapter } from '../src/lib/adapters/genericHtml';
 import { BrsapiMarketAdapter } from '../src/lib/adapters/brsapiMarket';
+import { ServixMarketAdapter } from '../src/lib/adapters/servixMarket';
 
 describe('adapters', () => {
   it('parses generic HTML with css selectors', () => {
@@ -123,6 +124,57 @@ describe('adapters', () => {
 
     expect(obs.title).toBe('طلای 18 عیار');
     expect(obs.price_irr).toBe(45000000);
+    expect(obs.availability).toBe('in_stock');
+  });
+
+  it('parses Servix payload', () => {
+    const adapter = new ServixMarketAdapter();
+    const payload = [
+      {
+        code: 'USD_RLS',
+        name: 'USD_RLS',
+        labelEn: 'US Dollar / Iranian Rial',
+        labelFa: 'دلار آمریکا / ریال ایران',
+        quoteUnit: 'RLS',
+        value: 2719825,
+        midPrice: 2719825,
+      },
+      {
+        code: 'SEKKEH_RLS',
+        name: 'SEKKEH_RLS',
+        labelEn: 'Emami Coin / Iranian Rial',
+        labelFa: 'سکه امامی / ریال ایران',
+        quoteUnit: 'RLS',
+        value: 2735930000,
+        midPrice: 2735930000,
+      },
+    ];
+
+    const obs = adapter.parseMarketPayload(
+      payload,
+      {
+        adapter: 'servix_market',
+        timeout_seconds: 10,
+        rate_limit_seconds: 0,
+        currency: 'IRR',
+        price_multiplier: 1,
+        headers: {},
+        settings: {},
+      },
+      {
+        product_key: 'usd',
+        source_key: 'servix_market',
+        url: 'https://servix.cc/api/v1/assets',
+        enabled: true,
+        adapter_settings: {
+          symbol: 'USD_RLS',
+        },
+      }
+    );
+
+    expect(obs.title).toBe('دلار آمریکا / ریال ایران');
+    expect(obs.price_irr).toBe(2719825);
+    expect(obs.seller).toBe('Servix');
     expect(obs.availability).toBe('in_stock');
   });
 });

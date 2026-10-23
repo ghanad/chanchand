@@ -2,12 +2,14 @@ import { PriceAdapter } from './types';
 import { DigikalaApiAdapter } from './digikalaApi';
 import { DigikalaWebAdapter } from './digikalaWeb';
 import { BrsapiMarketAdapter } from './brsapiMarket';
+import { ServixMarketAdapter } from './servixMarket';
 import { GenericHtmlAdapter } from './genericHtml';
 
 export * from './types';
 export * from './digikalaApi';
 export * from './digikalaWeb';
 export * from './brsapiMarket';
+export * from './servixMarket';
 export * from './genericHtml';
 
 const adapters: Record<string, () => PriceAdapter> = {
@@ -16,6 +18,7 @@ const adapters: Record<string, () => PriceAdapter> = {
   digikala_api: () => new DigikalaApiAdapter(),
   digikala_web: () => new DigikalaWebAdapter(),
   brsapi_market: () => new BrsapiMarketAdapter(),
+  servix_market: () => new ServixMarketAdapter(),
 };
 
 export function getAdapter(name: string): PriceAdapter {

@@ -37,6 +37,7 @@ Core flow:
   - Digikala API: `src/lib/adapters/digikalaApi.ts`
   - Digikala Web: `src/lib/adapters/digikalaWeb.ts`
   - BRSAPI gold/currency: `src/lib/adapters/brsapiMarket.ts`
+  - Servix gold/currency: `src/lib/adapters/servixMarket.ts`
   - Generic HTML: `src/lib/adapters/genericHtml.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
@@ -64,7 +65,7 @@ docker compose up -d
 ## Config Notes
 
 - Products, targets, and sources are managed entirely in SQLite via UI/API.
-- Source adapter names allowed: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`.
+- Source adapter names allowed: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`, `servix_market`.
 - Prices stored as `price_irr`.
 - `price_multiplier`: 10 for TOMAN, 1 for IRR.
-- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`.
+- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`.

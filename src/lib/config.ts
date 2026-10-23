@@ -7,7 +7,7 @@ import { AppConfig, SourceConfig, ProductConfig, TargetConfig } from './types';
 const KEY_RE = /^[A-Za-z0-9_.-]+$/;
 
 export const SourceConfigSchema = z.object({
-  adapter: z.enum(['generic_html', 'digikala', 'digikala_api', 'digikala_web', 'brsapi_market']),
+  adapter: z.enum(['generic_html', 'digikala', 'digikala_api', 'digikala_web', 'brsapi_market', 'servix_market']),
   timeout_seconds: z.number().positive().default(15.0),
   rate_limit_seconds: z.number().min(0).default(2.0),
   currency: z.string().trim().min(1).default('IRR').transform((v) => v.toUpperCase()),
