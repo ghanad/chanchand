@@ -39,6 +39,7 @@ Core flow:
   - BRSAPI gold/currency: `src/lib/adapters/brsapiMarket.ts`
   - Servix gold/currency: `src/lib/adapters/servixMarket.ts`
   - Generic HTML: `src/lib/adapters/genericHtml.ts`
+  - Fetch Utilities & Cookie Redirect: `src/lib/adapters/fetchUtils.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
 - Documentation: `docs/architecture.md`, `docs/adapters.md`, `docs/storage-config.md`, `docs/ui.md`, `docs/deploy.md`

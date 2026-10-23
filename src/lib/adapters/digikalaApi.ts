@@ -1,6 +1,7 @@
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
+import { fetchWithCookieRedirect } from './fetchUtils';
 
 export function extractProductId(url: string): string | null {
   const match = url.match(/(?:dkp-|(?:\/product\/))(\d+)/i);
@@ -56,12 +57,13 @@ export class DigikalaApiAdapter implements PriceAdapter {
   ): Promise<PriceObservation> {
     let apiUrl = productApiUrl(productId, fresh);
     const headers: Record<string, string> = {
-      'User-Agent': 'price-getter/0.1',
-      Accept: 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      Accept: 'application/json, text/plain, */*',
       ...context.source.headers,
     };
 
-    let response = await fetch(apiUrl, {
+    let response = await fetchWithCookieRedirect(apiUrl, {
       headers,
       signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
     });
@@ -75,7 +77,7 @@ export class DigikalaApiAdapter implements PriceAdapter {
 
     if (!product && !fresh && payload?.redirect_url?.uri?.includes('/fresh/product/')) {
       apiUrl = productApiUrl(productId, true);
-      response = await fetch(apiUrl, {
+      response = await fetchWithCookieRedirect(apiUrl, {
         headers,
         signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
       });

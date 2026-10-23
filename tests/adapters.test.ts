@@ -177,4 +177,42 @@ describe('adapters', () => {
     expect(obs.seller).toBe('Servix');
     expect(obs.availability).toBe('in_stock');
   });
+
+  it('fetchWithCookieRedirect follows 307 redirects and forwards Set-Cookie headers', async () => {
+    const { fetchWithCookieRedirect } = await import('../src/lib/adapters/fetchUtils');
+    const originalFetch = globalThis.fetch;
+
+    const calls: { url: string; cookie?: string | null }[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const headers = new Headers(init?.headers);
+      calls.push({ url, cookie: headers.get('Cookie') });
+
+      if (calls.length === 1) {
+        return new Response('Redirecting', {
+          status: 307,
+          headers: {
+            Location: 'https://api.digikala.com/v2/product/123/',
+            'Set-Cookie': 'digicdn_cookie=abc12345; Path=/; Domain=.digikala.com',
+          },
+        });
+      }
+
+      return new Response(JSON.stringify({ status: 200, data: { ok: true } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }) as any;
+
+    try {
+      const res = await fetchWithCookieRedirect('https://api.digikala.com/v2/product/123/');
+      expect(res.status).toBe(200);
+      expect(calls.length).toBe(2);
+      expect(calls[0].cookie).toBeNull();
+      expect(calls[1].cookie).toBe('digicdn_cookie=abc12345');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
+

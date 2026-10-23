@@ -3,6 +3,8 @@ import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
+import { fetchWithCookieRedirect } from './fetchUtils';
+import { DigikalaApiAdapter } from './digikalaApi';
 
 export class DigikalaWebAdapter implements PriceAdapter {
   name = 'digikala_web';
@@ -20,13 +22,23 @@ export class DigikalaWebAdapter implements PriceAdapter {
       ...context.source.headers,
     };
 
-    const res = await fetch(context.target.url, {
-      headers,
-      signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
-    });
+    try {
+      const res = await fetchWithCookieRedirect(context.target.url, {
+        headers,
+        signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
+      });
 
-    const html = await res.text();
-    return this.parse(html, context.source, context.target, res.status);
+      const html = await res.text();
+      return this.parse(html, context.source, context.target, res.status);
+    } catch (err) {
+      // Modern Digikala pages render price via client-side API; fall back to API adapter
+      try {
+        const apiAdapter = new DigikalaApiAdapter();
+        return await apiAdapter.fetch(context);
+      } catch {
+        throw err;
+      }
+    }
   }
 
   parse(
