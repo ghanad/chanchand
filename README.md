@@ -1,6 +1,6 @@
-# چن چند (chanchand) — Price Getter
+# Chanchand (Price Getter)
 
-**چن چند (chanchand)** (قبلاً Price Getter) یک سرویس جامع برای دریافت، مقایسه و تحلیل لحظه‌ای قیمت کالاها و بازارهای مالی است که با **Next.js**، **React**، **TypeScript** و **SQLite** ساخته شده است. این سامانه قیمت‌ها را از فروشگاه‌های آنلاین (مانند دیجی‌کالا) و بازارهای مالی (طلا و ارز) جمع‌آوری و با نرخ‌های معادل تحلیل می‌کند.
+**Chanchand** (formerly Price Getter) is a comprehensive service for real-time tracking, comparison, and analysis of consumer products and financial market prices, built with **Next.js**, **React**, **TypeScript**, and **SQLite**. It collects prices from online stores (such as Digikala) and financial markets (gold and currency) and analyzes them with equivalent rates.
 
 ## Quick Start
 
