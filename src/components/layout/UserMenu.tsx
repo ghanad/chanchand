@@ -119,7 +119,6 @@ export function UserMenu() {
   if (!currentUser) return null;
 
   const initialLetter = (currentUser.username?.trim().charAt(0) || "ک").toUpperCase();
-  const roleLabel = currentUser.role === "admin" ? "مدیر" : "بیننده";
 
   return (
     <div
@@ -142,7 +141,7 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls="user-dropdown-menu"
-        aria-label={`منوی حساب کاربری ${currentUser.username} (${roleLabel})`}
+        aria-label={`منوی حساب کاربری ${currentUser.username}`}
       >
         <span className="user-avatar user-avatar-sm" aria-hidden="true">
           {initialLetter}
@@ -174,7 +173,7 @@ export function UserMenu() {
           className="user-dropdown-menu"
           tabIndex={-1}
         >
-          {/* بخش بالای منو: آواتار بزرگتر، نام کاربر و نشان نقش با سایز ارتقایافته */}
+          {/* بخش بالای منو: آواتار بزرگتر و نام کاربر */}
           <div className="user-dropdown-header">
             <span className="user-avatar user-avatar-lg" aria-hidden="true">
               {initialLetter}
@@ -184,11 +183,6 @@ export function UserMenu() {
               {currentUser.email ? (
                 <span className="user-dropdown-email">{currentUser.email}</span>
               ) : null}
-              <div>
-                <span className={`role-pill ${currentUser.role}`}>
-                  {roleLabel}
-                </span>
-              </div>
             </div>
           </div>
 
