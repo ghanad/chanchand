@@ -1,18 +1,40 @@
 # UI Guidance
 
-Read this when changing the dashboard or its JSON API.
+Read this when changing the Next.js dashboard, components, or JSON API routes.
+
+## Architecture
+
+Price Getter uses Next.js 16 App Router with React 19 Server and Client Components, styled with vanilla CSS variables and responsive layouts.
 
 ## File Map
 
-- App Router entrypoint: `src/app/page.tsx` (protected dashboard overview) and `src/app/admin/page.tsx` (admin overview)
-- Authentication & Login: `src/app/login/page.tsx`, `src/middleware.ts`, `src/lib/auth.ts`, `src/lib/jwt.ts`
-- User Management (Admin only): `src/app/admin/users/page.tsx`, `src/components/views/UsersView.tsx`, `src/app/api/admin/users/*`
-- Global styles & fonts: `src/app/globals.css`
-- API Route handlers: `src/app/api/...` and `src/app/admin/...`
-- Authentication Policy: **All pages and data endpoints require authentication.** Only `/login`, `/api/auth/login`, and `/api/health` are unauthenticated.
-- Role-based Access Control (RBAC):
-  - `admin`: Full access to overview, prices, history, runs, products configuration, manual price collection (`/admin/run-now`), and user management (`/admin/users`).
-  - `viewer`: Read-only access to overview, prices, history, and runs. Cannot modify configuration or trigger runs.
-- `/admin/run-now` starts collection in a background task and returns immediately with `status: "running"`; repeated calls while a run is active return the active `run_id` instead of starting a second run.
-- Serializers: `src/lib/serializers.ts` (`serializePrice`, `serializeError`, `serializeRun`, `productsPayload`, `sourcesPayload`)
-- History price rows include `price_toman`, `price_usd`, and `usd_rate_toman`; `price_usd` is calculated from the configured `usd` product history.
+- **Layout & Shell**:
+  - Global layout & font definitions: `src/app/layout.tsx`, `src/app/globals.css`
+  - App Shell: `src/components/layout/AppShell.tsx`
+  - Sidebar Navigation: `src/components/layout/Sidebar.tsx`
+  - Workspace Header: `src/components/layout/WorkspaceHeader.tsx`
+  - User Menu: `src/components/layout/UserMenu.tsx`
+  - Status Strip: `src/components/layout/StatusStrip.tsx`
+  - Dashboard Context: `src/context/DashboardContext.tsx`
+- **Pages & Views**:
+  - Overview: `src/app/page.tsx` & `src/app/admin/page.tsx` -> `src/components/views/OverviewView.tsx`
+  - Prices: `src/app/prices/page.tsx` & `src/app/admin/prices/page.tsx` -> `src/components/views/PricesView.tsx`
+  - History: `src/app/history/page.tsx` & `src/app/admin/history/page.tsx` -> `src/components/views/HistoryView.tsx` (with Recharts)
+  - Runs & Errors: `src/app/runs/page.tsx` & `src/app/admin/runs/page.tsx` -> `src/components/views/RunsView.tsx`
+  - Products: `src/app/products/page.tsx` & `src/app/admin/products/page.tsx` -> `src/components/views/ProductsView.tsx` (Add & Edit modals)
+  - Sources: `src/app/sources/page.tsx` & `src/app/admin/sources/page.tsx` -> `src/components/views/SourcesView.tsx` (Add & Edit modals)
+  - Users (Admin only): `src/app/admin/users/page.tsx` -> `src/components/views/UsersView.tsx`
+  - Login: `src/app/login/page.tsx`
+- **Authentication & RBAC**:
+  - Route guard: `src/middleware.ts`
+  - JWT token creation and verification: `src/lib/jwt.ts`
+  - Password hashing and user DB management: `src/lib/auth.ts`
+  - Roles:
+    - `admin`: Full access to overview, prices, history, runs, products, sources, users, and trigger price runs (`/admin/run-now`).
+    - `viewer`: Read-only access to overview, prices, history, runs, products, sources, and documentation. Cannot modify data or trigger runs.
+- **API Endpoints**:
+  - `/api/auth/login`, `/api/auth/logout`, `/api/auth/me`
+  - `/api/latest`, `/api/products`, `/api/sources`, `/api/history`, `/api/runs`, `/api/errors`, `/api/health`
+  - `/admin/run-now`, `/admin/config/products/*`, `/api/admin/sources/*`, `/api/admin/users/*`
+- **Serializers**:
+  - `src/lib/serializers.ts` (`serializePrice`, `serializeError`, `serializeRun`, `productsPayload`, `sourcesPayload`)

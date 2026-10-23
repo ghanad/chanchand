@@ -40,6 +40,7 @@ Core flow:
   - Generic HTML: `src/lib/adapters/genericHtml.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
+- Documentation: `docs/architecture.md`, `docs/adapters.md`, `docs/storage-config.md`, `docs/ui.md`, `docs/deploy.md`
 - Deployment & Packaging: `Dockerfile`, `docker-compose.yml`, `docs/deploy.md`
 
 ## Local Commands

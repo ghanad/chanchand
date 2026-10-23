@@ -1,26 +1,34 @@
 # Storage And Config Notes
 
-Read this when changing YAML shape, database schema, or persistence behavior.
+Read this when changing configuration schemas, database schema, or persistence behavior.
 
-## Config
+## Configuration (Zod & SQLite)
 
-- Schema models live in `src/price_getter/config.py`.
-- Example user config lives in `config/example.yml`.
-- Safe product edits live in `src/price_getter/config_editor.py`.
-- Config tests live in `tests/test_config.py` and `tests/test_config_editor.py`.
-- CLI config validation is covered in `tests/test_cli.py`.
+- In modern Price Getter, products, targets, and sources are primarily stored and managed directly in SQLite via the UI and REST APIs (`managed_products`, `managed_targets`, `managed_sources`).
+- Zod schemas for YAML configuration validation live in `src/lib/config.ts` (`ConfigSchema`, `ProductConfigSchema`, `SourceConfigSchema`, `TargetConfigSchema`).
+- Example configuration lives in `config/example.yml`.
+- Config validation tests live in `tests/config.test.ts`.
+- CLI config validation command: `npm run validate-config -- -c config/example.yml`.
 
-## Database
+## Database (SQLite with better-sqlite3)
 
-- SQLAlchemy models live in `src/price_getter/models.py`.
-- Session setup lives in `src/price_getter/db.py`.
-- Query/write behavior lives in `src/price_getter/repository.py`.
-- Migrations live in `migrations/versions/`.
-- Repository tests live in `tests/test_repository.py`.
+- Connection initialization and PRAGMA settings (WAL mode, foreign keys) live in `src/lib/db.ts`.
+- Database schema initialization and table creation live in `initDatabaseSchema()` in `src/lib/db.ts`.
+- Database tests live in `tests/db.test.ts`.
+
+### Tables Overview
+
+- `managed_products`: Product catalog definitions (`key`, `name`, `category`, `enabled`, `sort_order`, `notes`, `created_at`).
+- `managed_sources`: Price source configurations (`key`, `name`, `adapter`, `base_url`, `rate_limit_per_second`, `adapter_settings_json`, `created_at`).
+- `managed_targets`: URL targets linking products to sources (`id`, `product_key`, `source_key`, `url`, `enabled`, `price_multiplier`, `adapter_settings_json`, `created_at`).
+- `runs`: Run execution records (`id`, `started_at`, `completed_at`, `status`, `target_count`, `success_count`, `error_count`).
+- `price_snapshots`: Captured price records (`id`, `run_id`, `product_key`, `source_key`, `price_irr`, `captured_at`, `availability`, `title`, `seller`, `raw_payload_json`).
+- `fetch_errors`: Target extraction error logs (`id`, `run_id`, `product_key`, `source_key`, `url`, `error_message`, `occurred_at`).
+- `users`: User authentication & RBAC (`id`, `username`, `password_hash`, `role`, `created_at`, `updated_at`).
 
 ## Change Checklist
 
-- New YAML field: update Pydantic model, `config/example.yml`, validation tests, and any UI config editor handling.
-- New adapter name: update config validation notes, adapter registry, `config/example.yml`, and adapter tests.
-- New table or column: update model, migration, repository methods, serializers/output if displayed, and tests.
-- Changed stored semantics: update code paths that read the field, not only the write path.
+- **New YAML field**: Update Zod schema in `src/lib/config.ts`, `config/example.yml`, and `tests/config.test.ts`.
+- **New Adapter**: Update `SourceConfigSchema` in `src/lib/config.ts`, `src/lib/adapters/index.ts`, UI dropdown in `src/components/views/SourcesView.tsx`, and `tests/adapters.test.ts`.
+- **New DB table or column**: Update `initDatabaseSchema` in `src/lib/db.ts`, TypeScript interfaces in `src/lib/types.ts` and `src/lib/db.ts`, CRUD methods in `src/lib/db.ts`, serializers in `src/lib/serializers.ts`, and `tests/db.test.ts`.
+- **Changed stored semantics**: Update code paths that read the field (in `runner.ts`, `serializers.ts`, and UI views), not only the write path.

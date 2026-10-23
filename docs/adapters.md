@@ -4,32 +4,39 @@ Read this when adding or changing a price source.
 
 ## Files
 
-- Interface and shared types: `src/price_getter/adapters/base.py`
-- Registry and aliases: `src/price_getter/adapters/__init__.py`
-- Generic selector scraping: `src/price_getter/adapters/generic_html.py`
-- Digikala API: `src/price_getter/adapters/digikala_api.py`
-- Digikala HTML: `src/price_getter/adapters/digikala_web.py`
-- BRSAPI markets: `src/price_getter/adapters/brsapi_market.py`
-- Adapter tests: `tests/test_adapters.py`
+- Interface and shared types: `src/lib/adapters/types.ts` (`PriceAdapter`, `PriceObservation`, `PriceObservationRaw`)
+- Registry and aliases: `src/lib/adapters/index.ts` (`getAdapter`, `adapters` map)
+- Generic CSS selector scraping: `src/lib/adapters/genericHtml.ts`
+- Digikala API: `src/lib/adapters/digikalaApi.ts`
+- Digikala Web (HTML/SSR): `src/lib/adapters/digikalaWeb.ts`
+- BRSAPI gold and currency markets: `src/lib/adapters/brsapiMarket.ts`
+- Adapter tests: `tests/adapters.test.ts`
 
 ## Contracts
 
-- `PriceAdapter.fetch()` returns a `PriceObservation`.
-- Use `adapter_settings` for source-specific and target-specific options.
-- Use `AdapterError` for expected source parsing/selection failures.
-- Keep aliases in `adapters/__init__.py` and compatibility imports in `adapters/digikala.py` unless intentionally changing public behavior.
-- Normalize prices to IRR before returning observations.
+- `PriceAdapter.fetch(target: ProductTarget, source: SourceConfig)` returns `Promise<PriceObservation>`.
+- Use `adapter_settings` for source-specific and target-specific options (e.g., CSS selector, API tokens).
+- Throw descriptive errors for expected source parsing/selection failures so `runner.ts` logs them to `fetch_errors`.
+- Normalize prices to IRR (`price_irr`) before returning observations (using `normalizeDigits` and `parsePriceString` from `src/lib/pricing.ts`).
+- Respect `price_multiplier` (e.g., 10 for TOMAN to IRR conversion).
+- Set `availability` to `'in_stock'`, `'out_of_stock'`, or `'unknown'`.
 
 ## Test Routing
 
-- Generic HTML: `test_generic_html_*`
-- Digikala HTML: `test_digikala_web_*`
-- Digikala API: `test_digikala_api_*`
-- BRSAPI: `test_brsapi_*`
-
-Run focused tests first:
+Run tests using Vitest:
 
 ```bash
-.venv/bin/pytest tests/test_adapters.py -k digikala_api
-.venv/bin/pytest tests/test_adapters.py -k brsapi
+# Run all tests
+npm test
+
+# Run only adapter tests
+npx vitest tests/adapters.test.ts
 ```
+
+## Adding a New Adapter
+
+1. **Implement Adapter**: Create a file in `src/lib/adapters/yourAdapter.ts` implementing the `PriceAdapter` interface with an async `fetch` method.
+2. **Register in Index**: Add the adapter instance to the `adapters` record in `src/lib/adapters/index.ts`.
+3. **Allow in Config Schema**: Add your adapter name to `SourceConfigSchema` in `src/lib/config.ts`.
+4. **Update UI Dropdown**: Add your adapter option to the dropdown in `src/components/views/SourcesView.tsx`.
+5. **Add Tests**: Add unit tests in `tests/adapters.test.ts` with test fixtures or mocks.
