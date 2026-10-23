@@ -32,7 +32,8 @@ Open [http://localhost:8000](http://localhost:8000) for the public dashboard, or
 
 ## Configuration
 
-Targets are defined in `config/example.yml`.
+All products, sources, and targets are configured and managed directly through the Web UI (`/admin`).
+
 For BRSAPI gold/currency targets, store your API key in `.env`:
 
 ```bash
