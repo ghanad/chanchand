@@ -1,206 +1,190 @@
-# Deployment And Operations
+# Deployment And Operations (VPS Guide)
 
-This guide covers the Docker Compose deployment used for a small VPS. It runs three services:
+This guide covers deploying Price Getter on a public VPS (Ubuntu/Debian) using Docker Compose with user management and role-based access control.
 
-- `app`: Price Getter UI/API on port `8000` inside the Compose network.
-- `scheduler`: repeated `price-getter run --config /data/config.yml` jobs.
-- `nginx`: public HTTP entrypoint with read-only public routes and Basic Auth for admin routes.
+It runs three isolated container services:
+- `app`: Next.js web application and API on port `8000` (Node.js 22 runtime).
+- `scheduler`: background worker that runs price collection periodically.
+- `nginx`: public reverse proxy handling gzip, SSL termination, and security headers.
 
-## VPS Prerequisites
+---
 
-Install these on the VPS:
+## 1. VPS Prerequisites
 
-- Docker Engine with the `docker compose` plugin.
-- Git, if you deploy from a repository checkout.
-- Enough disk for `data/price_getter.db` and backups.
-- Firewall rules that expose only the public HTTP/HTTPS port you intend to serve.
-
-Clone or copy the project onto the VPS, then run the rest of these commands from the repository root.
-
-## Persistent Data Directory
-
-Create the host-mounted data directory and SQLite file:
+On your VPS (e.g. Ubuntu 22.04 or 24.04 LTS):
 
 ```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install Docker Engine and Git
+sudo apt install -y git curl ca-certificates
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+```
+
+Log out and back in, or run `newgrp docker` to apply docker group permissions.
+
+### Firewall Configuration (UFW)
+
+Ensure SSH, HTTP, and HTTPS ports are open:
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw enable
+```
+
+---
+
+## 2. Clone Repository & Setup Directories
+
+Clone your repository to `/opt/price_getter` (or home directory):
+
+```bash
+git clone <your-repo-url> /opt/price_getter
+cd /opt/price_getter
+
+# Create persistent storage directory
 mkdir -p data
 touch data/price_getter.db
 ```
 
-The Compose file mounts `./data` at `/data`, so files in this directory survive image rebuilds and container replacement.
+The `./data` directory is mounted to `/data` in containers, so SQLite records, config, and state persist across container updates.
 
-## Config File
+---
 
-Place the production YAML config at `data/config.yml`:
+## 3. Configuration & Environment Variables
+
+### A. Price Collection Config
+
+Copy the example configuration to `data/config.yml`:
 
 ```bash
 cp config/example.yml data/config.yml
 ```
 
-Edit `data/config.yml` for real sources, products, targets, and adapter settings. Validate it before starting long-running services:
+Edit `data/config.yml` with your desired target URLs, sources, and alert thresholds.
 
-```bash
-docker compose run --rm app price-getter validate-config --config /data/config.yml
-```
+### B. Secrets & Environment File (`.env`)
 
-## Environment File
-
-Create `.env` in the repository root for Compose-level settings and secrets:
+Create `.env` in the repository root:
 
 ```bash
 cat > .env <<'EOF'
-brsapi_api=your_brsapi_key
+# API keys
+brsapi_api=your_brsapi_key_here
+
+# Scheduler interval in seconds (default: 3600 = 1 hour)
 PRICE_GETTER_RUN_INTERVAL_SECONDS=3600
+
+# Public web port (80 for standard HTTP, or custom port behind reverse proxy)
 PRICE_GETTER_PUBLIC_PORT=80
+
+# Security & Authentication (IMPORTANT: Use strong random values on a public VPS!)
+JWT_SECRET=change_this_to_a_random_32_character_secret_string_now
+ADMIN_USERNAME=admin
+ADMIN_INITIAL_PASSWORD=YourStrongPasswordHere!
 EOF
 ```
 
-`brsapi_api` is read by the BRSAPI adapter. `PRICE_GETTER_RUN_INTERVAL_SECONDS` controls the scheduler interval. `PRICE_GETTER_PUBLIC_PORT` controls the host port published by Nginx.
+> [!IMPORTANT]
+> Change `JWT_SECRET` and `ADMIN_INITIAL_PASSWORD` before starting services on a public IP.
 
-## Basic Auth Credentials
+---
 
-Create the htpasswd file that Nginx uses for `/admin` and `/admin/*`:
+## 4. Build and Start Services
 
-```bash
-docker run --rm httpd:2.4-alpine htpasswd -nbB admin 'change-this-password' > data/.htpasswd-price-getter
-```
-
-Replace `admin` and `change-this-password` with production credentials. This file is mounted read-only into the Nginx container.
-
-## Build And Start Services
-
-Build images:
+Build container images:
 
 ```bash
 docker compose build
 ```
 
-Start in the foreground for first boot:
-
-```bash
-docker compose up
-```
-
-Start in the background after smoke testing:
+Start services in detached background mode:
 
 ```bash
 docker compose up -d
 ```
 
-Check service state:
+Verify service status:
 
 ```bash
 docker compose ps
-```
-
-## UI Route Model
-
-Nginx exposes these routes:
-
-- `GET /`: public dashboard.
-- `GET /assets/*`: public built frontend assets.
-- `GET` and `HEAD /api/*`: public read-only JSON APIs, including `/api/latest`, `/api/products`, `/api/history`, `/api/runs`, and `/api/errors`.
-- `/admin` and `/admin/*`: Basic Auth protected admin UI and mutating endpoints, including `/admin/run-now` and `/admin/config/products...`.
-
-Smoke-test the boundary before adding TLS:
-
-```bash
-curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/
-curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/api/latest
-curl -i http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin
-curl -i -X POST http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin/run-now
-curl -i -u admin:change-this-password http://localhost:${PRICE_GETTER_PUBLIC_PORT:-80}/admin
-```
-
-For TLS, either add HTTPS to the Nginx server with the same location rules or terminate TLS at an external proxy/load balancer and forward HTTP to this Compose Nginx service.
-
-## Logs
-
-Follow all service logs:
-
-```bash
-docker compose logs -f
-```
-
-Follow one service:
-
-```bash
 docker compose logs -f app
-docker compose logs -f scheduler
-docker compose logs -f nginx
 ```
 
-The scheduler log shows each collection loop timestamp and the `price-getter run` result.
+---
 
-## Database Initialization And Migrations
+## 5. User Management via CLI (On Server)
 
-Most runtime paths call `init_database`, so a fresh SQLite database is usually initialized automatically. To create tables explicitly:
+In addition to the web UI at `/admin/users`, you can manage users directly on the VPS command line:
 
+### List registered users:
 ```bash
-docker compose run --rm app price-getter init-db --db-url sqlite:////data/price_getter.db
+docker compose run --rm app npm run cli -- user list
 ```
 
-If a future release ships schema migrations, run them from a full repository checkout where `alembic.ini` and `migrations/` are present:
-
+### Create a new user:
 ```bash
-PRICE_GETTER_DB_URL=sqlite:///data/price_getter.db .venv/bin/alembic upgrade head
+# Create an admin user:
+docker compose run --rm app npm run cli -- user create -u manager -p StrongPass123! -r admin
+
+# Create a viewer (read-only) user:
+docker compose run --rm app npm run cli -- user create -u viewer1 -p ViewerPass123! -r viewer
 ```
 
-For the current Docker image, use the `price-getter init-db` command above for production initialization.
-
-## Manual One-Off Collection
-
-Run a collection against the same config and SQLite file used by the services:
-
+### Reset a forgotten password:
 ```bash
-docker compose run --rm app price-getter run --config /data/config.yml
+docker compose run --rm app npm run cli -- user reset-password -u admin -p NewSecretPass123!
 ```
 
-Inspect latest results:
-
+### Delete a user:
 ```bash
-docker compose run --rm app price-getter latest --db-url sqlite:////data/price_getter.db
-docker compose run --rm app price-getter errors --db-url sqlite:////data/price_getter.db
+docker compose run --rm app npm run cli -- user delete -u old_user
 ```
 
-## Backup
+---
 
-Stop services before a simple file-level backup, or use SQLite's online backup command while services are running.
+## 6. Securing with SSL (Let's Encrypt / HTTPS)
 
-Offline backup:
+When hosting on a public VPS, HTTPS is essential to protect login credentials and session tokens over the public internet.
 
+### Option A: Using Certbot & Nginx on Host
+
+If your VPS has a public domain (e.g., `prices.example.com` pointing to your server's IP):
+
+1. Stop Compose Nginx temporarily or change `PRICE_GETTER_PUBLIC_PORT=8080` in `.env`.
+2. Install Certbot on the host:
+   ```bash
+   sudo apt install -y certbot python3-certbot-nginx
+   sudo certbot --nginx -d prices.example.com
+   ```
+3. Proxy traffic to `http://127.0.0.1:8080` (or `8000`).
+
+### Option B: Cloudflare Proxied DNS (Recommended & Easiest)
+
+1. Add your domain to Cloudflare.
+2. Create an `A` record pointing to your VPS IP with the orange cloud (Proxy enabled).
+3. Set SSL/TLS encryption mode to **Full** in Cloudflare Dashboard.
+4. Cloudflare automatically handles SSL termination, DDoS protection, and Iranian network caching.
+
+---
+
+## 7. Backups and Maintenance
+
+### Backup Database & Config
 ```bash
-docker compose stop app scheduler
 mkdir -p backups
-cp data/config.yml backups/config.yml.$(date +%Y%m%d%H%M%S)
-cp data/price_getter.db backups/price_getter.db.$(date +%Y%m%d%H%M%S)
-docker compose start app scheduler
+docker compose exec app sqlite3 /data/price_getter.db ".backup '/data/backup.db'"
+cp data/backup.db backups/price_getter_$(date +%Y%m%d%H%M%S).db
+cp data/config.yml backups/config_$(date +%Y%m%d%H%M%S).yml
 ```
 
-Online SQLite backup:
-
+### Update Project to Latest Version
 ```bash
-mkdir -p backups
-docker compose exec app python -c "import sqlite3; src=sqlite3.connect('/data/price_getter.db'); dst=sqlite3.connect('/data/price_getter.backup.db'); src.backup(dst); dst.close(); src.close()"
-cp data/price_getter.backup.db backups/price_getter.db.$(date +%Y%m%d%H%M%S)
-cp data/config.yml backups/config.yml.$(date +%Y%m%d%H%M%S)
-```
-
-Also back up `.env` and `data/.htpasswd-price-getter` in your server secret backup system. Do not commit production copies of these files.
-
-## Restore
-
-Stop services, replace the persistent files, then start services again:
-
-```bash
-docker compose stop app scheduler nginx
-cp backups/config.yml.YYYYMMDDHHMMSS data/config.yml
-cp backups/price_getter.db.YYYYMMDDHHMMSS data/price_getter.db
+git pull origin main
+docker compose build
 docker compose up -d
-```
-
-Validate after restore:
-
-```bash
-docker compose run --rm app price-getter validate-config --config /data/config.yml
-docker compose run --rm app price-getter latest --db-url sqlite:////data/price_getter.db
 ```

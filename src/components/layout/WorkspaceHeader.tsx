@@ -11,12 +11,13 @@ function getPageTitle(pathname: string): string {
   if (cleanPath.startsWith("/history")) return "تاریخچه";
   if (cleanPath.startsWith("/runs")) return "اجرا و خطا";
   if (cleanPath.startsWith("/products")) return "محصولات";
+  if (cleanPath.startsWith("/users")) return "مدیریت کاربران";
   return "داشبورد";
 }
 
 export function WorkspaceHeader() {
   const pathname = usePathname();
-  const { isAdmin, loading, triggerRefresh, runNow, isCollecting } = useDashboard();
+  const { isAdmin, currentUser, logout, loading, triggerRefresh, runNow, isCollecting } = useDashboard();
   const title = getPageTitle(pathname);
 
   return (
@@ -43,6 +44,22 @@ export function WorkspaceHeader() {
           >
             {isCollecting ? "در حال اجرا" : "اجرای جمع‌آوری"}
           </button>
+        ) : null}
+        {currentUser ? (
+          <div className="user-profile-badge">
+            <span className="user-name">{currentUser.username}</span>
+            <span className={`role-pill ${currentUser.role}`}>
+              {currentUser.role === "admin" ? "مدیر" : "بیننده"}
+            </span>
+            <button
+              className="ghost-button logout-button"
+              type="button"
+              onClick={logout}
+              title="خروج از حساب کاربری"
+            >
+              خروج
+            </button>
+          </div>
         ) : null}
       </div>
     </header>

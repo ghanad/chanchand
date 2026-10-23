@@ -708,3 +708,184 @@ tbody tr:last-child td {
     font-size: 18px;
   }
 }
+
+/* Authentication & Login UI */
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at top right, #243235 0%, #172124 100%);
+  padding: 20px;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-card {
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 16px;
+  padding: 36px 32px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.brand-mark.large {
+  width: 54px;
+  height: 54px;
+  font-size: 22px;
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #fff;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.login-brand h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+  color: var(--text);
+}
+
+.login-subtitle {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.login-alert {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+.login-alert.error {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid rgba(180, 59, 59, 0.2);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.login-button {
+  width: 100%;
+  margin-top: 8px;
+  height: 44px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* User Profile Badge in Header */
+.user-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 10px;
+  margin-right: 8px;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.role-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.role-pill.admin {
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--accent);
+}
+
+.role-pill.viewer {
+  background: rgba(101, 115, 118, 0.12);
+  color: var(--muted);
+}
+
+.ghost-button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--danger);
+  font-size: 12px;
+  padding: 4px 8px;
+  min-height: 28px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ghost-button:hover {
+  background: var(--danger-soft);
+}
+
+/* User Management View Styles */
+.current-user-tag {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: normal;
+  margin-right: 6px;
+}
+
+.inline-reset-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-reset-form input {
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 12px;
+  width: 160px;
+}
+
+.inline-reset-form button {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+

@@ -1,0 +1,79 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getDatabase, getUserByUsername } from '@/lib/db';
+import {
+  AUTH_COOKIE_NAME,
+  ensureDefaultAdmin,
+  signAuthToken,
+  verifyPassword,
+} from '@/lib/auth';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => null);
+    const username = body?.username?.trim();
+    const password = body?.password;
+
+    if (!username || !password) {
+      return NextResponse.json(
+        { error: 'نام کاربری و کلمه عبور الزامی است.' },
+        { status: 400 }
+      );
+    }
+
+    const db = getDatabase();
+    // Auto-bootstrap default admin if database is newly initialized
+    await ensureDefaultAdmin(db);
+
+    const user = getUserByUsername(db, username);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'نام کاربری یا کلمه عبور نادرست است.' },
+        { status: 401 }
+      );
+    }
+
+    const passwordMatches = await verifyPassword(password, user.password_hash);
+    if (!passwordMatches) {
+      return NextResponse.json(
+        { error: 'نام کاربری یا کلمه عبور نادرست است.' },
+        { status: 401 }
+      );
+    }
+
+    const token = await signAuthToken({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    });
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    const response = NextResponse.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    });
+
+    response.cookies.set({
+      name: AUTH_COOKIE_NAME,
+      value: token,
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    });
+
+    return response;
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || 'خطا در فرآیند ورود به سیستم.' },
+      { status: 500 }
+    );
+  }
+}

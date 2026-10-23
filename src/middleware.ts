@@ -1,0 +1,61 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/lib/jwt';
+
+const PUBLIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.woff2', '.woff', '.ttf', '.ico'];
+
+export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+
+  // Ignore static assets and Next.js internal files
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/IranSansX') ||
+    pathname === '/favicon.ico' ||
+    PUBLIC_FILE_EXTENSIONS.some((ext) => pathname.endsWith(ext))
+  ) {
+    return NextResponse.next();
+  }
+
+  const isLoginPage = pathname === '/login';
+  const isAuthLoginApi = pathname === '/api/auth/login';
+  const isHealthApi = pathname === '/api/health';
+
+  const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const session = token ? await verifyAuthToken(token) : null;
+
+  // If already authenticated and visits /login, redirect to dashboard
+  if (isLoginPage && session) {
+    const redirectUrl = req.nextUrl.searchParams.get('redirect') || (session.role === 'admin' ? '/admin' : '/');
+    return NextResponse.redirect(new URL(redirectUrl, req.url));
+  }
+
+  // Allow login page, login API endpoint, and health check without session
+  if (isLoginPage || isAuthLoginApi || isHealthApi) {
+    return NextResponse.next();
+  }
+
+  // If unauthenticated:
+  if (!session) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'برای دسترسی ابتدا باید وارد شوید.' }, { status: 401 });
+    }
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Role check: /admin/* or /api/admin/* require 'admin' role
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/') || pathname.startsWith('/api/admin/');
+  if (isAdminPath && session.role !== 'admin') {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'دسترسی فقط برای مدیر سیستم مجاز است.' }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL('/', req.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+};

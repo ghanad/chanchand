@@ -9,6 +9,7 @@ interface NavItem {
   id: string;
   label: string;
   subpath: string;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -17,6 +18,7 @@ const navItems: NavItem[] = [
   { id: "history", label: "تاریخچه", subpath: "/history" },
   { id: "runs", label: "اجرا و خطا", subpath: "/runs" },
   { id: "products", label: "محصولات", subpath: "/products" },
+  { id: "users", label: "مدیریت کاربران", subpath: "/users", adminOnly: true },
 ];
 
 export function Sidebar() {
@@ -29,17 +31,19 @@ export function Sidebar() {
       <div className="brand-block">
         <span className="brand-mark">PG</span>
         <div>
-          <p>داشبورد محلی</p>
+          <p>داشبورد قیمت</p>
           <h1>Price Getter</h1>
         </div>
       </div>
       <nav className="nav-list" aria-label="بخش‌های داشبورد">
-        {navItems.map((item) => {
-          const href = `${basePath}${item.subpath}` || "/";
-          const isActive =
-            item.subpath === ""
-              ? pathname === (basePath || "/")
-              : pathname === href || pathname.startsWith(`${href}/`);
+        {navItems
+          .filter((item) => !item.adminOnly || isAdmin)
+          .map((item) => {
+            const href = `${basePath}${item.subpath}` || "/";
+            const isActive =
+              item.subpath === ""
+                ? pathname === (basePath || "/")
+                : pathname === href || pathname.startsWith(`${href}/`);
 
           return (
             <Link
