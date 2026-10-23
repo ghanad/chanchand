@@ -24,7 +24,6 @@ export function ProductCatalogView() {
   const [latestPrices, setLatestPrices] = useState<PriceRow[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_stock" | "out_of_stock" | "active">("all");
-  const [sortBy, setSortBy] = useState<"title" | "price_asc" | "price_desc" | "recent">("recent");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -69,78 +68,54 @@ export function ProductCatalogView() {
   const outOfStockCount = configuredProducts.filter((p) => p.latestSnapshot?.availability === "out_of_stock").length;
   const activeTrackingCount = configuredProducts.filter((p) => p.enabled_target_count > 0).length;
 
-  // Filtered and sorted products
+  // Filtered products list
   const filteredProducts = useMemo(() => {
-    return configuredProducts
-      .filter((item) => {
-        if (statusFilter === "in_stock" && item.latestSnapshot?.availability !== "in_stock") return false;
-        if (statusFilter === "out_of_stock" && item.latestSnapshot?.availability !== "out_of_stock") return false;
-        if (statusFilter === "active" && item.enabled_target_count === 0) return false;
+    return configuredProducts.filter((item) => {
+      if (statusFilter === "in_stock" && item.latestSnapshot?.availability !== "in_stock") return false;
+      if (statusFilter === "out_of_stock" && item.latestSnapshot?.availability !== "out_of_stock") return false;
+      if (statusFilter === "active" && item.enabled_target_count === 0) return false;
 
-        if (!searchQuery.trim()) return true;
-        const q = searchQuery.trim().toLowerCase();
-        const matchTitle = item.title.toLowerCase().includes(q);
-        const matchKey = item.key.toLowerCase().includes(q);
-        const matchSeller = item.latestSnapshot?.seller?.toLowerCase().includes(q) || false;
-        const matchSource = item.sources.some((s) => s.toLowerCase().includes(q));
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.trim().toLowerCase();
+      const matchTitle = item.title.toLowerCase().includes(q);
+      const matchKey = item.key.toLowerCase().includes(q);
+      const matchSeller = item.latestSnapshot?.seller?.toLowerCase().includes(q) || false;
+      const matchSource = item.sources.some((s) => s.toLowerCase().includes(q));
 
-        return matchTitle || matchKey || matchSeller || matchSource;
-      })
-      .sort((a, b) => {
-        if (sortBy === "title") {
-          return a.title.localeCompare(b.title, "fa");
-        }
-        if (sortBy === "price_asc") {
-          const priceA = a.latestSnapshot?.price_toman ?? Infinity;
-          const priceB = b.latestSnapshot?.price_toman ?? Infinity;
-          return priceA - priceB;
-        }
-        if (sortBy === "price_desc") {
-          const priceA = a.latestSnapshot?.price_toman ?? -Infinity;
-          const priceB = b.latestSnapshot?.price_toman ?? -Infinity;
-          return priceB - priceA;
-        }
-        // "recent" by default
-        const timeA = a.latestSnapshot?.observed_at ? new Date(a.latestSnapshot.observed_at).getTime() : 0;
-        const timeB = b.latestSnapshot?.observed_at ? new Date(b.latestSnapshot.observed_at).getTime() : 0;
-        return timeB - timeA;
-      });
-  }, [configuredProducts, statusFilter, searchQuery, sortBy]);
+      return matchTitle || matchKey || matchSeller || matchSource;
+    });
+  }, [configuredProducts, statusFilter, searchQuery]);
 
   return (
     <div className="product-catalog-page page-stack">
       {/* Metrics Summary Grid */}
-      <section className="product-summary-grid" aria-label="خلاصه کاتالوگ محصولات">
-        <Metric label="کل کالاها" value={formatNumber(totalCount)} />
-        <Metric label="کالاهای موجود" value={formatNumber(inStockCount)} hint="دارای موجودی در فروشگاه" />
+      <section className="product-summary-grid" aria-label="خلاصه محصولات">
+        <Metric label="کل محصول‌ها" value={formatNumber(totalCount)} />
+        <Metric label="کالاهای موجود" value={formatNumber(inStockCount)} hint="دارای موجودی در بازار" />
         <Metric label="ناموجود در بازار" value={formatNumber(outOfStockCount)} />
         <Metric label="رهگیری فعال" value={`${formatNumber(activeTrackingCount)} / ${formatNumber(totalCount)}`} />
       </section>
 
-      {/* Main Catalog Panel */}
-      <section className="panel catalog-main-panel">
+      {/* Main Panel */}
+      <section className="panel product-list-panel">
         <PanelHead
           title="محصولات"
-          meta={`${formatNumber(totalCount)} کالا`}
+          meta={`${formatNumber(totalCount)} محصول`}
           action={
             isAdmin ? (
               <Link
                 href={`${basePath}/manage-products`}
-                className="secondary-button compact-btn"
+                className="primary-button compact-btn"
                 title="رفتن به جدول تنظیمات، افزودن و لینک‌های محصولات"
               >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                </svg>
-                مدیریت و افزودن محصولات
+                + مدیریت و افزودن محصول
               </Link>
             ) : null
           }
         />
 
-        {/* Toolbar: Search, Filter pills, Sort */}
-        <div className="product-table-toolbar catalog-toolbar">
+        {/* Search & Filter Toolbar (Identical to manage-products) */}
+        <div className="product-table-toolbar">
           <div className="product-search-wrapper">
             <span className="product-search-icon" aria-hidden="true">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -151,17 +126,17 @@ export function ProductCatalogView() {
             <input
               type="text"
               className="product-search-input"
-              placeholder="جستجو در نام محصول، شناسه یا فروشنده..."
+              placeholder="جستجو در عنوان، شناسه، فروشنده یا منبع..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label="جستجوی کاتالوگ محصولات"
+              aria-label="جستجوی محصولات"
             />
             {searchQuery && (
               <button
                 type="button"
                 className="product-search-clear"
                 onClick={() => setSearchQuery("")}
-                aria-label="پاک کردن جستجو"
+                aria-label="پاک کردن متن جستجو"
                 title="پاک کردن"
               >
                 ✕
@@ -169,7 +144,7 @@ export function ProductCatalogView() {
             )}
           </div>
 
-          <div className="status-filter-pills" role="radiogroup" aria-label="فیلتر وضعیت">
+          <div className="status-filter-pills" role="radiogroup" aria-label="فیلتر وضعیت محصول">
             <button
               type="button"
               className={`filter-pill-btn ${statusFilter === "all" ? "is-active" : ""}`}
@@ -199,129 +174,166 @@ export function ProductCatalogView() {
               رهگیری فعال ({formatNumber(activeTrackingCount)})
             </button>
           </div>
-
-          <div className="catalog-sort-wrapper">
-            <label className="catalog-sort-label">
-              ترتیب:
-              <select
-                className="compact-select"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                aria-label="ترتیب نمایش محصولات"
-              >
-                <option value="recent">آخرین بروزرسانی</option>
-                <option value="price_asc">ارزان‌ترین</option>
-                <option value="price_desc">گران‌ترین</option>
-                <option value="title">نام محصول (الفبا)</option>
-              </select>
-            </label>
-          </div>
         </div>
 
-        {/* Catalog Grid Cards */}
-        {totalCount === 0 ? (
-          <EmptyState text="هنوز هیچ محصولی ثبت نشده است." />
-        ) : filteredProducts.length === 0 ? (
-          <div className="empty-filter-container">
-            <p>هیچ محصولی با معیارهای جستجو یا فیلتر فعلی یافت نشد.</p>
-            <button
-              type="button"
-              className="secondary-button compact-btn"
-              onClick={() => {
-                setSearchQuery("");
-                setStatusFilter("all");
-              }}
-            >
-              پاک کردن فیلترها
-            </button>
-          </div>
-        ) : (
-          <div className="catalog-grid" aria-label="فهرست کارت‌های محصول">
-            {filteredProducts.map((item) => {
-              const snapshot = item.latestSnapshot;
-              const hasPrice = snapshot?.price_toman !== null && snapshot?.price_toman !== undefined;
-              const detailHref = `${basePath}/products/${encodeURIComponent(item.key)}`;
+        {/* Compact Table (Identical to manage-products) */}
+        <div className="product-table-wrap">
+          {totalCount === 0 ? (
+            <EmptyState text="هنوز هیچ محصولی ثبت نشده است." />
+          ) : filteredProducts.length === 0 ? (
+            <div className="empty-filter-container">
+              <p>هیچ محصولی با معیارهای جستجو یا فیلتر فعلی یافت نشد.</p>
+              <button
+                type="button"
+                className="secondary-button compact-btn"
+                onClick={() => {
+                  setSearchQuery("");
+                  setStatusFilter("all");
+                }}
+              >
+                پاک کردن فیلترها
+              </button>
+            </div>
+          ) : (
+            <table className="product-compact-table" aria-label="جدول محصولات">
+              <thead>
+                <tr>
+                  <th scope="col">عنوان و شناسه</th>
+                  <th scope="col">منبع</th>
+                  <th scope="col">آخرین قیمت</th>
+                  <th scope="col">وضعیت موجودی</th>
+                  <th scope="col">فروشنده</th>
+                  <th scope="col">آخرین استعلام</th>
+                  <th scope="col" className="th-actions">عملیات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((item) => {
+                  const snapshot = item.latestSnapshot;
+                  const hasPrice = snapshot?.price_toman !== null && snapshot?.price_toman !== undefined;
+                  const detailHref = `${basePath}/products/${encodeURIComponent(item.key)}`;
+                  const isActive = item.enabled_target_count > 0;
 
-              return (
-                <article key={item.key} className="catalog-card">
-                  {/* Card Header Badges */}
-                  <div className="catalog-card-header">
-                    <div className="catalog-card-badges">
-                      {item.sources.map((source) => (
-                        <span key={source} className="product-source-badge">
-                          {source}
-                        </span>
-                      ))}
-                      <span className="product-slug-pill" title={item.key}>
-                        {item.key}
-                      </span>
-                    </div>
-
-                    {snapshot && (
-                      <StatusPill
-                        text={availabilityText(snapshot.availability)}
-                        tone={snapshot.availability}
-                      />
-                    )}
-                  </div>
-
-                  {/* Card Title */}
-                  <Link href={detailHref} className="catalog-card-title-link">
-                    <h2 className="catalog-card-title" title={item.title}>
-                      {item.title}
-                    </h2>
-                  </Link>
-
-                  {/* Price Section */}
-                  <div className="catalog-card-price-box">
-                    {hasPrice ? (
-                      <>
-                        <div className="catalog-card-price-main">
-                          <strong>{formatNumber(snapshot!.price_toman)}</strong>
-                          <span className="catalog-currency-label">تومان</span>
+                  return (
+                    <tr
+                      key={item.key}
+                      className={`product-table-row ${isActive ? "is-active" : "is-inactive"}`}
+                    >
+                      {/* 1. Title & Slug (bold clickable title + small muted slug) */}
+                      <td className="col-title">
+                        <div className="product-title-cell product-info-text">
+                          <Link
+                            href={detailHref}
+                            className="product-row-title-link"
+                            title={`مشاهده جزئیات و تاریخچه ${item.title}`}
+                          >
+                            <strong className="product-row-title">{item.title}</strong>
+                          </Link>
+                          <span className="product-row-slug" title={item.key}>
+                            {item.key}
+                          </span>
                         </div>
-                        {snapshot?.price_usd ? (
-                          <div className="catalog-card-price-usd">
-                            معادل {formatNumber(snapshot.price_usd)} دلار
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <div className="catalog-card-price-none">هنوز قیمتی ثبت نشده است</div>
-                    )}
-                  </div>
+                      </td>
 
-                  {/* Seller & Date Info */}
-                  <div className="catalog-card-meta">
-                    <div className="catalog-card-meta-row">
-                      <span className="meta-label">فروشنده:</span>
-                      <span className="meta-value" title={snapshot?.seller || "نامشخص"}>
-                        {snapshot?.seller || "نامشخص"}
-                      </span>
-                    </div>
-                    {snapshot?.observed_at && (
-                      <div className="catalog-card-meta-row">
-                        <span className="meta-label">آخرین بررسی:</span>
-                        <span className="meta-value">{formatDate(snapshot.observed_at)}</span>
-                      </div>
-                    )}
-                  </div>
+                      {/* 2. Source Badge */}
+                      <td className="col-source">
+                        <div className="product-info-text">
+                          {item.sources.length ? (
+                            item.sources.map((source) => (
+                              <span className="product-source-badge" key={`${item.key}:${source}`}>
+                                {source}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="product-source-badge muted">بدون منبع</span>
+                          )}
+                        </div>
+                      </td>
 
-                  {/* Card Action Link */}
-                  <div className="catalog-card-footer">
-                    <Link href={detailHref} className="catalog-card-detail-btn">
-                      <span>مشاهده تاریخچه و جزئیات</span>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <line x1="19" y1="12" x2="5" y2="12" />
-                        <polyline points="12 19 5 12 12 5" />
-                      </svg>
-                    </Link>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+                      {/* 3. Latest Price */}
+                      <td className="col-price">
+                        <div className="product-info-text">
+                          {hasPrice ? (
+                            <div className="catalog-table-price">
+                              <strong className="catalog-price-val">
+                                {formatNumber(snapshot!.price_toman)} تومان
+                              </strong>
+                              {snapshot?.price_usd ? (
+                                <span className="catalog-usd-val">
+                                  ({formatNumber(snapshot.price_usd)} دلار)
+                                </span>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <span className="muted-text">-</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 4. Availability Status */}
+                      <td className="col-status">
+                        <div className="product-info-text">
+                          {snapshot ? (
+                            <StatusPill
+                              text={availabilityText(snapshot.availability)}
+                              tone={snapshot.availability}
+                            />
+                          ) : (
+                            <span className="muted-text">-</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 5. Seller */}
+                      <td className="col-seller">
+                        <div className="product-info-text">
+                          <span title={snapshot?.seller || "-"}>{snapshot?.seller || "-"}</span>
+                        </div>
+                      </td>
+
+                      {/* 6. Last Checked Time */}
+                      <td className="col-date">
+                        <div className="product-info-text">
+                          <span className="muted-text">
+                            {snapshot?.observed_at ? formatDate(snapshot.observed_at) : "-"}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* 7. Action: View Details */}
+                      <td className="col-actions">
+                        <div className="product-actions-cell">
+                          <Link
+                            href={detailHref}
+                            className="action-icon-button"
+                            title="مشاهده جزئیات و تاریخچه قیمت"
+                            aria-label={`مشاهده جزئیات ${item.title}`}
+                          >
+                            <svg
+                              width="15"
+                              height="15"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <line x1="18" y1="20" x2="18" y2="10" />
+                              <line x1="12" y1="20" x2="12" y2="4" />
+                              <line x1="6" y1="20" x2="6" y2="14" />
+                            </svg>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
       </section>
     </div>
   );
