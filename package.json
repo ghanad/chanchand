@@ -17,6 +17,7 @@
     "errors": "tsx src/cli/index.ts errors",
     "validate-config": "tsx src/cli/index.ts validate-config",
     "init-db": "tsx src/cli/index.ts init-db",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

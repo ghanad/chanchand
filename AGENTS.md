@@ -50,6 +50,7 @@ Core flow:
 ```bash
 npm install
 npm test
+npm run typecheck
 npm run validate-config
 npm run run
 npm run latest

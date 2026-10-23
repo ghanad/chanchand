@@ -199,7 +199,7 @@ describe('Security Utilities & Hardening', () => {
     });
 
     it('throws error when JWT_SECRET is missing in production mode', async () => {
-      process.env.NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
       delete process.env.JWT_SECRET;
 
       await expect(
@@ -208,7 +208,7 @@ describe('Security Utilities & Hardening', () => {
     });
 
     it('throws error when JWT_SECRET is shorter than 32 chars in production', async () => {
-      process.env.NODE_ENV = 'production';
+      (process.env as Record<string, string | undefined>).NODE_ENV = 'production';
       process.env.JWT_SECRET = 'short_secret';
 
       await expect(

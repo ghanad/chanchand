@@ -55,7 +55,7 @@ describe('db module', () => {
     const runId = startRun(db, null, config);
     expect(runId).toBeGreaterThan(0);
 
-    const priceId = recordPrice(db, runId, config.targets[0], {
+    const priceId = recordPrice(db, runId, config.targets![0], {
       title: 'Item One',
       seller: 'Test Seller',
       price_irr: 500000,
