@@ -148,7 +148,7 @@ export function ProductsView() {
 
   async function deleteProduct(product: ProductRow) {
     if (!isAdmin || !product.key) return;
-    const confirmed = window.confirm(`محصول «${product.title}» از config حذف شود؟`);
+    const confirmed = window.confirm(`محصول «${product.title}» حذف شود؟`);
     if (!confirmed) return;
 
     setBusyAction(`delete:${product.key}`);
@@ -175,7 +175,7 @@ export function ProductsView() {
         <Metric label="کل محصول‌ها" value={formatNumber(configuredProductCount)} />
         <Metric label="محصول فعال" value={formatNumber(activeProducts)} />
         <Metric label="هدف‌های فعال" value={`${formatNumber(activeTargetCount)} / ${formatNumber(targetCount)}`} />
-        <Metric label="منبع‌های config" value={formatNumber(configuredSources.length)} />
+        <Metric label="منابع قیمت‌گیری" value={formatNumber(configuredSources.length)} />
       </section>
 
       <div className={`product-grid ${isAdmin ? "" : "read-only"}`}>
@@ -222,7 +222,7 @@ export function ProductsView() {
         ) : null}
 
         <section className="panel product-list-panel">
-          <PanelHead title="محصول‌های config" meta={`${formatNumber(configuredProductCount)} محصول`} />
+          <PanelHead title="محصولات" meta={`${formatNumber(configuredProductCount)} محصول`} />
           <div className="product-list">
             {configProducts.map((product) => {
               const isActive = product.enabled_target_count > 0;
@@ -230,7 +230,7 @@ export function ProductsView() {
               const actionBusy = busyAction === `disable:${product.key}` || busyAction === `enable:${product.key}`;
               const editBusy = busyAction === `edit:${product.key}`;
               const deleteBusy = busyAction === `delete:${product.key}`;
-              const canDelete = product.configured && configuredProductCount > 1;
+              const canDelete = product.configured;
               const isEditing = editProductKey === product.key;
               const status = product.target_count === 0 ? "بدون هدف" : isActive ? "فعال" : "غیرفعال";
               const statusTone = isActive ? "in_stock" : product.target_count === 0 ? "unknown" : "out_of_stock";

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { loadConfig } from '@/lib/config';
 import { PriceRunner } from '@/lib/runner';
-import { getDatabase, startRun } from '@/lib/db';
+import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,8 +23,12 @@ export async function POST() {
     }
 
     const config = loadConfig();
-    const activeTargets = config.targets.filter((t) => t.enabled);
     const db = getDatabase();
+    const managedTargets = getManagedTargets(db);
+    const activeTargets =
+      managedTargets.length > 0
+        ? managedTargets.filter((t) => t.enabled)
+        : (config.targets || []).filter((t) => t.enabled);
     const runId = startRun(db, null, config);
 
     isRunning = true;

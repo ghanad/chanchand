@@ -70,14 +70,20 @@ export function serializeRun(row: RunRow): Record<string, any> {
 
 export function productsPayload(
   config: AppConfig,
-  dbProducts: Array<{ id: number; run_id: number; key: string; title: string }>
+  dbProducts: Array<{ id?: number; run_id?: number; key: string; title: string }>,
+  managedTargets?: Array<{
+    product_key: string;
+    source_key: string;
+    url: string;
+    enabled: number | boolean;
+  }>
 ): Array<Record<string, any>> {
   const products: Record<string, any> = {};
 
-  for (const [key, prod] of Object.entries(config.products)) {
-    products[key] = {
-      key,
-      title: prod.title,
+  for (const dbProduct of dbProducts) {
+    products[dbProduct.key] = {
+      key: dbProduct.key,
+      title: dbProduct.title,
       configured: true,
       target_count: 0,
       enabled_target_count: 0,
@@ -86,12 +92,26 @@ export function productsPayload(
     };
   }
 
-  for (const target of config.targets) {
+  for (const [key, prod] of Object.entries(config.products || {})) {
+    if (!products[key]) {
+      products[key] = {
+        key,
+        title: prod.title,
+        configured: true,
+        target_count: 0,
+        enabled_target_count: 0,
+        sources: [],
+        primary_target: null,
+      };
+    }
+  }
+
+  for (const target of managedTargets || []) {
     if (!products[target.product_key]) {
       products[target.product_key] = {
         key: target.product_key,
         title: target.product_key,
-        configured: false,
+        configured: true,
         target_count: 0,
         enabled_target_count: 0,
         sources: [],
@@ -100,7 +120,8 @@ export function productsPayload(
     }
     const product = products[target.product_key];
     product.target_count++;
-    if (target.enabled) {
+    const isEnabled = Boolean(target.enabled);
+    if (isEnabled) {
       product.enabled_target_count++;
     }
     if (!product.sources.includes(target.source_key)) {
@@ -110,22 +131,39 @@ export function productsPayload(
       product.primary_target = {
         source_key: target.source_key,
         url: target.url,
-        enabled: target.enabled,
+        enabled: isEnabled,
       };
     }
   }
 
-  for (const dbProduct of dbProducts) {
-    if (!products[dbProduct.key]) {
-      products[dbProduct.key] = {
-        key: dbProduct.key,
-        title: dbProduct.title,
-        configured: false,
-        target_count: 0,
-        enabled_target_count: 0,
-        sources: [],
-        primary_target: null,
-      };
+  if (!managedTargets || managedTargets.length === 0) {
+    for (const target of config.targets || []) {
+      if (!products[target.product_key]) {
+        products[target.product_key] = {
+          key: target.product_key,
+          title: target.product_key,
+          configured: false,
+          target_count: 0,
+          enabled_target_count: 0,
+          sources: [],
+          primary_target: null,
+        };
+      }
+      const product = products[target.product_key];
+      product.target_count++;
+      if (target.enabled) {
+        product.enabled_target_count++;
+      }
+      if (!product.sources.includes(target.source_key)) {
+        product.sources.push(target.source_key);
+      }
+      if (!product.primary_target) {
+        product.primary_target = {
+          source_key: target.source_key,
+          url: target.url,
+          enabled: target.enabled,
+        };
+      }
     }
   }
 

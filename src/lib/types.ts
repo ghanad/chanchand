@@ -30,9 +30,28 @@ export interface TargetConfig {
 
 export interface AppConfig {
   sources: Record<string, SourceConfig>;
-  products: Record<string, ProductConfig>;
-  targets: TargetConfig[];
+  products?: Record<string, ProductConfig>;
+  targets?: TargetConfig[];
 }
+
+export interface ManagedProductRow {
+  key: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ManagedTargetRow {
+  id: number;
+  product_key: string;
+  source_key: string;
+  url: string;
+  enabled: number;
+  adapter_settings: string;
+  created_at: string;
+  updated_at: string;
+}
+
 
 export interface RunRow {
   id: number;
@@ -70,3 +89,25 @@ export interface FetchErrorRow {
   observed_at: string;
   raw_observation: string;
 }
+
+export type UserRole = 'admin' | 'viewer';
+
+export interface UserRow {
+  id: number;
+  username: string;
+  email: string | null;
+  password_hash: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SafeUser {
+  id: number;
+  username: string;
+  email: string | null;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+

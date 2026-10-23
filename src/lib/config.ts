@@ -33,8 +33,8 @@ export const TargetConfigSchema = z.object({
 export const AppConfigSchema = z
   .object({
     sources: z.record(SourceConfigSchema),
-    products: z.record(ProductConfigSchema),
-    targets: z.array(TargetConfigSchema),
+    products: z.record(ProductConfigSchema).default({}),
+    targets: z.array(TargetConfigSchema).default([]),
   })
   .superRefine((data, ctx) => {
     for (const key of Object.keys(data.sources)) {
@@ -45,7 +45,7 @@ export const AppConfigSchema = z
         });
       }
     }
-    for (const key of Object.keys(data.products)) {
+    for (const key of Object.keys(data.products || {})) {
       if (!KEY_RE.test(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -60,21 +60,15 @@ export const AppConfigSchema = z
         message: 'at least one source is required',
       });
     }
-    if (Object.keys(data.products).length === 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'at least one product is required',
-      });
-    }
 
-    const productKeys = new Set(Object.keys(data.products));
+    const productKeys = new Set(Object.keys(data.products || {}));
     const sourceKeys = new Set(Object.keys(data.sources));
 
     const missingProducts = new Set<string>();
     const missingSources = new Set<string>();
 
-    for (const target of data.targets) {
-      if (!productKeys.has(target.product_key)) {
+    for (const target of data.targets || []) {
+      if (productKeys.size > 0 && !productKeys.has(target.product_key)) {
         missingProducts.add(target.product_key);
       }
       if (!sourceKeys.has(target.source_key)) {

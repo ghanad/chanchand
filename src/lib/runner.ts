@@ -1,5 +1,14 @@
 import { AppConfig, TargetConfig, SourceConfig } from './types';
-import { getDatabase, startRun, finishRun, markRunFailed, recordPrice, recordError, hasSuccessfulPriceToday } from './db';
+import {
+  getDatabase,
+  startRun,
+  finishRun,
+  markRunFailed,
+  recordPrice,
+  recordError,
+  hasSuccessfulPriceToday,
+  getManagedTargets,
+} from './db';
 import { getAdapter } from './adapters';
 import { loadConfig } from './config';
 
@@ -25,19 +34,62 @@ export class PriceRunner {
     return this.run(config, configPath);
   }
 
-  async run(config: AppConfig, configPath?: string): Promise<RunSummary> {
+  async run(config: AppConfig, configPath?: string, customTargets?: TargetConfig[]): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
-    const runId = startRun(db, configPath || null, config);
-    return this.executeRun(config, runId);
+    let targetsToRun = customTargets;
+    if (!targetsToRun) {
+      const managedTargets = getManagedTargets(db);
+      if (managedTargets.length > 0) {
+        targetsToRun = managedTargets.map((t) => {
+          let adapterSettings: Record<string, any> = {};
+          try {
+            adapterSettings = JSON.parse(t.adapter_settings || '{}');
+          } catch {}
+          return {
+            product_key: t.product_key,
+            source_key: t.source_key,
+            url: t.url,
+            enabled: Boolean(t.enabled),
+            adapter_settings: adapterSettings,
+          };
+        });
+      } else {
+        targetsToRun = config.targets || [];
+      }
+    }
+    const runId = startRun(db, configPath || null, config, targetsToRun);
+    return this.executeRun(config, runId, targetsToRun);
   }
 
-  async executeRun(config: AppConfig, runId: number): Promise<RunSummary> {
+  async executeRun(config: AppConfig, runId: number, targets?: TargetConfig[]): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
     let successCount = 0;
     let errorCount = 0;
     const lastRequestAt: Record<string, number> = {};
 
-    const activeTargets = config.targets.filter((t) => t.enabled);
+    let candidateTargets = targets;
+    if (!candidateTargets) {
+      const managedTargets = getManagedTargets(db);
+      if (managedTargets.length > 0) {
+        candidateTargets = managedTargets.map((t) => {
+          let adapterSettings: Record<string, any> = {};
+          try {
+            adapterSettings = JSON.parse(t.adapter_settings || '{}');
+          } catch {}
+          return {
+            product_key: t.product_key,
+            source_key: t.source_key,
+            url: t.url,
+            enabled: Boolean(t.enabled),
+            adapter_settings: adapterSettings,
+          };
+        });
+      } else {
+        candidateTargets = config.targets || [];
+      }
+    }
+
+    const activeTargets = candidateTargets.filter((t) => t.enabled);
     console.log(`[Runner] run ${runId} started: ${activeTargets.length} active targets`);
 
     try {

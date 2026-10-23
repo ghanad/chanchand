@@ -8,6 +8,12 @@ import {
   finishRun,
   latestSnapshots,
   hasSuccessfulPriceToday,
+  addManagedProduct,
+  getManagedProducts,
+  getManagedTargets,
+  updateManagedProduct,
+  deleteManagedProduct,
+  setManagedProductEnabled,
 } from '../src/lib/db';
 import { AppConfig } from '../src/lib/types';
 
@@ -62,6 +68,56 @@ describe('db module', () => {
     expect(snapshots.length).toBe(1);
     expect(snapshots[0].product_key).toBe('item_1');
     expect(snapshots[0].price_irr).toBe(500000);
+
+    db.close();
+  });
+
+  it('manages products and targets in SQLite', () => {
+    const db = new Database(':memory:');
+    initDatabase(db);
+
+    const added = addManagedProduct(db, {
+      title: 'گوشی موبایل',
+      url: 'https://www.digikala.com/product/dkp-12345',
+      source_key: 'digikala_api',
+    });
+    expect(added.product_key).toBeDefined();
+
+    const prods = getManagedProducts(db);
+    expect(prods.length).toBe(1);
+    expect(prods[0].key).toBe(added.product_key);
+    expect(prods[0].title).toBe('گوشی موبایل');
+
+    const targets = getManagedTargets(db);
+    expect(targets.length).toBe(1);
+    expect(targets[0].product_key).toBe(added.product_key);
+    expect(targets[0].enabled).toBe(1);
+
+    // Disable target
+    setManagedProductEnabled(db, added.product_key, false);
+    const disabledTargets = getManagedTargets(db, added.product_key);
+    expect(disabledTargets[0].enabled).toBe(0);
+
+    // Enable target
+    setManagedProductEnabled(db, added.product_key, true);
+    const enabledTargets = getManagedTargets(db, added.product_key);
+    expect(enabledTargets[0].enabled).toBe(1);
+
+    // Update
+    updateManagedProduct(db, added.product_key, {
+      title: 'گوشی موبایل آپدیت‌شده',
+      url: 'https://www.digikala.com/product/dkp-99999',
+      source_key: 'digikala_web',
+    });
+    const updatedProds = getManagedProducts(db);
+    expect(updatedProds[0].title).toBe('گوشی موبایل آپدیت‌شده');
+    const updatedTargets = getManagedTargets(db, added.product_key);
+    expect(updatedTargets[0].source_key).toBe('digikala_web');
+
+    // Delete
+    deleteManagedProduct(db, added.product_key);
+    expect(getManagedProducts(db).length).toBe(0);
+    expect(getManagedTargets(db).length).toBe(0);
 
     db.close();
   });

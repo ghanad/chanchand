@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDatabase, latestSnapshots, productsFromLatestRun, recentRuns } from '@/lib/db';
+import { getDatabase, getManagedProducts, getManagedTargets, latestSnapshots, recentRuns } from '@/lib/db';
 import { loadConfig } from '@/lib/config';
 import { productsPayload, serializePrice, serializeRun } from '@/lib/serializers';
 
@@ -11,8 +11,9 @@ export async function GET() {
     const db = getDatabase();
     const rows = latestSnapshots(db);
     const runs = recentRuns(db, 1);
-    const dbProducts = productsFromLatestRun(db);
-    const products = productsPayload(config, dbProducts);
+    const dbProducts = getManagedProducts(db);
+    const dbTargets = getManagedTargets(db);
+    const products = productsPayload(config, dbProducts, dbTargets);
 
     const latestRunRow = runs.length > 0 ? serializeRun(runs[0]) : null;
     let latestObservedAt: string | null = null;

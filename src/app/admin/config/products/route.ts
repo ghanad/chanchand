@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addProductTarget } from '@/lib/configEditor';
-import { resolveConfigPath } from '@/lib/config';
+import { getDatabase, addManagedProduct } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,8 +10,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'title and url are required' }, { status: 400 });
     }
 
-    const configPath = resolveConfigPath();
-    const result = addProductTarget(configPath, {
+    const db = getDatabase();
+    const result = addManagedProduct(db, {
       title: body.title,
       url: body.url,
       source_key: body.source_key,

@@ -1,9 +1,21 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { resolveConfigPath, loadConfig } from '../lib/config';
-import { getDatabase, DEFAULT_DB_URL, latestSnapshots, productHistory, recentErrors } from '../lib/db';
+import {
+  getDatabase,
+  DEFAULT_DB_URL,
+  latestSnapshots,
+  productHistory,
+  recentErrors,
+  listUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  getUserByUsername,
+} from '../lib/db';
 import { PriceRunner } from '../lib/runner';
 import { priceToman } from '../lib/serializers';
+import { hashPassword } from '../lib/auth';
 
 const program = new Command();
 program.name('price-getter').description('Price collection CLI service for public ecommerce and market sources');
@@ -16,11 +28,13 @@ program
     try {
       const configPath = resolveConfigPath(options.config);
       const config = loadConfig(configPath);
-      const activeTargets = config.targets.filter((t) => t.enabled);
+      const activeTargets = (config.targets || []).filter((t) => t.enabled);
+      const productsCount = Object.keys(config.products || {}).length;
       console.log(
-        `Config is valid: ${Object.keys(config.sources).length} sources, ` +
-          `${Object.keys(config.products).length} products, ` +
-          `${activeTargets.length}/${config.targets.length} active targets`
+        `Config is valid: ${Object.keys(config.sources).length} sources` +
+          (productsCount
+            ? `, ${productsCount} products, ${activeTargets.length}/${config.targets?.length || 0} active targets`
+            : '')
       );
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
@@ -175,6 +189,101 @@ program
           observed_at: r.observed_at,
         }))
       );
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+const userCmd = program.command('user').description('Manage system users');
+
+userCmd
+  .command('list')
+  .description('List all registered users')
+  .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
+  .action((options) => {
+    try {
+      const db = getDatabase(options.dbUrl);
+      const users = listUsers(db);
+      db.close();
+      if (users.length === 0) {
+        console.log('No users found.');
+        return;
+      }
+      console.table(users);
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+userCmd
+  .command('create')
+  .description('Create a new user')
+  .requiredOption('-u, --username <username>', 'Username')
+  .requiredOption('-p, --password <password>', 'Password')
+  .option('-r, --role <role>', 'Role (admin or viewer)', 'viewer')
+  .option('-e, --email <email>', 'Email address')
+  .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
+  .action(async (options) => {
+    try {
+      const db = getDatabase(options.dbUrl);
+      const role = options.role === 'admin' ? 'admin' : 'viewer';
+      const passwordHash = await hashPassword(options.password);
+      const user = createUser(db, {
+        username: options.username,
+        password_hash: passwordHash,
+        role,
+        email: options.email || null,
+      });
+      db.close();
+      console.log(`User created successfully: ID=${user.id}, Username=${user.username}, Role=${user.role}`);
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+userCmd
+  .command('reset-password')
+  .description('Reset a user password')
+  .requiredOption('-u, --username <username>', 'Username')
+  .requiredOption('-p, --password <password>', 'New password')
+  .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
+  .action(async (options) => {
+    try {
+      const db = getDatabase(options.dbUrl);
+      const user = getUserByUsername(db, options.username);
+      if (!user) {
+        console.error(`User not found: ${options.username}`);
+        process.exit(1);
+      }
+      const passwordHash = await hashPassword(options.password);
+      updateUser(db, user.id, { password_hash: passwordHash });
+      db.close();
+      console.log(`Password reset successfully for user: ${options.username}`);
+    } catch (err: any) {
+      console.error(`Error: ${err.message}`);
+      process.exit(1);
+    }
+  });
+
+userCmd
+  .command('delete')
+  .description('Delete a user')
+  .requiredOption('-u, --username <username>', 'Username')
+  .option('--db-url <url>', 'Database URL or path', DEFAULT_DB_URL)
+  .action((options) => {
+    try {
+      const db = getDatabase(options.dbUrl);
+      const user = getUserByUsername(db, options.username);
+      if (!user) {
+        console.error(`User not found: ${options.username}`);
+        process.exit(1);
+      }
+      deleteUser(db, user.id);
+      db.close();
+      console.log(`User deleted successfully: ${options.username}`);
     } catch (err: any) {
       console.error(`Error: ${err.message}`);
       process.exit(1);
