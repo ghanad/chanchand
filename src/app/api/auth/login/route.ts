@@ -6,11 +6,22 @@ import {
   signAuthToken,
   verifyPassword,
 } from '@/lib/auth';
+import { loginRateLimiter } from '@/lib/security';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
+    const forwarded = req.headers.get('x-forwarded-for');
+    const clientIp = forwarded ? forwarded.split(',')[0].trim() : '127.0.0.1';
+
+    if (loginRateLimiter.isRateLimited(clientIp)) {
+      return NextResponse.json(
+        { error: 'به دلیل تلاش‌های ناموفق مکرر، لطفاً چند دقیقه بعد مجدداً تلاش کنید.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => null);
     const username = body?.username?.trim();
     const password = body?.password;
@@ -28,6 +39,7 @@ export async function POST(req: NextRequest) {
 
     const user = getUserByUsername(db, username);
     if (!user) {
+      loginRateLimiter.recordFailure(clientIp);
       return NextResponse.json(
         { error: 'نام کاربری یا کلمه عبور نادرست است.' },
         { status: 401 }
@@ -36,11 +48,15 @@ export async function POST(req: NextRequest) {
 
     const passwordMatches = await verifyPassword(password, user.password_hash);
     if (!passwordMatches) {
+      loginRateLimiter.recordFailure(clientIp);
       return NextResponse.json(
         { error: 'نام کاربری یا کلمه عبور نادرست است.' },
         { status: 401 }
       );
     }
+
+    // Reset rate limiter on successful authentication
+    loginRateLimiter.recordSuccess(clientIp);
 
     const token = await signAuthToken({
       id: user.id,

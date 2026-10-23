@@ -2,11 +2,17 @@ import * as cheerio from 'cheerio';
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
+import { validateSafeUrl } from '../security';
 
 export class DigikalaWebAdapter implements PriceAdapter {
   name = 'digikala_web';
 
   async fetch(context: FetchContext): Promise<PriceObservation> {
+    const urlCheck = validateSafeUrl(context.target.url);
+    if (!urlCheck.valid) {
+      throw new Error(`SSRF validation failed for DigikalaWeb target URL: ${urlCheck.reason}`);
+    }
+
     const headers: Record<string, string> = {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',

@@ -3,8 +3,10 @@ import path from 'path';
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { parsePriceToIrr } from '../pricing';
+import { validateSafeUrl } from '../security';
 
 const DEFAULT_API_KEY_ENV = 'brsapi_api';
+const ALLOWED_API_KEY_ENVS = new Set(['brsapi_api', 'BRSAPI_API', 'BRSAPI_KEY']);
 const DEFAULT_CACHE_TTL_SECONDS = 30.0;
 
 const BRSAPI_BROWSER_HEADERS: Record<string, string> = {
@@ -19,15 +21,26 @@ export class BrsapiMarketAdapter implements PriceAdapter {
   private cache: Map<string, { timestamp: number; payload: any; statusCode: number }> = new Map();
 
   async fetch(context: FetchContext): Promise<PriceObservation> {
+    const urlCheck = validateSafeUrl(context.target.url);
+    if (!urlCheck.valid) {
+      throw new Error(`SSRF validation failed for BRSAPI target URL: ${urlCheck.reason}`);
+    }
+
     const settings = {
       ...context.source.settings,
       ...context.target.adapter_settings,
     };
 
-    const apiKeyEnv = String(settings.api_key_env || DEFAULT_API_KEY_ENV);
-    const apiKey = this.resolveApiKey(apiKeyEnv, settings.env_file);
+    const requestedEnv = settings.api_key_env ? String(settings.api_key_env).trim() : DEFAULT_API_KEY_ENV;
+    if (!ALLOWED_API_KEY_ENVS.has(requestedEnv)) {
+      throw new Error(
+        `Disallowed API key environment variable "${requestedEnv}". Allowed variables: ${Array.from(ALLOWED_API_KEY_ENVS).join(', ')}`
+      );
+    }
+
+    const apiKey = this.resolveApiKey(requestedEnv);
     if (!apiKey) {
-      throw new Error(`missing BRSAPI API key; set ${apiKeyEnv} in environment or .env`);
+      throw new Error(`missing BRSAPI API key; set ${requestedEnv} in environment or .env`);
     }
 
     const apiUrl = this.urlWithApiKey(context.target.url, apiKey);
@@ -165,15 +178,11 @@ export class BrsapiMarketAdapter implements PriceAdapter {
     return { item: null, category: null };
   }
 
-  private resolveApiKey(envName: string, envFile?: string): string | null {
+  private resolveApiKey(envName: string): string | null {
     if (process.env[envName]) {
       return process.env[envName]!.trim();
     }
-    const envFilePath = envFile
-      ? path.isAbsolute(envFile)
-        ? envFile
-        : path.resolve(process.cwd(), envFile)
-      : path.resolve(process.cwd(), '.env');
+    const envFilePath = path.resolve(process.cwd(), '.env');
 
     if (!fs.existsSync(envFilePath)) return null;
 

@@ -2,11 +2,17 @@ import * as cheerio from 'cheerio';
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
+import { validateSafeUrl } from '../security';
 
 export class GenericHtmlAdapter implements PriceAdapter {
   name = 'generic_html';
 
   async fetch(context: FetchContext): Promise<PriceObservation> {
+    const urlCheck = validateSafeUrl(context.target.url);
+    if (!urlCheck.valid) {
+      throw new Error(`SSRF validation failed for GenericHtml target URL: ${urlCheck.reason}`);
+    }
+
     const headers: Record<string, string> = {
       'User-Agent': 'price-getter/0.1 (+https://example.local)',
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',

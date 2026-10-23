@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import Database from 'better-sqlite3';
 import { NextRequest } from 'next/server';
@@ -29,7 +30,17 @@ export async function ensureDefaultAdmin(db: Database.Database): Promise<SafeUse
     }
 
     const username = (process.env.ADMIN_USERNAME || 'admin').trim();
-    const initialPassword = process.env.ADMIN_INITIAL_PASSWORD || 'admin123456';
+    let initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
+    if (!initialPassword) {
+      if (process.env.NODE_ENV === 'production') {
+        initialPassword = crypto.randomBytes(12).toString('base64url');
+        console.warn(
+          `[SECURITY NOTICE] ADMIN_INITIAL_PASSWORD not set. Generated secure random password for admin account: "${initialPassword}". Save this password immediately!`
+        );
+      } else {
+        initialPassword = 'admin123456';
+      }
+    }
     const passwordHash = await hashPassword(initialPassword);
 
     const admin = createUser(db, {

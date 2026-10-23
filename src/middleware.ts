@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/lib/jwt';
+import { sanitizeInternalRedirect } from '@/lib/security';
 
 const PUBLIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.woff2', '.woff', '.ttf', '.ico'];
 
@@ -25,7 +26,9 @@ export async function middleware(req: NextRequest) {
 
   // If already authenticated and visits /login, redirect to dashboard
   if (isLoginPage && session) {
-    const redirectUrl = req.nextUrl.searchParams.get('redirect') || (session.role === 'admin' ? '/admin' : '/');
+    const rawRedirect = req.nextUrl.searchParams.get('redirect');
+    const defaultTarget = session.role === 'admin' ? '/admin' : '/';
+    const redirectUrl = sanitizeInternalRedirect(rawRedirect, defaultTarget);
     return NextResponse.redirect(new URL(redirectUrl, req.url));
   }
 

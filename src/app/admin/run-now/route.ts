@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PriceRunner } from '@/lib/runner';
 import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
+import { requireAdmin } from '@/lib/api-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,8 +10,13 @@ let activeRunId: number | null = null;
 let activeTargetCount = 0;
 let isRunning = false;
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    const auth = await requireAdmin(req);
+    if (!auth.authorized) {
+      return auth.response;
+    }
+
     if (isRunning && activeRunId !== null) {
       return NextResponse.json({
         run_id: activeRunId,

@@ -4,6 +4,7 @@ import React, { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { requestJson } from "@/lib/api-client";
 import { useDashboard } from "@/context/DashboardContext";
+import { sanitizeInternalRedirect } from "@/lib/redirect";
 
 function LoginForm() {
   const router = useRouter();
@@ -31,12 +32,10 @@ function LoginForm() {
 
       showToast(`خوش آمدید، ${response.user.username}`);
 
-      const redirectPath = searchParams.get("redirect");
-      if (redirectPath) {
-        window.location.href = redirectPath;
-      } else {
-        window.location.href = response.user.role === "admin" ? "/admin" : "/";
-      }
+      const rawRedirect = searchParams.get("redirect");
+      const defaultTarget = response.user.role === "admin" ? "/admin" : "/";
+      const redirectPath = sanitizeInternalRedirect(rawRedirect, defaultTarget);
+      window.location.href = redirectPath;
     } catch (err: any) {
       setError(err instanceof Error ? err.message : "خطا در ورود به سیستم");
     } finally {
