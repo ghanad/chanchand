@@ -41,7 +41,7 @@ brsapi_api=your_api_key
 
 ## CLI Commands
 
-- `npm run init-db`: initialize SQLite schema (`price_getter.db`).
+- `npm run init-db`: initialize SQLite schema (`data/price_getter.db`).
 - `npm run validate-config`: validate YAML config structure.
 - `npm run run`: execute price collection for all enabled targets.
 - `npm run latest`: print latest snapshot for each product/source pair.
