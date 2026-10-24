@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ProductRow, SourceRow, ProductsPayload, PriceRow, LatestPayload } from "../../types/dashboard";
 import { requestJson } from "../../lib/api-client";
 import { formatNumber, formatDate } from "../../lib/formatters";
@@ -17,8 +18,10 @@ interface ProductItemWithPrice extends ProductRow {
 
 type SortField = "title" | "price" | "status" | "date";
 type SortDirection = "asc" | "desc";
+type ProductTab = "all" | "personal" | "public";
 
 export function ProductsView() {
+  const router = useRouter();
   const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
   const basePath = isAdmin ? "/admin" : "";
   const [products, setProducts] = useState<ProductRow[]>([]);
@@ -39,7 +42,7 @@ export function ProductsView() {
 
   // Filtering & search state
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [activeTab, setActiveTab] = useState<ProductTab>("all");
 
   // Interaction feedback state
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -128,52 +131,72 @@ export function ProductsView() {
     }));
   }, [configProducts, latestPrices]);
 
-  // Filtered products list
-  const filteredProducts = useMemo(() => {
-    return productsWithPrices.filter((product) => {
-      const isActive = product.enabled_target_count > 0;
-      if (statusFilter === "active" && !isActive) return false;
-      if (statusFilter === "inactive" && isActive) return false;
-
+  // Search filter matcher
+  const matchesSearch = useCallback(
+    (product: ProductItemWithPrice) => {
       if (!searchQuery.trim()) return true;
       const q = searchQuery.trim().toLowerCase();
       const matchTitle = product.title.toLowerCase().includes(q);
       const matchKey = product.key.toLowerCase().includes(q);
-      const matchUrl = (!product.is_public || isAdmin) && product.primary_target?.url.toLowerCase().includes(q);
+      const matchUrl = (!product.is_public || isAdmin) && Boolean(product.primary_target?.url.toLowerCase().includes(q));
       const matchSource = product.sources.some((s) => s.toLowerCase().includes(q));
-
       return matchTitle || matchKey || matchUrl || matchSource;
-    });
-  }, [productsWithPrices, statusFilter, searchQuery]);
+    },
+    [searchQuery, isAdmin]
+  );
 
-  // Sorted products list
-  const sortedProducts = useMemo(() => {
-    if (!sortField) return filteredProducts;
+  // Sorting function
+  const sortList = useCallback(
+    (items: ProductItemWithPrice[]) => {
+      if (!sortField) return items;
 
-    return [...filteredProducts].sort((a, b) => {
-      let comparison = 0;
-      if (sortField === "title") {
-        comparison = a.title.localeCompare(b.title, "fa", { numeric: true, sensitivity: "base" });
-      } else if (sortField === "price") {
-        const priceA = a.latestSnapshot?.price_toman ?? null;
-        const priceB = b.latestSnapshot?.price_toman ?? null;
-        if (priceA === null && priceB === null) comparison = 0;
-        else if (priceA === null) comparison = 1;
-        else if (priceB === null) comparison = -1;
-        else comparison = priceA - priceB;
-      } else if (sortField === "status") {
-        const activeA = a.enabled_target_count > 0 ? 1 : 0;
-        const activeB = b.enabled_target_count > 0 ? 1 : 0;
-        comparison = activeA - activeB;
-      } else if (sortField === "date") {
-        const dateA = a.latestSnapshot?.observed_at ? new Date(a.latestSnapshot.observed_at).getTime() : 0;
-        const dateB = b.latestSnapshot?.observed_at ? new Date(b.latestSnapshot.observed_at).getTime() : 0;
-        comparison = dateA - dateB;
-      }
+      return [...items].sort((a, b) => {
+        let comparison = 0;
+        if (sortField === "title") {
+          comparison = a.title.localeCompare(b.title, "fa", { numeric: true, sensitivity: "base" });
+        } else if (sortField === "price") {
+          const priceA = a.latestSnapshot?.price_toman ?? null;
+          const priceB = b.latestSnapshot?.price_toman ?? null;
+          if (priceA === null && priceB === null) comparison = 0;
+          else if (priceA === null) comparison = 1;
+          else if (priceB === null) comparison = -1;
+          else comparison = priceA - priceB;
+        } else if (sortField === "status") {
+          const activeA = a.enabled_target_count > 0 ? 1 : 0;
+          const activeB = b.enabled_target_count > 0 ? 1 : 0;
+          comparison = activeA - activeB;
+        } else if (sortField === "date") {
+          const dateA = a.latestSnapshot?.observed_at ? new Date(a.latestSnapshot.observed_at).getTime() : 0;
+          const dateB = b.latestSnapshot?.observed_at ? new Date(b.latestSnapshot.observed_at).getTime() : 0;
+          comparison = dateA - dateB;
+        }
 
-      return sortDirection === "asc" ? comparison : -comparison;
-    });
-  }, [filteredProducts, sortField, sortDirection]);
+        return sortDirection === "asc" ? comparison : -comparison;
+      });
+    },
+    [sortField, sortDirection]
+  );
+
+  // Partition products into personal and public market
+  const personalProducts = useMemo(
+    () => productsWithPrices.filter((p) => !p.is_public),
+    [productsWithPrices]
+  );
+  const publicProducts = useMemo(
+    () => productsWithPrices.filter((p) => Boolean(p.is_public)),
+    [productsWithPrices]
+  );
+
+  // Filtered and sorted lists
+  const filteredPersonal = useMemo(
+    () => sortList(personalProducts.filter(matchesSearch)),
+    [personalProducts, matchesSearch, sortList]
+  );
+  const filteredPublic = useMemo(
+    () => sortList(publicProducts.filter(matchesSearch)),
+    [publicProducts, matchesSearch, sortList]
+  );
+  const allFilteredCount = filteredPersonal.length + filteredPublic.length;
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -308,7 +331,11 @@ export function ProductsView() {
         nextActive ? "enable" : "disable"
       }`;
       const result = await requestJson<{ product_key: string }>(endpoint, { method: "POST" });
-      showToast(nextActive ? `محصول ${result.product_key} فعال شد.` : `محصول ${result.product_key} غیرفعال شد.`);
+      showToast(
+        nextActive
+          ? `محصول «${product.title}» فعال شد (جمع‌آوری خودکار قیمت فعال شد).`
+          : `محصول «${product.title}» غیرفعال شد (جمع‌آوری خودکار قیمت متوقف شد).`
+      );
       triggerRefresh();
     } catch (error) {
       // 3. Revert on failure
@@ -451,33 +478,33 @@ export function ProductsView() {
               )}
             </div>
 
-            <div className="status-filter-pills" role="radiogroup" aria-label="فیلتر وضعیت محصول">
+            <div className="status-filter-pills" role="tablist" aria-label="دسته‌بندی محصولات">
               <button
                 type="button"
-                role="radio"
-                aria-checked={statusFilter === "all"}
-                className={`filter-pill-btn ${statusFilter === "all" ? "is-active" : ""}`}
-                onClick={() => setStatusFilter("all")}
+                role="tab"
+                aria-selected={activeTab === "all"}
+                className={`filter-pill-btn ${activeTab === "all" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("all")}
               >
                 همه ({formatNumber(configuredProductCount)})
               </button>
               <button
                 type="button"
-                role="radio"
-                aria-checked={statusFilter === "active"}
-                className={`filter-pill-btn ${statusFilter === "active" ? "is-active" : ""}`}
-                onClick={() => setStatusFilter("active")}
+                role="tab"
+                aria-selected={activeTab === "personal"}
+                className={`filter-pill-btn ${activeTab === "personal" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("personal")}
               >
-                فعال ({formatNumber(totalActive)})
+                محصولات من ({formatNumber(personalProducts.length)})
               </button>
               <button
                 type="button"
-                role="radio"
-                aria-checked={statusFilter === "inactive"}
-                className={`filter-pill-btn ${statusFilter === "inactive" ? "is-active" : ""}`}
-                onClick={() => setStatusFilter("inactive")}
+                role="tab"
+                aria-selected={activeTab === "public"}
+                className={`filter-pill-btn ${activeTab === "public" ? "is-active" : ""}`}
+                onClick={() => setActiveTab("public")}
               >
-                غیرفعال ({formatNumber(totalInactive)})
+                بازار عمومی ({formatNumber(publicProducts.length)})
               </button>
             </div>
           </div>
@@ -486,18 +513,29 @@ export function ProductsView() {
           <div className="product-table-wrap">
             {configProducts.length === 0 ? (
               <EmptyState text="هنوز هیچ محصولی ثبت نشده است." />
-            ) : filteredProducts.length === 0 ? (
+            ) : activeTab === "personal" && personalProducts.length === 0 ? (
+              <div className="empty-personal-state">
+                <EmptyState text="هنوز محصول شخصی اضافه نکرده‌اید." />
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => setShowAddProductModal(true)}
+                  style={{ marginTop: "1rem" }}
+                >
+                  + افزودن محصول
+                </button>
+              </div>
+            ) : (activeTab === "all" && allFilteredCount === 0) ||
+              (activeTab === "personal" && filteredPersonal.length === 0) ||
+              (activeTab === "public" && filteredPublic.length === 0) ? (
               <div className="empty-filter-container">
-                <p>هیچ محصولی با معیارهای جستجو یا فیلتر فعلی یافت نشد.</p>
+                <p>هیچ محصولی با معیارهای جستجوی فعلی یافت نشد.</p>
                 <button
                   type="button"
                   className="secondary-button compact-btn"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setStatusFilter("all");
-                  }}
+                  onClick={() => setSearchQuery("")}
                 >
-                  پاک کردن فیلترها
+                  پاک کردن جستجو
                 </button>
               </div>
             ) : (
@@ -563,400 +601,148 @@ export function ProductsView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedProducts.map((product) => {
-                    const isActive = product.enabled_target_count > 0;
-                    const canToggle = product.target_count > 0;
-                    const isToggling = !!togglingKeys[product.key];
-                    const isKebabOpen = activeKebabKey === product.key;
-                    const hasPrimaryTarget = !!product.primary_target;
-
-                    return (
-                      <tr
+                  {activeTab === "all" ? (
+                    <>
+                      {filteredPersonal.length > 0 && (
+                        <>
+                          <tr className="table-group-header-row">
+                            <td colSpan={isAdmin ? 8 : 7} className="table-group-header-cell">
+                              <div className="table-group-header-content">
+                                <span className="table-group-title">محصولات من</span>
+                                <span className="table-group-badge">{formatNumber(filteredPersonal.length)}</span>
+                              </div>
+                            </td>
+                          </tr>
+                          {filteredPersonal.map((product) => (
+                            <ProductTableRow
+                              key={product.key}
+                              product={product}
+                              isAdmin={isAdmin}
+                              basePath={basePath}
+                              showPublicIndicator={false}
+                              isToggling={Boolean(togglingKeys[product.key])}
+                              isKebabOpen={activeKebabKey === product.key}
+                              busyAction={busyAction}
+                              copiedKey={copiedKey}
+                              kebabTriggerRef={(el) => {
+                                kebabTriggerRefs.current[product.key] = el;
+                              }}
+                              onToggleKebab={() =>
+                                setActiveKebabKey((curr) => (curr === product.key ? null : product.key))
+                              }
+                              onCloseKebab={() => setActiveKebabKey(null)}
+                              onEdit={() => startEditProduct(product)}
+                              onToggle={() => handleToggleProduct(product)}
+                              onRefresh={() => handleRefreshProduct(product)}
+                              onDelete={() => {
+                                setActiveKebabKey(null);
+                                setProductToDelete(product);
+                              }}
+                              onCopyUrl={(url) => copyToClipboard(url, product.key, product.is_public)}
+                            />
+                          ))}
+                        </>
+                      )}
+                      {filteredPublic.length > 0 && (
+                        <>
+                          <tr className="table-group-header-row">
+                            <td colSpan={isAdmin ? 8 : 7} className="table-group-header-cell">
+                              <div className="table-group-header-content">
+                                <span className="table-group-title">قیمت‌های بازار</span>
+                                <span className="table-group-badge">{formatNumber(filteredPublic.length)}</span>
+                              </div>
+                            </td>
+                          </tr>
+                          {filteredPublic.map((product) => (
+                            <ProductTableRow
+                              key={product.key}
+                              product={product}
+                              isAdmin={isAdmin}
+                              basePath={basePath}
+                              showPublicIndicator={true}
+                              isToggling={Boolean(togglingKeys[product.key])}
+                              isKebabOpen={activeKebabKey === product.key}
+                              busyAction={busyAction}
+                              copiedKey={copiedKey}
+                              kebabTriggerRef={(el) => {
+                                kebabTriggerRefs.current[product.key] = el;
+                              }}
+                              onToggleKebab={() =>
+                                setActiveKebabKey((curr) => (curr === product.key ? null : product.key))
+                              }
+                              onCloseKebab={() => setActiveKebabKey(null)}
+                              onEdit={() => startEditProduct(product)}
+                              onToggle={() => handleToggleProduct(product)}
+                              onRefresh={() => handleRefreshProduct(product)}
+                              onDelete={() => {
+                                setActiveKebabKey(null);
+                                setProductToDelete(product);
+                              }}
+                              onCopyUrl={(url) => copyToClipboard(url, product.key, product.is_public)}
+                            />
+                          ))}
+                        </>
+                      )}
+                    </>
+                  ) : activeTab === "personal" ? (
+                    filteredPersonal.map((product) => (
+                      <ProductTableRow
                         key={product.key}
-                        className={`product-table-row ${isActive ? "is-active" : "is-inactive"}`}
-                      >
-                        {/* 1. Title & Slug (bold title + small muted slug, with tooltip and truncation) */}
-                        <td className="col-title">
-                          <div className="product-title-cell product-info-text">
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                              <Link
-                                href={`${basePath}/products/${encodeURIComponent(product.key)}`}
-                                className="product-row-title-link"
-                                title={product.title}
-                              >
-                                <strong className="product-row-title" title={product.title}>{product.title}</strong>
-                              </Link>
-                              {product.is_public ? (
-                                <span className="adapter-badge brsapi_market" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
-                                  عمومی / بازار
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="product-row-slug" title={product.key}>
-                              {product.key}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* Owner Column for Admin */}
-                        {isAdmin && (
-                          <td className="col-owner" style={{ width: "110px", whiteSpace: "nowrap" }}>
-                            <div className="product-info-text">
-                              {product.owner_username ? (
-                                <span
-                                  className="adapter-badge generic_html"
-                                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
-                                  title={`مالک کالا: ${product.owner_username}`}
-                                >
-                                  {product.owner_username}
-                                </span>
-                              ) : (
-                                <span
-                                  className="adapter-badge brsapi_market"
-                                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
-                                  title="کالای عمومی سیستم بدون مالک اختصاصی"
-                                >
-                                  سیستم/عمومی
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        )}
-
-                        {/* 2. Source Badge */}
-                        <td className="col-source">
-                          <div className="product-info-text">
-                            {product.sources.length ? (
-                              product.sources.map((source) => (
-                                <span className="product-source-badge" key={`${product.key}:${source}`}>
-                                  {source}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="product-source-badge muted">بدون منبع</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 3. URL (Clean External Link icon button + Copy button) */}
-                        <td className="col-url">
-                          <div className="product-info-text">
-                            {product.is_public && !isAdmin ? (
-                              <span
-                                className="muted-text"
-                                title="آدرس اینترنتی کالاهای عمومی فقط برای مدیر قابل مشاهده است"
-                                style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
-                              >
-                                <svg
-                                  width="14"
-                                  height="14"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  aria-hidden="true"
-                                >
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                                <span>-</span>
-                              </span>
-                            ) : product.primary_target ? (
-                              <div className="product-url-wrapper">
-                                <a
-                                  href={product.primary_target.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="product-url-icon-btn"
-                                  aria-label={`مشاهده صفحه محصول در سایت مقصد`}
-                                  title={`مشاهده صفحه محصول در سایت مقصد: ${product.primary_target.url}`}
-                                >
-                                  <svg
-                                    width="15"
-                                    height="15"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                    <polyline points="15 3 21 3 21 9" />
-                                    <line x1="10" y1="14" x2="21" y2="3" />
-                                  </svg>
-                                </a>
-                                <button
-                                  type="button"
-                                  className="product-copy-btn"
-                                  onClick={() => copyToClipboard(product.primary_target!.url, product.key, product.is_public)}
-                                  aria-label={`کپی آدرس اینترنتی ${product.title}`}
-                                  title={copiedKey === product.key ? "کپی شد!" : "کپی لینک"}
-                                >
-                                  {copiedKey === product.key ? (
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="var(--ok)"
-                                      strokeWidth="2.5"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden="true"
-                                    >
-                                      <polyline points="20 6 9 17 4 12" />
-                                    </svg>
-                                  ) : (
-                                    <svg
-                                      width="14"
-                                      height="14"
-                                      viewBox="0 0 24 24"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="2"
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      aria-hidden="true"
-                                    >
-                                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                                    </svg>
-                                  )}
-                                </button>
-                              </div>
-                            ) : (
-                              <span className="muted-text">-</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 4. Latest Price */}
-                        <td className="col-price">
-                          <div className="product-info-text">
-                            {product.latestSnapshot?.price_toman != null ? (
-                              <div className="catalog-table-price">
-                                <strong className="catalog-price-val">
-                                  {formatNumber(product.latestSnapshot.price_toman)} تومان
-                                </strong>
-                                {product.latestSnapshot.price_usd != null ? (
-                                  <span className="catalog-usd-val">
-                                    ({formatNumber(product.latestSnapshot.price_usd)} دلار)
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : (
-                              <span className="muted-text">-</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 5. Status Toggle Switch */}
-                        <td className="col-status">
-                          <div className="status-toggle-wrapper">
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={isActive}
-                              aria-label={
-                                isActive
-                                  ? `غیرفعال کردن ${product.title}`
-                                  : `فعال کردن ${product.title}`
-                              }
-                              disabled={!canToggle || isToggling || (!product.can_edit && !isAdmin)}
-                              className={`status-toggle-btn ${isActive ? "is-active" : ""} ${
-                                isToggling ? "is-loading" : ""
-                              }`}
-                              onClick={() => handleToggleProduct(product)}
-                              title={
-                                !canToggle
-                                  ? "بدون هدف فعال"
-                                  : (!product.can_edit && !isAdmin)
-                                  ? "محصول عمومی فقط توسط مدیر قابل تغییر وضعیت است"
-                                  : isActive
-                                  ? "کلیک برای غیرفعال‌سازی"
-                                  : "کلیک برای فعال‌سازی"
-                              }
-                            >
-                              <span className="status-toggle-thumb">
-                                {isToggling && (
-                                  <span className="status-toggle-spinner" aria-hidden="true" />
-                                )}
-                              </span>
-                            </button>
-                            <span className={`status-toggle-label ${isActive ? "active" : ""}`}>
-                              {isActive ? "فعال" : "غیرفعال"}
-                            </span>
-                          </div>
-                        </td>
-
-                        {/* 6. Last Check Observation Time */}
-                        <td className="col-date">
-                          <div className="product-info-text">
-                            {product.latestSnapshot?.observed_at ? (
-                              <span className="muted-text" title={product.latestSnapshot.observed_at}>
-                                {formatDate(product.latestSnapshot.observed_at)}
-                              </span>
-                            ) : (
-                              <span className="muted-text">-</span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* 7. Actions: Edit icon button & Kebab (⋯) menu (View icon removed) */}
-                        <td className="col-actions">
-                          <div className="product-actions-cell">
-
-                            {(product.can_edit || isAdmin) ? (
-                              <>
-                                {/* Edit Icon Button */}
-                                <button
-                                  type="button"
-                                  className="action-icon-button"
-                                  onClick={() => startEditProduct(product)}
-                                  disabled={!hasPrimaryTarget || busyAction !== null}
-                                  aria-label={`ویرایش ${product.title}`}
-                                  title="ویرایش محصول"
-                                >
-                                  <svg
-                                    width="15"
-                                    height="15"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                                  </svg>
-                                </button>
-
-                                {/* Kebab (⋯) Menu */}
-                                <div className="kebab-container">
-                                  <button
-                                    type="button"
-                                    ref={(el) => {
-                                      kebabTriggerRefs.current[product.key] = el;
-                                    }}
-                                    className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
-                                    onClick={() =>
-                                      setActiveKebabKey((current) =>
-                                        current === product.key ? null : product.key,
-                                      )
-                                    }
-                                    aria-label={`عملیات بیشتر برای ${product.title}`}
-                                    aria-haspopup="menu"
-                                    aria-expanded={isKebabOpen}
-                                    title="عملیات بیشتر"
-                                    onKeyDown={(e) => {
-                                      if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-                                        setActiveKebabKey(product.key);
-                                      }
-                                    }}
-                                  >
-                                    <svg
-                                      width="16"
-                                      height="16"
-                                      viewBox="0 0 24 24"
-                                      fill="currentColor"
-                                      aria-hidden="true"
-                                    >
-                                      <circle cx="12" cy="12" r="2" />
-                                      <circle cx="19" cy="12" r="2" />
-                                      <circle cx="5" cy="12" r="2" />
-                                    </svg>
-                                  </button>
-
-                                  {isKebabOpen && (
-                                    <div
-                                      className="kebab-menu-dropdown"
-                                      role="menu"
-                                      aria-orientation="vertical"
-                                      tabIndex={-1}
-                                    >
-                                      {(isAdmin || product.can_edit) && (
-                                        <button
-                                          type="button"
-                                          role="menuitem"
-                                          className="kebab-menu-item"
-                                          onClick={() => {
-                                            setActiveKebabKey(null);
-                                            handleRefreshProduct(product);
-                                          }}
-                                          disabled={busyAction !== null || product.enabled_target_count === 0}
-                                          title={
-                                            product.enabled_target_count === 0
-                                              ? "محصول هدف فعالی ندارد"
-                                              : "استعلام قیمت این کالا"
-                                          }
-                                        >
-                                          <svg
-                                            width="14"
-                                            height="14"
-                                            viewBox="0 0 24 24"
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            aria-hidden="true"
-                                          >
-                                            <polyline points="23 4 23 10 17 10" />
-                                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-                                          </svg>
-                                          <span>استعلام قیمت این کالا</span>
-                                        </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        role="menuitem"
-                                        className="kebab-menu-item danger"
-                                        onClick={() => {
-                                          setActiveKebabKey(null);
-                                          setProductToDelete(product);
-                                        }}
-                                        onKeyDown={(e) => {
-                                          if (e.key === "Escape") {
-                                            setActiveKebabKey(null);
-                                            kebabTriggerRefs.current[product.key]?.focus();
-                                          }
-                                        }}
-                                        autoFocus
-                                      >
-                                        <svg
-                                          width="14"
-                                          height="14"
-                                          viewBox="0 0 24 24"
-                                          fill="none"
-                                          stroke="currentColor"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                          aria-hidden="true"
-                                        >
-                                          <polyline points="3 6 5 6 21 6" />
-                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                          <line x1="10" y1="11" x2="10" y2="17" />
-                                          <line x1="14" y1="11" x2="14" y2="17" />
-                                        </svg>
-                                        <span>حذف محصول</span>
-                                      </button>
-                                    </div>
-                                  )}
-                                </div>
-                              </>
-                            ) : null}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                        product={product}
+                        isAdmin={isAdmin}
+                        basePath={basePath}
+                        showPublicIndicator={false}
+                        isToggling={Boolean(togglingKeys[product.key])}
+                        isKebabOpen={activeKebabKey === product.key}
+                        busyAction={busyAction}
+                        copiedKey={copiedKey}
+                        kebabTriggerRef={(el) => {
+                          kebabTriggerRefs.current[product.key] = el;
+                        }}
+                        onToggleKebab={() =>
+                          setActiveKebabKey((curr) => (curr === product.key ? null : product.key))
+                        }
+                        onCloseKebab={() => setActiveKebabKey(null)}
+                        onEdit={() => startEditProduct(product)}
+                        onToggle={() => handleToggleProduct(product)}
+                        onRefresh={() => handleRefreshProduct(product)}
+                        onDelete={() => {
+                          setActiveKebabKey(null);
+                          setProductToDelete(product);
+                        }}
+                        onCopyUrl={(url) => copyToClipboard(url, product.key, product.is_public)}
+                      />
+                    ))
+                  ) : (
+                    filteredPublic.map((product) => (
+                      <ProductTableRow
+                        key={product.key}
+                        product={product}
+                        isAdmin={isAdmin}
+                        basePath={basePath}
+                        showPublicIndicator={false}
+                        isToggling={Boolean(togglingKeys[product.key])}
+                        isKebabOpen={activeKebabKey === product.key}
+                        busyAction={busyAction}
+                        copiedKey={copiedKey}
+                        kebabTriggerRef={(el) => {
+                          kebabTriggerRefs.current[product.key] = el;
+                        }}
+                        onToggleKebab={() =>
+                          setActiveKebabKey((curr) => (curr === product.key ? null : product.key))
+                        }
+                        onCloseKebab={() => setActiveKebabKey(null)}
+                        onEdit={() => startEditProduct(product)}
+                        onToggle={() => handleToggleProduct(product)}
+                        onRefresh={() => handleRefreshProduct(product)}
+                        onDelete={() => {
+                          setActiveKebabKey(null);
+                          setProductToDelete(product);
+                        }}
+                        onCopyUrl={(url) => copyToClipboard(url, product.key, product.is_public)}
+                      />
+                    ))
+                  )}
                 </tbody>
               </table>
             )}
@@ -1148,5 +934,498 @@ export function ProductsView() {
         </div>
       </Modal>
     </div>
+  );
+}
+
+interface ProductTableRowProps {
+  product: ProductItemWithPrice;
+  isAdmin: boolean;
+  basePath: string;
+  showPublicIndicator?: boolean;
+  isToggling: boolean;
+  isKebabOpen: boolean;
+  busyAction: string | null;
+  copiedKey: string | null;
+  kebabTriggerRef: (el: HTMLButtonElement | null) => void;
+  onToggleKebab: () => void;
+  onCloseKebab: () => void;
+  onEdit: () => void;
+  onToggle: () => void;
+  onRefresh: () => void;
+  onDelete: () => void;
+  onCopyUrl: (url: string) => void;
+}
+
+function ProductTableRow({
+  product,
+  isAdmin,
+  basePath,
+  showPublicIndicator = false,
+  isToggling,
+  isKebabOpen,
+  busyAction,
+  copiedKey,
+  kebabTriggerRef,
+  onToggleKebab,
+  onCloseKebab,
+  onEdit,
+  onToggle,
+  onRefresh,
+  onDelete,
+  onCopyUrl,
+}: ProductTableRowProps) {
+  const router = useRouter();
+  const isActive = product.enabled_target_count > 0;
+  const canToggle = product.target_count > 0;
+  const hasPrimaryTarget = Boolean(product.primary_target);
+  const canEdit = Boolean(product.can_edit || isAdmin);
+  const detailUrl = `${basePath}/products/${encodeURIComponent(product.key)}`;
+
+  return (
+    <tr
+      className={`product-table-row clickable-row ${isActive ? "is-active" : "is-inactive"}`}
+      tabIndex={0}
+      role="link"
+      aria-label={`مشاهده جزئیات ${product.title}`}
+      onClick={() => router.push(detailUrl)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          router.push(detailUrl);
+        }
+      }}
+    >
+      {/* 1. Title & Slug (bold title with 2-line clamp, bidi handling, full tooltip) */}
+      <td className="col-title">
+        <div className="product-title-cell product-info-text">
+          <div className="product-title-line">
+            <Link
+              href={detailUrl}
+              className="product-row-title-link"
+              title={product.title}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <strong className="product-row-title" title={product.title} dir="auto">
+                {product.title}
+              </strong>
+            </Link>
+            {showPublicIndicator && product.is_public ? (
+              <span
+                className="public-market-indicator"
+                title="کالای بازار عمومی (مشترک بین تمام کاربران)"
+                aria-label="کالای بازار عمومی"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg
+                  width="13"
+                  height="13"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+              </span>
+            ) : null}
+          </div>
+          <span className="product-row-slug" title={product.key} dir="ltr">
+            {product.key}
+          </span>
+        </div>
+      </td>
+
+      {/* Owner Column for Admin */}
+      {isAdmin && (
+        <td className="col-owner" onClick={(e) => e.stopPropagation()}>
+          <div className="product-info-text">
+            {product.owner_username ? (
+              <span
+                className="adapter-badge generic_html"
+                title={`مالک کالا: ${product.owner_username}`}
+              >
+                {product.owner_username}
+              </span>
+            ) : (
+              <span
+                className="adapter-badge brsapi_market"
+                title="کالای عمومی سیستم بدون مالک اختصاصی"
+              >
+                سیستم/عمومی
+              </span>
+            )}
+          </div>
+        </td>
+      )}
+
+      {/* 2. Source Badge */}
+      <td className="col-source" onClick={(e) => e.stopPropagation()}>
+        <div className="product-info-text">
+          {product.sources.length ? (
+            product.sources.map((source) => (
+              <span className="product-source-badge" key={`${product.key}:${source}`}>
+                {source}
+              </span>
+            ))
+          ) : (
+            <span className="product-source-badge muted">بدون منبع</span>
+          )}
+        </div>
+      </td>
+
+      {/* 3. Address Column */}
+      <td className="col-url" onClick={(e) => e.stopPropagation()}>
+        <div className="product-info-text">
+          {product.is_public && !isAdmin ? (
+            <span
+              className="private-address-badge"
+              title="آدرس منبع برای کالاهای عمومی بازار محرمانه است و توسط سیستم مدیریت می‌شود."
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>محرمانه</span>
+            </span>
+          ) : product.primary_target ? (
+            <a
+              href={product.primary_target.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="product-url-link"
+              aria-label={`مشاهده صفحه محصول در سایت مقصد`}
+              title={`مشاهده صفحه محصول در سایت مقصد: ${product.primary_target.url}`}
+            >
+              <svg
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                <polyline points="15 3 21 3 21 9" />
+                <line x1="10" y1="14" x2="21" y2="3" />
+              </svg>
+              <span>مشاهده منبع</span>
+            </a>
+          ) : (
+            <span className="muted-text">-</span>
+          )}
+        </div>
+      </td>
+
+      {/* 4. Latest Price */}
+      <td className="col-price">
+        <div className="product-info-text">
+          {product.latestSnapshot?.price_toman != null ? (
+            <div className="catalog-table-price">
+              <strong className="catalog-price-val">
+                {formatNumber(product.latestSnapshot.price_toman)} تومان
+              </strong>
+              {product.latestSnapshot.price_usd != null ? (
+                <span className="catalog-usd-val">
+                  ({formatNumber(product.latestSnapshot.price_usd)} دلار)
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <span className="muted-text">-</span>
+          )}
+        </div>
+      </td>
+
+      {/* 5. Status Column (Interactive Switch for editable, Static Badge for read-only public) */}
+      <td className="col-status" onClick={(e) => e.stopPropagation()}>
+        {canEdit ? (
+          <div className="status-toggle-wrapper">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isActive}
+              aria-label={
+                isActive
+                  ? `غیرفعال کردن ${product.title}`
+                  : `فعال کردن ${product.title}`
+              }
+              disabled={!canToggle || isToggling}
+              className={`status-toggle-btn ${isActive ? "is-active" : "is-inactive"} ${
+                isToggling ? "is-loading" : ""
+              }`}
+              onClick={onToggle}
+              title={
+                !canToggle
+                  ? "بدون هدف فعال"
+                  : isActive
+                  ? "کلیک برای غیرفعال‌سازی (توقف جمع‌آوری قیمت)"
+                  : "کلیک برای فعال‌سازی (از سرگیری استعلام قیمت)"
+              }
+            >
+              <span className="status-toggle-thumb">
+                {isToggling && (
+                  <span className="status-toggle-spinner" aria-hidden="true" />
+                )}
+              </span>
+            </button>
+            <span className={`status-toggle-label ${isActive ? "active" : ""}`}>
+              {isActive ? "فعال" : "غیرفعال"}
+            </span>
+          </div>
+        ) : (
+          <div className="status-readonly-wrapper">
+            <span
+              className={`status-static-badge ${isActive ? "active" : "inactive"}`}
+              title={isActive ? "محصول در سیستم فعال است" : "محصول در سیستم غیرفعال است"}
+            >
+              <span className="status-dot" aria-hidden="true" />
+              <span>{isActive ? "فعال" : "غیرفعال"}</span>
+            </span>
+          </div>
+        )}
+      </td>
+
+      {/* 6. Last Check Observation Time */}
+      <td className="col-date">
+        <div className="product-info-text">
+          {product.latestSnapshot?.observed_at ? (
+            <span className="muted-text" title={product.latestSnapshot.observed_at}>
+              {formatDate(product.latestSnapshot.observed_at)}
+            </span>
+          ) : (
+            <span className="muted-text">-</span>
+          )}
+        </div>
+      </td>
+
+      {/* 7. Actions */}
+      <td className="col-actions" onClick={(e) => e.stopPropagation()}>
+        <div className="product-actions-cell">
+          {canEdit ? (
+            <>
+              {/* Edit Icon Button */}
+              <button
+                type="button"
+                className="action-icon-button"
+                onClick={onEdit}
+                disabled={!hasPrimaryTarget || busyAction !== null}
+                aria-label={`ویرایش ${product.title}`}
+                title="ویرایش محصول"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+              </button>
+
+              {/* Kebab (⋯) Menu */}
+              <div className="kebab-container">
+                <button
+                  type="button"
+                  ref={kebabTriggerRef}
+                  className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
+                  onClick={onToggleKebab}
+                  aria-label={`عملیات بیشتر برای ${product.title}`}
+                  aria-haspopup="menu"
+                  aria-expanded={isKebabOpen}
+                  title="عملیات بیشتر"
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+                      onToggleKebab();
+                    }
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="19" cy="12" r="2" />
+                    <circle cx="5" cy="12" r="2" />
+                  </svg>
+                </button>
+
+                {isKebabOpen && (
+                  <div
+                    className="kebab-menu-dropdown"
+                    role="menu"
+                    aria-orientation="vertical"
+                    tabIndex={-1}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="kebab-menu-item"
+                      onClick={() => {
+                        onCloseKebab();
+                        onRefresh();
+                      }}
+                      disabled={busyAction !== null || product.enabled_target_count === 0}
+                      title={
+                        product.enabled_target_count === 0
+                          ? "محصول هدف فعالی ندارد"
+                          : "استعلام آنلاین و فوری قیمت این کالا"
+                      }
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                      </svg>
+                      <span>استعلام فوری قیمت</span>
+                    </button>
+
+                    {product.primary_target?.url && (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="kebab-menu-item"
+                          onClick={() => {
+                            onCloseKebab();
+                            onCopyUrl(product.primary_target!.url);
+                          }}
+                          title="کپی آدرس منبع قیمت‌گیری در کلیپ‌بورد"
+                        >
+                          {copiedKey === product.key ? (
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="var(--ok)"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : (
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                          )}
+                          <span>{copiedKey === product.key ? "کپی شد!" : "کپی لینک منبع"}</span>
+                        </button>
+
+                        <a
+                          href={product.primary_target.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          role="menuitem"
+                          className="kebab-menu-item"
+                          onClick={onCloseKebab}
+                          title="مشاهده صفحه منبع در تب جدید"
+                        >
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                          >
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                            <polyline points="15 3 21 3 21 9" />
+                            <line x1="10" y1="14" x2="21" y2="3" />
+                          </svg>
+                          <span>مشاهده در تب جدید</span>
+                        </a>
+                      </>
+                    )}
+
+                    <div className="kebab-menu-divider" role="separator" />
+
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="kebab-menu-item danger"
+                      onClick={() => {
+                        onCloseKebab();
+                        onDelete();
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                        <line x1="10" y1="11" x2="10" y2="17" />
+                        <line x1="14" y1="11" x2="14" y2="17" />
+                      </svg>
+                      <span>حذف محصول</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          ) : (
+            <span className="muted-text">-</span>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
