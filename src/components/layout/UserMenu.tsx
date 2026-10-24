@@ -29,7 +29,7 @@ export function UserMenu() {
       if (!menu) return;
       const items = Array.from(
         menu.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>(
-          '[role="menuitem"]:not([disabled])'
+          '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])'
         )
       );
       if (items.length > 0) {
@@ -85,7 +85,7 @@ export function UserMenu() {
 
     const items = Array.from(
       menu.querySelectorAll<HTMLButtonElement | HTMLAnchorElement>(
-        '[role="menuitem"]:not([disabled])'
+        '[role="menuitem"]:not([disabled]):not([aria-disabled="true"])'
       )
     );
     if (!items.length) return;
@@ -119,7 +119,14 @@ export function UserMenu() {
 
   if (!currentUser) return null;
 
-  const initialLetter = (currentUser.username?.trim().charAt(0) || "ک").toUpperCase();
+  const displayName =
+    (currentUser as any).displayName ||
+    (currentUser as any).display_name ||
+    currentUser.username;
+
+  const firstChar = (Array.from(String(displayName).trim()) as string[])[0] || "ک";
+  const initialLetter = firstChar.toUpperCase();
+  const roleLabel = currentUser.role === "admin" ? "مدیر سیستم" : "کاربر عادی";
 
   return (
     <div
@@ -142,12 +149,12 @@ export function UserMenu() {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         aria-controls="user-dropdown-menu"
-        aria-label={`منوی حساب کاربری ${currentUser.username}`}
+        aria-label={`منوی حساب کاربری ${displayName}`}
       >
         <span className="user-avatar user-avatar-sm" aria-hidden="true">
           {initialLetter}
         </span>
-        <span className="user-menu-name" title={currentUser.username}>{currentUser.username}</span>
+        <span className="user-menu-name" title={displayName}>{displayName}</span>
         <svg
           className={`user-menu-chevron ${isOpen ? "is-open" : ""}`}
           width="14"
@@ -174,13 +181,14 @@ export function UserMenu() {
           className="user-dropdown-menu"
           tabIndex={-1}
         >
-          {/* بخش بالای منو: آواتار بزرگتر و نام کاربر */}
+          {/* بخش بالای منو: آواتار، نام و نقش کاربر */}
           <div className="user-dropdown-header">
             <span className="user-avatar user-avatar-lg" aria-hidden="true">
               {initialLetter}
             </span>
             <div className="user-dropdown-info">
-              <span className="user-dropdown-name">{currentUser.username}</span>
+              <span className="user-dropdown-name">{displayName}</span>
+              <span className="user-dropdown-role">{roleLabel}</span>
               {currentUser.email ? (
                 <span className="user-dropdown-email">{currentUser.email}</span>
               ) : null}
@@ -189,8 +197,35 @@ export function UserMenu() {
 
           <div className="user-dropdown-divider" role="separator" />
 
-          {/* گزینه تغییر کلمه عبور */}
+          {/* گزینه‌های منو */}
           <div className="user-dropdown-group" role="group">
+            {/* گزینه پروفایل / تنظیمات (غیرفعال با راهنمای به‌زودی) */}
+            <div
+              role="menuitem"
+              aria-disabled="true"
+              className="user-dropdown-item is-disabled"
+              title="به‌زودی"
+              tabIndex={-1}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              <span>پروفایل و تنظیمات</span>
+              <span className="user-dropdown-badge">به‌زودی</span>
+            </div>
+
+            {/* گزینه تغییر کلمه عبور */}
             <Link
               href="/change-password"
               role="menuitem"
@@ -218,7 +253,7 @@ export function UserMenu() {
 
           <div className="user-dropdown-divider" role="separator" />
 
-          {/* گزینه خروج با آیکون اشاره‌کننده به چپ در RTL و رنگ قرمز ملایم */}
+          {/* گزینه خروج */}
           <button
             type="button"
             role="menuitem"
