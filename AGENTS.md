@@ -51,6 +51,7 @@ Core flow:
 npm install
 npm test
 npm run typecheck
+npm run lint
 npm run validate-config
 npm run run
 npm run latest

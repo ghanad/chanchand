@@ -18,6 +18,7 @@
     "validate-config": "tsx src/cli/index.ts validate-config",
     "init-db": "tsx src/cli/index.ts init-db",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
