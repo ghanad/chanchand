@@ -558,6 +558,19 @@ label {
   min-height: 440px;
 }
 
+.chart-panel .recharts-surface {
+  cursor: crosshair;
+}
+
+.chart-panel .recharts-wrapper {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chart-panel .recharts-reference-area rect {
+  pointer-events: none;
+}
+
 .chart-tooltip {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -2811,6 +2824,33 @@ tbody tr:last-child td {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+
+.chart-reset-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(15, 118, 110, 0.08);
+  border: 1px solid var(--accent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.chart-reset-zoom-btn:hover {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.25);
+}
+
+.chart-reset-zoom-btn svg {
+  flex-shrink: 0;
 }
 
 /* History Filter Panel & Toolbar */
