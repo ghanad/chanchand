@@ -2,20 +2,30 @@
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
-import { ProductRow, SourceRow, ProductsPayload } from "../../types/dashboard";
+import { ProductRow, SourceRow, ProductsPayload, PriceRow, LatestPayload } from "../../types/dashboard";
 import { requestJson } from "../../lib/api-client";
-import { formatNumber } from "../../lib/formatters";
+import { formatNumber, formatDate } from "../../lib/formatters";
 import { useDashboard } from "../../context/DashboardContext";
 import { Metric } from "../common/Metric";
 import { PanelHead } from "../common/PanelHead";
 import { Modal } from "../common/Modal";
 import { EmptyState } from "../common/EmptyState";
 
+interface ProductItemWithPrice extends ProductRow {
+  latestSnapshot?: PriceRow | null;
+}
+
+type SortField = "title" | "price" | "status" | "date";
+type SortDirection = "asc" | "desc";
+
 export function ProductsView() {
   const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
   const basePath = isAdmin ? "/admin" : "";
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
+  const [latestPrices, setLatestPrices] = useState<PriceRow[]>([]);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
   // Modals state
@@ -40,9 +50,15 @@ export function ProductsView() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const payload = await requestJson<ProductsPayload>("/api/products");
+      const [payload, latestPayload] = await Promise.all([
+        requestJson<ProductsPayload>("/api/products"),
+        requestJson<LatestPayload>("/api/latest").catch(() => ({ rows: [] as PriceRow[], summary: null })),
+      ]);
       setProducts(payload.products);
       setSources(payload.sources);
+      if (latestPayload && Array.isArray(latestPayload.rows)) {
+        setLatestPrices(latestPayload.rows);
+      }
       setForm((current) => {
         if (current.source_key) return current;
         const defaultSource = payload.sources.find((s) => s.key === "digikala_api") || payload.sources[0];
@@ -98,9 +114,23 @@ export function ProductsView() {
   );
   const totalInactive = configProducts.length - totalActive;
 
+  // Combine products with latest prices
+  const productsWithPrices = useMemo<ProductItemWithPrice[]>(() => {
+    const priceMap = new Map<string, PriceRow>();
+    for (const row of latestPrices) {
+      if (!priceMap.has(row.product_key)) {
+        priceMap.set(row.product_key, row);
+      }
+    }
+    return configProducts.map((p) => ({
+      ...p,
+      latestSnapshot: priceMap.get(p.key) || null,
+    }));
+  }, [configProducts, latestPrices]);
+
   // Filtered products list
   const filteredProducts = useMemo(() => {
-    return configProducts.filter((product) => {
+    return productsWithPrices.filter((product) => {
       const isActive = product.enabled_target_count > 0;
       if (statusFilter === "active" && !isActive) return false;
       if (statusFilter === "inactive" && isActive) return false;
@@ -114,7 +144,76 @@ export function ProductsView() {
 
       return matchTitle || matchKey || matchUrl || matchSource;
     });
-  }, [configProducts, statusFilter, searchQuery]);
+  }, [productsWithPrices, statusFilter, searchQuery]);
+
+  // Sorted products list
+  const sortedProducts = useMemo(() => {
+    if (!sortField) return filteredProducts;
+
+    return [...filteredProducts].sort((a, b) => {
+      let comparison = 0;
+      if (sortField === "title") {
+        comparison = a.title.localeCompare(b.title, "fa", { numeric: true, sensitivity: "base" });
+      } else if (sortField === "price") {
+        const priceA = a.latestSnapshot?.price_toman ?? null;
+        const priceB = b.latestSnapshot?.price_toman ?? null;
+        if (priceA === null && priceB === null) comparison = 0;
+        else if (priceA === null) comparison = 1;
+        else if (priceB === null) comparison = -1;
+        else comparison = priceA - priceB;
+      } else if (sortField === "status") {
+        const activeA = a.enabled_target_count > 0 ? 1 : 0;
+        const activeB = b.enabled_target_count > 0 ? 1 : 0;
+        comparison = activeA - activeB;
+      } else if (sortField === "date") {
+        const dateA = a.latestSnapshot?.observed_at ? new Date(a.latestSnapshot.observed_at).getTime() : 0;
+        const dateB = b.latestSnapshot?.observed_at ? new Date(b.latestSnapshot.observed_at).getTime() : 0;
+        comparison = dateA - dateB;
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  }, [filteredProducts, sortField, sortDirection]);
+
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else {
+        setSortField(null);
+        setSortDirection("asc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  }
+
+  function renderSortIndicator(field: SortField) {
+    if (sortField !== field) {
+      return (
+        <span className="sort-indicator neutral" aria-hidden="true" title="مرتب‌سازی">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7 15l5 5 5-5" />
+            <path d="M7 9l5-5 5 5" />
+          </svg>
+        </span>
+      );
+    }
+    return (
+      <span className="sort-indicator active" aria-hidden="true">
+        {sortDirection === "asc" ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 15l-6-6-6 6" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        )}
+      </span>
+    );
+  }
 
   async function addProduct(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -286,22 +385,13 @@ export function ProductsView() {
             title="مدیریت و پیکربندی محصولات"
             meta={`${formatNumber(configuredProductCount)} محصول`}
             action={
-              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                <Link
-                  href={`${basePath}/products`}
-                  className="secondary-button compact-btn"
-                  title="مشاهده کاتالوگ و ویترین محصولات"
-                >
-                  مشاهده کاتالوگ کالاها &rarr;
-                </Link>
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={() => setShowAddProductModal(true)}
-                >
-                  + افزودن محصول
-                </button>
-              </div>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setShowAddProductModal(true)}
+              >
+                + افزودن محصول
+              </button>
             }
           />
 
@@ -388,16 +478,61 @@ export function ProductsView() {
               <table className="product-compact-table" aria-label="جدول محصولات">
                 <thead>
                   <tr>
-                    <th scope="col">عنوان و شناسه</th>
-                    <th scope="col">منبع</th>
-                    <th scope="col">آدرس اینترنتی (URL)</th>
-                    <th scope="col">اهداف فعال</th>
-                    <th scope="col">وضعیت</th>
-                    <th scope="col" className="th-actions">عملیات</th>
+                    <th
+                      scope="col"
+                      className="sortable-th col-th-title"
+                      onClick={() => handleSort("title")}
+                      aria-sort={sortField === "title" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                      title="مرتب‌سازی بر اساس عنوان کالا"
+                    >
+                      <div className="th-sort-content">
+                        <span>عنوان و شناسه</span>
+                        {renderSortIndicator("title")}
+                      </div>
+                    </th>
+                    <th scope="col" className="col-th-source">منبع</th>
+                    <th scope="col" className="col-th-url">آدرس</th>
+                    <th
+                      scope="col"
+                      className="sortable-th col-th-price"
+                      onClick={() => handleSort("price")}
+                      aria-sort={sortField === "price" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                      title="مرتب‌سازی بر اساس قیمت آخرین استعلام"
+                    >
+                      <div className="th-sort-content">
+                        <span>آخرین قیمت</span>
+                        {renderSortIndicator("price")}
+                      </div>
+                    </th>
+                    <th
+                      scope="col"
+                      className="sortable-th col-th-status"
+                      onClick={() => handleSort("status")}
+                      aria-sort={sortField === "status" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                      title="مرتب‌سازی بر اساس وضعیت فعال/غیرفعال"
+                    >
+                      <div className="th-sort-content">
+                        <span>وضعیت</span>
+                        {renderSortIndicator("status")}
+                      </div>
+                    </th>
+                    <th
+                      scope="col"
+                      className="sortable-th col-th-date"
+                      onClick={() => handleSort("date")}
+                      aria-sort={sortField === "date" ? (sortDirection === "asc" ? "ascending" : "descending") : "none"}
+                      title="مرتب‌سازی بر اساس زمان آخرین استعلام"
+                    >
+                      <div className="th-sort-content">
+                        <span>آخرین استعلام</span>
+                        {renderSortIndicator("date")}
+                      </div>
+                    </th>
+                    <th scope="col" className="th-actions col-th-actions">عملیات</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => {
+                  {sortedProducts.map((product) => {
                     const isActive = product.enabled_target_count > 0;
                     const canToggle = product.target_count > 0;
                     const isToggling = !!togglingKeys[product.key];
@@ -409,16 +544,16 @@ export function ProductsView() {
                         key={product.key}
                         className={`product-table-row ${isActive ? "is-active" : "is-inactive"}`}
                       >
-                        {/* 1. Title & Slug (bold title + small muted slug) */}
+                        {/* 1. Title & Slug (bold title + small muted slug, with tooltip and truncation) */}
                         <td className="col-title">
                           <div className="product-title-cell product-info-text">
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                               <Link
                                 href={`${basePath}/products/${encodeURIComponent(product.key)}`}
                                 className="product-row-title-link"
-                                title={`مشاهده جزئیات و تاریخچه ${product.title}`}
+                                title={product.title}
                               >
-                                <strong className="product-row-title">{product.title}</strong>
+                                <strong className="product-row-title" title={product.title}>{product.title}</strong>
                               </Link>
                               {product.is_public ? (
                                 <span className="adapter-badge brsapi_market" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
@@ -452,11 +587,35 @@ export function ProductsView() {
                           </div>
                         </td>
 
-                        {/* 3. URL (truncated with ellipsis, full URL in tooltip, copy button, dir="ltr") */}
+                        {/* 3. URL (Clean External Link icon button + Copy button) */}
                         <td className="col-url">
                           <div className="product-info-text">
                             {product.primary_target ? (
                               <div className="product-url-wrapper">
+                                <a
+                                  href={product.primary_target.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="product-url-icon-btn"
+                                  aria-label={`مشاهده صفحه محصول در سایت مقصد`}
+                                  title={`مشاهده صفحه محصول در سایت مقصد: ${product.primary_target.url}`}
+                                >
+                                  <svg
+                                    width="15"
+                                    height="15"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                    <polyline points="15 3 21 3 21 9" />
+                                    <line x1="10" y1="14" x2="21" y2="3" />
+                                  </svg>
+                                </a>
                                 <button
                                   type="button"
                                   className="product-copy-btn"
@@ -495,16 +654,6 @@ export function ProductsView() {
                                     </svg>
                                   )}
                                 </button>
-                                <a
-                                  href={product.primary_target.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="product-url-link"
-                                  dir="ltr"
-                                  title={product.primary_target.url}
-                                >
-                                  {product.primary_target.url}
-                                </a>
                               </div>
                             ) : (
                               <span className="muted-text">-</span>
@@ -512,12 +661,23 @@ export function ProductsView() {
                           </div>
                         </td>
 
-                        {/* 4. Active Targets Count (e.g. 1 / 1) */}
-                        <td className="col-targets">
+                        {/* 4. Latest Price */}
+                        <td className="col-price">
                           <div className="product-info-text">
-                            <span className="product-targets-text">
-                              {formatNumber(product.enabled_target_count)} / {formatNumber(product.target_count)}
-                            </span>
+                            {product.latestSnapshot?.price_toman != null ? (
+                              <div className="catalog-table-price">
+                                <strong className="catalog-price-val">
+                                  {formatNumber(product.latestSnapshot.price_toman)} تومان
+                                </strong>
+                                {product.latestSnapshot.price_usd != null ? (
+                                  <span className="catalog-usd-val">
+                                    ({formatNumber(product.latestSnapshot.price_usd)} دلار)
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="muted-text">-</span>
+                            )}
                           </div>
                         </td>
 
@@ -560,32 +720,22 @@ export function ProductsView() {
                           </div>
                         </td>
 
-                        {/* 6. Actions: Details icon button, Edit icon button & Kebab (⋯) menu */}
+                        {/* 6. Last Check Observation Time */}
+                        <td className="col-date">
+                          <div className="product-info-text">
+                            {product.latestSnapshot?.observed_at ? (
+                              <span className="muted-text" title={product.latestSnapshot.observed_at}>
+                                {formatDate(product.latestSnapshot.observed_at)}
+                              </span>
+                            ) : (
+                              <span className="muted-text">-</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* 7. Actions: Edit icon button & Kebab (⋯) menu (View icon removed) */}
                         <td className="col-actions">
                           <div className="product-actions-cell">
-                            {/* Detail / Analytics Button */}
-                            <Link
-                              href={`${basePath}/products/${encodeURIComponent(product.key)}`}
-                              className="action-icon-button"
-                              title="مشاهده جزئیات و تاریخچه قیمت"
-                              aria-label={`مشاهده جزئیات ${product.title}`}
-                            >
-                              <svg
-                                width="15"
-                                height="15"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                aria-hidden="true"
-                              >
-                                <line x1="18" y1="20" x2="18" y2="10" />
-                                <line x1="12" y1="20" x2="12" y2="4" />
-                                <line x1="6" y1="20" x2="6" y2="14" />
-                              </svg>
-                            </Link>
 
                             {(product.can_edit || isAdmin) ? (
                               <>
