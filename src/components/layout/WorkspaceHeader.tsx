@@ -15,7 +15,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: "products", label: "محصولات", subpath: "/products" },
-  { id: "runs", label: "اجرا و خطا", subpath: "/runs" },
+  { id: "runs", label: "اجرا و خطا", subpath: "/runs", adminOnly: true },
   { id: "sources", label: "منابع قیمت‌گیری", subpath: "/sources", adminOnly: true },
   { id: "users", label: "مدیریت کاربران", subpath: "/users", adminOnly: true },
 ];
@@ -73,9 +73,6 @@ export function WorkspaceHeader() {
       <div className="top-navbar-inner">
         <div className="top-navbar-start">
           <Link href={homeHref} className="top-navbar-brand" title="چن چند - صفحه محصولات">
-            <span className="brand-badge" aria-hidden="true">
-              چ‌چ
-            </span>
             <div className="brand-text">
               <span className="brand-title">چن چند</span>
               {isAdmin && <span className="brand-role-badge">مدیر</span>}
