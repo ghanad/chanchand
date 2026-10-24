@@ -1,5 +1,5 @@
-import { OverviewView } from "../../components/views/OverviewView";
+import { redirect } from "next/navigation";
 
 export default function AdminPage() {
-  return <OverviewView />;
+  redirect("/admin/products");
 }

@@ -117,118 +117,252 @@ label {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
-}
-
-.sidebar {
-  position: sticky;
-  top: 0;
-  height: 100vh;
-  background: var(--sidebar);
-  color: #eff7f5;
-  padding: 22px;
-}
-
-.brand-block {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.brand-mark {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  place-items: center;
-  border-radius: 8px;
-  background: #d9f4ef;
-  color: var(--sidebar);
-  font-weight: 800;
-}
-
-.brand-block p,
-.brand-block h1 {
-  margin: 0;
-}
-
-.brand-block p {
-  color: #aebcbd;
-  font-size: 12px;
-}
-
-.brand-block h1 {
-  margin-top: 3px;
-  font-size: 20px;
-}
-
-.nav-list {
-  display: grid;
-  gap: 8px;
-  margin-top: 22px;
-}
-
-.nav-list button,
-.nav-list a {
-  display: flex;
-  align-items: center;
-  min-height: 40px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  padding: 0 14px;
-  cursor: pointer;
-  white-space: nowrap;
-  text-decoration: none;
-  font: inherit;
-  justify-content: flex-start;
-  background: transparent;
-  color: #dbe8e8;
-  text-align: right;
-  box-sizing: border-box;
-}
-
-.nav-list button:hover,
-.nav-list a:hover,
-.nav-list button.active,
-.nav-list a.active {
-  background: var(--sidebar-soft);
-  color: #fff;
+  background: var(--bg);
 }
 
 .workspace {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  padding: 22px;
+  width: 100%;
+  padding: 20px 24px;
+  box-sizing: border-box;
 }
 
-.workspace-header {
+.workspace-main {
+  flex: 1 0 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+/* ==========================================================================
+   Top Navbar Navigation Architecture
+   ========================================================================== */
+
+.top-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #141f21;
+  background: linear-gradient(180deg, #182528 0%, #131d1f 100%);
+  color: #eff7f5;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 2px 12px rgba(10, 16, 18, 0.18);
+}
+
+.top-navbar-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 18px;
+  min-height: 54px;
+  padding: 0 24px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-.workspace-header h2 {
-  margin: 4px 0 0;
-  font-size: 28px;
-  line-height: 1.2;
+.top-navbar-start {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
-.eyebrow {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+.top-navbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+  user-select: none;
 }
 
-.header-actions {
+.brand-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: -0.5px;
+  box-shadow: 0 2px 6px rgba(15, 118, 110, 0.35);
+}
+
+.brand-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.brand-role-badge {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #5eead4;
+  background: rgba(15, 118, 110, 0.28);
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  padding: 1px 7px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+.top-navbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0;
+}
+
+.top-navbar-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.top-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b1c4c3;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.top-nav-icon {
+  opacity: 0.8;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease;
+}
+
+.top-nav-link:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.top-nav-link:hover .top-nav-icon {
+  opacity: 1;
+}
+
+.top-nav-link.active {
+  color: #ffffff;
+  background: #0f766e;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.4);
+}
+
+.top-nav-link.active .top-nav-icon {
+  opacity: 1;
+}
+
+.top-navbar-end {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+}
+
+.top-navbar-run-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  border-radius: 6px;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(15, 118, 110, 0.3);
+  transition: all 0.15s ease;
+}
+
+.top-navbar-run-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0d6e66 0%, #0c8278 100%);
+  border-color: rgba(45, 212, 191, 0.5);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.4);
+}
+
+.top-navbar-run-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.top-navbar-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: topNavSpin 0.7s linear infinite;
+}
+
+@keyframes topNavSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* User Menu styling inside Top Navbar */
+.top-navbar .user-menu-trigger {
+  min-height: 34px;
+  height: 34px;
+  padding: 2px 10px 2px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #eff7f5;
+  border-radius: 999px;
+  transition: all 0.15s ease;
+}
+
+.top-navbar .user-menu-trigger:hover,
+.top-navbar .user-menu-trigger.is-open {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.top-navbar .user-menu-name {
+  color: #eff7f5;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.top-navbar .user-menu-chevron {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.top-navbar .user-avatar {
+  background: rgba(45, 212, 191, 0.25);
+  color: #5eead4;
+  border: 1px solid rgba(45, 212, 191, 0.4);
 }
 
 .primary-button {
@@ -726,21 +860,6 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 1100px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
-    position: static;
-    height: auto;
-    padding: 16px;
-  }
-
-  .nav-list {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    margin-top: 14px;
-  }
-
   .metric-grid,
   .product-summary-grid,
   .overview-grid,
@@ -756,12 +875,55 @@ tbody tr:last-child td {
   }
 }
 
-@media (max-width: 640px) {
-  .workspace {
-    padding: 14px;
+@media (max-width: 768px) {
+  .top-navbar-inner {
+    padding: 0 14px;
+    gap: 12px;
+    min-height: 50px;
   }
 
-  .workspace-header,
+  .top-navbar-start {
+    gap: 12px;
+  }
+
+  .brand-text {
+    display: none;
+  }
+
+  .top-navbar-run-btn .btn-label {
+    display: none;
+  }
+
+  .top-navbar-run-btn {
+    padding: 0 9px;
+  }
+
+  .top-navbar .user-menu-name {
+    display: none;
+  }
+
+  .top-navbar .user-menu-chevron {
+    display: none;
+  }
+
+  .top-navbar .user-menu-trigger {
+    padding: 2px 4px;
+  }
+
+  .workspace {
+    padding: 14px 12px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .workspace {
+    padding: 12px 10px;
+  }
+
   .product-row,
   .product-meta,
   .product-edit-actions {
@@ -772,44 +934,6 @@ tbody tr:last-child td {
   .product-title-row {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .header-actions,
-  .header-actions button,
-  .product-meta button {
-    width: 100%;
-  }
-
-  .header-actions {
-    flex-direction: column;
-  }
-
-  .header-actions .user-menu-trigger {
-    width: auto;
-    padding: 3px;
-    border-radius: 50%;
-  }
-
-  .user-menu-name,
-  .user-menu-chevron {
-    display: none;
-  }
-
-  .header-actions .user-menu-container {
-    width: auto;
-    align-self: flex-start;
-  }
-
-  .nav-list {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .metric-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .workspace-header h2 {
-    font-size: 24px;
   }
 
   .metric-card strong {

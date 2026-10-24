@@ -10,19 +10,16 @@ Price Getter uses Next.js 16 App Router with React 19 Server and Client Componen
 
 - **Layout & Shell**:
   - Global layout & font definitions: `src/app/layout.tsx`, `src/app/globals.css`
-  - App Shell: `src/components/layout/AppShell.tsx`
-  - Sidebar Navigation: `src/components/layout/Sidebar.tsx`
-  - Workspace Header: `src/components/layout/WorkspaceHeader.tsx`
+  - App Shell: `src/components/layout/AppShell.tsx` (Single-column layout with top navbar)
+  - Horizontal Top Navbar: `src/components/layout/WorkspaceHeader.tsx` (Compact, responsive navigation bar)
   - User Menu: `src/components/layout/UserMenu.tsx`
   - Status Strip: `src/components/layout/StatusStrip.tsx`
   - Dashboard Context: `src/context/DashboardContext.tsx`
 - **Pages & Views**:
-  - Overview: `src/app/page.tsx` & `src/app/admin/page.tsx` -> `src/components/views/OverviewView.tsx`
-  - Prices: `src/app/prices/page.tsx` & `src/app/admin/prices/page.tsx` -> `src/components/views/PricesView.tsx`
-  - History: `src/app/history/page.tsx` & `src/app/admin/history/page.tsx` -> `src/components/views/HistoryView.tsx` (with Recharts)
+  - Products (Default Home): `src/app/products/page.tsx` & `src/app/admin/products/page.tsx` (`/` & `/admin` redirect here) -> `src/components/views/ProductsView.tsx`
+  - Product Details: `src/app/products/[key]/page.tsx` & `src/app/admin/products/[key]/page.tsx` -> `src/components/views/ProductDetailView.tsx` (includes full history snapshots)
   - Runs & Errors: `src/app/runs/page.tsx` & `src/app/admin/runs/page.tsx` -> `src/components/views/RunsView.tsx`
-  - Products: `src/app/products/page.tsx` & `src/app/admin/products/page.tsx` -> `src/components/views/ProductsView.tsx` (Add & Edit modals)
-  - Sources: `src/app/sources/page.tsx` & `src/app/admin/sources/page.tsx` -> `src/components/views/SourcesView.tsx` (Add & Edit modals)
+  - Sources (Admin only): `src/app/sources/page.tsx` & `src/app/admin/sources/page.tsx` -> `src/components/views/SourcesView.tsx`
   - Users (Admin only): `src/app/admin/users/page.tsx` -> `src/components/views/UsersView.tsx`
   - Login: `src/app/login/page.tsx`
 - **Authentication & RBAC**:

@@ -2,7 +2,6 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import { Sidebar } from "./Sidebar";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 import { StatusStrip } from "./StatusStrip";
 import { Toast } from "../common/Toast";
@@ -22,14 +21,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="app-shell">
-      <Sidebar />
-      <section className="workspace">
-        <WorkspaceHeader />
-        {children}
+    <div className="app-shell">
+      <WorkspaceHeader />
+      <div className="workspace">
+        <main className="workspace-main">
+          {children}
+        </main>
         <StatusStrip />
-      </section>
+      </div>
       <Toast message={toast} />
-    </main>
+    </div>
   );
 }

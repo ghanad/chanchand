@@ -630,14 +630,6 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
         <PanelHead
           title="سوابق و ثبت قیمت‌ها"
           meta={`${formatNumber(history.length)} ردیف`}
-          action={
-            <Link
-              href={`${basePath}/history?product=${encodeURIComponent(product.key)}`}
-              className="secondary-button compact-btn"
-            >
-              مشاهده در صفحه فیلتر پیشرفته تاریخچه &rarr;
-            </Link>
-          }
         />
         <HistoryTable rows={[...history].reverse()} />
       </section>
