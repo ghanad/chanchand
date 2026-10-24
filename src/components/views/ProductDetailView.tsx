@@ -119,7 +119,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
 
   // Copy URL handler
   const handleCopyUrl = async () => {
-    if (!product?.primary_target?.url) return;
+    if (!product?.primary_target?.url || (product.is_public && !isAdmin)) return;
     try {
       await navigator.clipboard.writeText(product.primary_target.url);
       setCopiedUrl(true);
@@ -384,7 +384,28 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
             </div>
             <h1 className="product-detail-title">{product.title}</h1>
 
-            {product.primary_target && (
+            {product.is_public && !isAdmin ? (
+              <div
+                className="product-url-wrapper product-detail-url muted-text"
+                style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>آدرس اینترنتی این کالای عمومی برای کاربران عادی در دسترس نیست.</span>
+              </div>
+            ) : product.primary_target ? (
               <div className="product-url-wrapper product-detail-url">
                 <button
                   type="button"
@@ -420,25 +441,27 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
                   </svg>
                 </a>
               </div>
-            )}
+            ) : null}
           </div>
 
           {/* Action Buttons for Header */}
           <div className="product-detail-actions">
-            {/* Re-fetch price button for all authenticated users */}
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handleRunNow}
-              disabled={isRunningNow || !isActive}
-              title={isActive ? "استعلام فوری و بروزرسانی قیمت همین محصول" : "محصول غیرفعال است"}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </svg>
-              {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
-            </button>
+            {/* Re-fetch price button only for admin or product owner */}
+            {(isAdmin || product.can_edit) && (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={handleRunNow}
+                disabled={isRunningNow || !isActive}
+                title={isActive ? "استعلام فوری و بروزرسانی قیمت همین محصول" : "محصول غیرفعال است"}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
+                  <polyline points="23 4 23 10 17 10" />
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
+              </button>
+            )}
 
             {/* Actions for owner or admin: Status toggle, Edit, Delete */}
             {(isAdmin || product.can_edit) && (

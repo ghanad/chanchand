@@ -25,9 +25,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       | { user_id: number | null; is_public: number }
       | undefined;
 
-    if (prod && auth.user.role !== 'admin' && prod.user_id !== auth.user.id && prod.is_public !== 1) {
+    if (!prod) {
       return NextResponse.json(
-        { error: 'دسترسی غیرمجاز: شما فقط امکان استعلام محصولات خود یا آیتم‌های عمومی را دارید.' },
+        { error: `محصولی با شناسه «${productKey}» یافت نشد.` },
+        { status: 404 }
+      );
+    }
+
+    if (auth.user.role !== 'admin' && prod.user_id !== auth.user.id) {
+      return NextResponse.json(
+        { error: 'دسترسی غیرمجاز: کاربران عادی فقط مجاز به استعلام دستی محصولات اختصاصی خود هستند.' },
         { status: 403 }
       );
     }

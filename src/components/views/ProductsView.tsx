@@ -139,7 +139,7 @@ export function ProductsView() {
       const q = searchQuery.trim().toLowerCase();
       const matchTitle = product.title.toLowerCase().includes(q);
       const matchKey = product.key.toLowerCase().includes(q);
-      const matchUrl = product.primary_target?.url.toLowerCase().includes(q);
+      const matchUrl = (!product.is_public || isAdmin) && product.primary_target?.url.toLowerCase().includes(q);
       const matchSource = product.sources.some((s) => s.toLowerCase().includes(q));
 
       return matchTitle || matchKey || matchUrl || matchSource;
@@ -355,7 +355,8 @@ export function ProductsView() {
     }
   }
 
-  async function copyToClipboard(url: string, key: string) {
+  async function copyToClipboard(url: string, key: string, isPublic?: boolean) {
+    if (isPublic && !isAdmin) return;
     try {
       await navigator.clipboard.writeText(url);
       setCopiedKey(key);
@@ -367,6 +368,31 @@ export function ProductsView() {
       showToast("خطا در کپی آدرس اینترنتی");
     }
   }
+
+  const handleRefreshProduct = async (product: ProductRow) => {
+    if (busyAction !== null) return;
+    setBusyAction(`refresh:${product.key}`);
+    try {
+      const res = await requestJson<{
+        run_id: number;
+        success_count?: number;
+        error_count?: number;
+      }>(`/api/products/${encodeURIComponent(product.key)}/refresh`, {
+        method: "POST",
+      });
+
+      if (res.error_count && res.error_count > 0 && res.success_count === 0) {
+        showToast("استعلام قیمت با خطا مواجه شد. لطفاً اتصال اینترنت یا آدرس هدف را بررسی کنید.");
+      } else {
+        showToast(`قیمت «${product.title}» با موفقیت استعلام و ثبت شد.`);
+      }
+      triggerRefresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "خطا در استعلام قیمت محصول");
+    } finally {
+      setBusyAction(null);
+    }
+  };
 
 
 
@@ -490,6 +516,11 @@ export function ProductsView() {
                         {renderSortIndicator("title")}
                       </div>
                     </th>
+                    {isAdmin && (
+                      <th scope="col" className="col-th-owner" style={{ width: "110px", whiteSpace: "nowrap" }}>
+                        مالک
+                      </th>
+                    )}
                     <th scope="col" className="col-th-source">منبع</th>
                     <th scope="col" className="col-th-url">آدرس</th>
                     <th
@@ -560,17 +591,37 @@ export function ProductsView() {
                                   عمومی / بازار
                                 </span>
                               ) : null}
-                              {isAdmin && product.owner_username ? (
-                                <span className="adapter-badge generic_html" style={{ fontSize: "0.7rem", padding: "1px 6px" }}>
-                                  کاربر: {product.owner_username}
-                                </span>
-                              ) : null}
                             </div>
                             <span className="product-row-slug" title={product.key}>
                               {product.key}
                             </span>
                           </div>
                         </td>
+
+                        {/* Owner Column for Admin */}
+                        {isAdmin && (
+                          <td className="col-owner" style={{ width: "110px", whiteSpace: "nowrap" }}>
+                            <div className="product-info-text">
+                              {product.owner_username ? (
+                                <span
+                                  className="adapter-badge generic_html"
+                                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                                  title={`مالک کالا: ${product.owner_username}`}
+                                >
+                                  {product.owner_username}
+                                </span>
+                              ) : (
+                                <span
+                                  className="adapter-badge brsapi_market"
+                                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                                  title="کالای عمومی سیستم بدون مالک اختصاصی"
+                                >
+                                  سیستم/عمومی
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        )}
 
                         {/* 2. Source Badge */}
                         <td className="col-source">
@@ -590,7 +641,29 @@ export function ProductsView() {
                         {/* 3. URL (Clean External Link icon button + Copy button) */}
                         <td className="col-url">
                           <div className="product-info-text">
-                            {product.primary_target ? (
+                            {product.is_public && !isAdmin ? (
+                              <span
+                                className="muted-text"
+                                title="آدرس اینترنتی کالاهای عمومی فقط برای مدیر قابل مشاهده است"
+                                style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden="true"
+                                >
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                                <span>-</span>
+                              </span>
+                            ) : product.primary_target ? (
                               <div className="product-url-wrapper">
                                 <a
                                   href={product.primary_target.url}
@@ -619,7 +692,7 @@ export function ProductsView() {
                                 <button
                                   type="button"
                                   className="product-copy-btn"
-                                  onClick={() => copyToClipboard(product.primary_target!.url, product.key)}
+                                  onClick={() => copyToClipboard(product.primary_target!.url, product.key, product.is_public)}
                                   aria-label={`کپی آدرس اینترنتی ${product.title}`}
                                   title={copiedKey === product.key ? "کپی شد!" : "کپی لینک"}
                                 >
@@ -807,6 +880,39 @@ export function ProductsView() {
                                       aria-orientation="vertical"
                                       tabIndex={-1}
                                     >
+                                      {(isAdmin || product.can_edit) && (
+                                        <button
+                                          type="button"
+                                          role="menuitem"
+                                          className="kebab-menu-item"
+                                          onClick={() => {
+                                            setActiveKebabKey(null);
+                                            handleRefreshProduct(product);
+                                          }}
+                                          disabled={busyAction !== null || product.enabled_target_count === 0}
+                                          title={
+                                            product.enabled_target_count === 0
+                                              ? "محصول هدف فعالی ندارد"
+                                              : "استعلام قیمت این کالا"
+                                          }
+                                        >
+                                          <svg
+                                            width="14"
+                                            height="14"
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            aria-hidden="true"
+                                          >
+                                            <polyline points="23 4 23 10 17 10" />
+                                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                                          </svg>
+                                          <span>استعلام قیمت این کالا</span>
+                                        </button>
+                                      )}
                                       <button
                                         type="button"
                                         role="menuitem"
