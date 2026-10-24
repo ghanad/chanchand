@@ -11,6 +11,7 @@ export interface CurrentUser {
   username: string;
   email: string | null;
   role: "admin" | "viewer";
+  must_change_password?: boolean;
 }
 
 interface DashboardContextType {

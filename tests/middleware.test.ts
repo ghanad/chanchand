@@ -101,6 +101,21 @@ describe('Next.js RBAC & Edge Middleware', () => {
     expect(json.error).toContain('الزام تغییر کلمه عبور');
   });
 
+  it('allows authenticated users without must_change_password to access /change-password', async () => {
+    const normalUserToken = await signAuthToken({
+      id: 2,
+      username: 'normal_user',
+      role: 'viewer',
+      must_change_password: false,
+    });
+
+    const req = new NextRequest('https://example.com/change-password', {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${normalUserToken}` },
+    });
+    const res = await middleware(req);
+    expect(res.status).toBe(200);
+  });
+
   it('prevents viewer users from accessing admin routes', async () => {
     const viewerToken = await signAuthToken({ id: 10, username: 'viewer_bob', role: 'viewer' });
 

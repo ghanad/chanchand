@@ -335,12 +335,18 @@ label {
 .top-navbar .user-menu-trigger {
   min-height: 34px;
   height: 34px;
-  padding: 2px 10px 2px 4px;
+  padding: 0;
+  padding-inline-start: 4px;
+  padding-inline-end: 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
   color: #eff7f5;
   border-radius: 999px;
   transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
 .top-navbar .user-menu-trigger:hover,
@@ -353,6 +359,12 @@ label {
   color: #eff7f5;
   font-size: 12.5px;
   font-weight: 500;
+  line-height: 1;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  unicode-bidi: plaintext;
 }
 
 .top-navbar .user-menu-chevron {
@@ -360,9 +372,14 @@ label {
 }
 
 .top-navbar .user-avatar {
+  width: 26px;
+  height: 26px;
+  font-size: 11.5px;
+  font-weight: 700;
   background: rgba(45, 212, 191, 0.25);
   color: #5eead4;
   border: 1px solid rgba(45, 212, 191, 0.4);
+  flex-shrink: 0;
 }
 
 .primary-button {
@@ -920,7 +937,12 @@ tbody tr:last-child td {
   }
 
   .top-navbar .user-menu-trigger {
-    padding: 2px 4px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
   }
 
   .workspace {
@@ -2729,65 +2751,113 @@ tbody tr:last-child td {
   white-space: nowrap;
 }
 
+/* Product Detail Page Layout */
+.product-detail-page {
+  gap: 12px;
+}
+
+.product-detail-page .breadcrumb-bar {
+  margin-bottom: -4px;
+}
+
 /* Product Detail Header Panel */
 .product-detail-header-panel {
-  padding: 22px 24px;
+  padding: 14px 18px;
 }
 
 .product-detail-header-main {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 20px;
+  align-items: center;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .product-title-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   flex: 1;
-  min-width: 280px;
+  min-width: 260px;
 }
 
 .product-badges-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .product-slug-pill {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 6px;
   background: var(--surface-soft);
   border: 1px solid var(--line);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--muted);
   direction: ltr;
 }
 
 .product-detail-title {
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text);
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.35;
 }
 
 .product-detail-url {
-  margin-top: 4px;
+  margin-top: 2px;
+  font-size: 12.5px;
   max-width: 100%;
 }
 
 .product-detail-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+.product-detail-actions .secondary-button,
+.product-detail-actions .danger-button-outline {
+  min-height: 34px;
+  height: 34px;
+  padding: 0 11px;
+  font-size: 12.5px;
+  border-radius: 6px;
+}
+
+.product-detail-actions .danger-button-outline {
+  padding: 0 10px;
+}
+
+.product-detail-actions .status-toggle-wrapper {
+  gap: 6px;
+}
+
+.product-detail-actions .status-toggle-label {
+  font-size: 12px;
+}
+
+.product-detail-actions .status-toggle-btn {
+  width: 38px;
+  height: 20px;
+  min-height: 20px;
+}
+
+.product-detail-actions .status-toggle-thumb {
+  width: 14px;
+  height: 14px;
+  top: 3px;
+  right: 3px;
+}
+
+.product-detail-actions .status-toggle-btn.is-active .status-toggle-thumb {
+  transform: translateX(-18px);
 }
 
 .danger-button-outline {
@@ -2806,6 +2876,32 @@ tbody tr:last-child td {
 
 .danger-button-outline:hover {
   background: var(--danger-soft);
+}
+
+/* Product Detail Summary Grid (Compact KPIs) */
+.product-detail-page .product-summary-grid {
+  gap: 10px;
+}
+
+.product-detail-page .product-summary-grid .metric-card {
+  min-height: auto;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.product-detail-page .product-summary-grid .metric-card span {
+  font-size: 11.5px;
+}
+
+.product-detail-page .product-summary-grid .metric-card strong {
+  margin-top: 5px;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.product-detail-page .product-summary-grid .metric-card .metric-hint {
+  margin-top: 3px;
+  font-size: 11px;
 }
 
 .chart-toolbar-actions {

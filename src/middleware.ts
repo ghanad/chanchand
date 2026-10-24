@@ -84,11 +84,6 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // If user without must_change_password visits /change-password, redirect to dashboard
-  if (pathname === '/change-password') {
-    const defaultTarget = session.role === 'admin' ? '/admin' : '/';
-    return NextResponse.redirect(new URL(defaultTarget, req.url));
-  }
 
   // If authenticated admin visits root '/', redirect to '/admin' so they land directly on admin dashboard
   if (pathname === '/' && session.role === 'admin') {

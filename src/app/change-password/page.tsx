@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { requestJson } from "@/lib/api-client";
 import { useDashboard } from "@/context/DashboardContext";
 
 export default function ChangePasswordPage() {
-  const { showToast, logout } = useDashboard();
+  const { showToast, logout, currentUser } = useDashboard();
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -140,8 +141,26 @@ export default function ChangePasswordPage() {
           </div>
 
           <button type="submit" className="primary-button login-button" disabled={loading}>
-            {loading ? "در حال ثبت..." : "ثبت کلمه عبور و ورود به سامانه"}
+            {loading ? "در حال ثبت..." : "ثبت کلمه عبور و به‌روزرسانی"}
           </button>
+
+          {!currentUser?.must_change_password && (
+            <Link
+              href={currentUser?.role === "admin" ? "/admin" : "/"}
+              className="secondary-button"
+              style={{
+                width: "100%",
+                marginTop: "8px",
+                textAlign: "center",
+                display: "block",
+                textDecoration: "none",
+                boxSizing: "border-box",
+                padding: "10px 16px",
+              }}
+            >
+              انصراف و بازگشت به سامانه
+            </Link>
+          )}
 
           <button
             type="button"

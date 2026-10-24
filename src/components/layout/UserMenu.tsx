@@ -147,7 +147,7 @@ export function UserMenu() {
         <span className="user-avatar user-avatar-sm" aria-hidden="true">
           {initialLetter}
         </span>
-        <span className="user-menu-name">{currentUser.username}</span>
+        <span className="user-menu-name" title={currentUser.username}>{currentUser.username}</span>
         <svg
           className={`user-menu-chevron ${isOpen ? "is-open" : ""}`}
           width="14"
