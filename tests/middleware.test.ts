@@ -146,4 +146,24 @@ describe('Next.js RBAC & Edge Middleware', () => {
     expect(res.status).toBe(307);
     expect(res.headers.get('location')).toContain('/admin');
   });
+
+  it('restricts /runs to admin and redirects viewer to /', async () => {
+    const viewerToken = await signAuthToken({ id: 10, username: 'viewer_bob', role: 'viewer' });
+    const req = new NextRequest('https://example.com/runs', {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${viewerToken}` },
+    });
+    const res = await middleware(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toMatch(/\/$/);
+  });
+
+  it('redirects admin from /runs to /admin/runs', async () => {
+    const adminToken = await signAuthToken({ id: 1, username: 'admin', role: 'admin' });
+    const req = new NextRequest('https://example.com/runs', {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${adminToken}` },
+    });
+    const res = await middleware(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain('/admin/runs');
+  });
 });
