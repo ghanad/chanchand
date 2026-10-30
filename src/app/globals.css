@@ -2285,8 +2285,8 @@ tbody tr:last-child td {
 
 .product-compact-table th.col-th-url,
 .product-compact-table td.col-url {
-  width: 12%;
-  min-width: 100px;
+  width: 70px;
+  min-width: 60px;
   white-space: nowrap;
 }
 
@@ -2428,6 +2428,47 @@ tbody tr:last-child td {
 .product-url-link:hover {
   background-color: var(--surface-soft);
   text-decoration: underline;
+}
+
+.product-url-link.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--accent);
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.product-url-link.icon-only:hover {
+  background-color: var(--surface-soft);
+  text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.private-address-badge.icon-only {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: help;
+  user-select: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.private-address-badge.icon-only:hover {
+  background-color: var(--surface-soft);
+  border-color: var(--line);
+  color: var(--text-secondary);
 }
 
 /* Status: Static Badge for read-only public products */

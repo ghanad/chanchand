@@ -1082,12 +1082,13 @@ function ProductTableRow({
         <div className="product-info-text">
           {product.is_public && !isAdmin ? (
             <span
-              className="private-address-badge"
+              className="private-address-badge icon-only"
               title="آدرس منبع برای کالاهای عمومی بازار محرمانه است و توسط سیستم مدیریت می‌شود."
+              aria-label="آدرس منبع محرمانه است"
             >
               <svg
-                width="13"
-                height="13"
+                width="15"
+                height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -1099,20 +1100,19 @@ function ProductTableRow({
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </svg>
-              <span>محرمانه</span>
             </span>
           ) : product.primary_target ? (
             <a
               href={product.primary_target.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="product-url-link"
+              className="product-url-link icon-only"
               aria-label={`مشاهده صفحه محصول در سایت مقصد`}
               title={`مشاهده صفحه محصول در سایت مقصد: ${product.primary_target.url}`}
             >
               <svg
-                width="13"
-                height="13"
+                width="15"
+                height="15"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -1125,7 +1125,6 @@ function ProductTableRow({
                 <polyline points="15 3 21 3 21 9" />
                 <line x1="10" y1="14" x2="21" y2="3" />
               </svg>
-              <span>مشاهده منبع</span>
             </a>
           ) : (
             <span className="muted-text">-</span>
