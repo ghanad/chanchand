@@ -56,6 +56,7 @@ export default function ChangePasswordPage() {
       <div className="login-card">
         <div className="login-brand">
           <h1>تغییر کلمه عبور</h1>
+          <p className="login-subtitle">کلمه عبور جدید حساب کاربری خود را وارد کنید</p>
         </div>
 
         {error && (
@@ -164,38 +165,42 @@ export default function ChangePasswordPage() {
             {loading ? "در حال ثبت..." : "ثبت کلمه عبور و به‌روزرسانی"}
           </button>
 
-          {!currentUser?.must_change_password && (
-            <Link
-              href={currentUser?.role === "admin" ? "/admin" : "/"}
-              className="secondary-button"
-              style={{
-                width: "100%",
-                marginTop: "8px",
-                textAlign: "center",
-                display: "block",
-                textDecoration: "none",
-                boxSizing: "border-box",
-                padding: "10px 16px",
-              }}
-            >
-              انصراف و بازگشت به سامانه
-            </Link>
+          {!currentUser?.must_change_password ? (
+            <div className="login-action-footer">
+              <Link
+                href={currentUser?.role === "admin" ? "/admin" : "/"}
+                className="login-subtle-link"
+              >
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="19" y1="12" x2="5" y2="12" />
+                  <polyline points="12 19 5 12 12 5" />
+                </svg>
+                <span>انصراف و بازگشت به سامانه</span>
+              </Link>
+            </div>
+          ) : (
+            <div className="login-action-footer">
+              <button
+                type="button"
+                className="login-subtle-link login-logout-link"
+                onClick={logout}
+                disabled={loading}
+              >
+                خروج از حساب کاربری
+              </button>
+            </div>
           )}
-
-          <button
-            type="button"
-            className="secondary-button"
-            style={{ width: "100%", marginTop: "8px" }}
-            onClick={logout}
-            disabled={loading}
-          >
-            خروج از حساب کاربری
-          </button>
         </form>
-
-        <div className="login-footer">
-          <span>چن چند — حفظ امنیت دسترسی</span>
-        </div>
       </div>
     </div>
   );

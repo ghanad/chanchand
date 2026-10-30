@@ -1327,6 +1327,51 @@ tbody tr:last-child td {
   font-weight: 600;
 }
 
+.login-action-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.login-subtle-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.login-subtle-link:hover {
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.login-subtle-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.login-subtle-link.login-logout-link {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.login-subtle-link.login-logout-link:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
 .login-footer {
   text-align: center;
   margin-top: 24px;
