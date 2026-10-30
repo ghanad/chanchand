@@ -14,9 +14,11 @@ import {
   SafeUser,
   SourceConfig,
   TargetConfig,
+  UserProductRow,
   UserRole,
   UserRow,
 } from './types';
+import { normalizeTargetUrl } from './urls';
 
 export const DEFAULT_DB_URL = 'sqlite:///data/price_getter.db';
 
@@ -170,6 +172,17 @@ export function initDatabase(db: Database.Database): void {
       updated_at DATETIME NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_users_username ON users(username);
+
+    CREATE TABLE IF NOT EXISTS user_products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_key VARCHAR(128) NOT NULL REFERENCES managed_products(key) ON DELETE CASCADE,
+      custom_title TEXT,
+      created_at DATETIME NOT NULL,
+      UNIQUE(user_id, product_key)
+    );
+    CREATE INDEX IF NOT EXISTS ix_user_products_user_id ON user_products(user_id);
+    CREATE INDEX IF NOT EXISTS ix_user_products_product_key ON user_products(product_key);
   `);
 
   try {
@@ -221,6 +234,39 @@ export function initDatabase(db: Database.Database): void {
     }
   } catch (err) {
     console.warn('[DB] managed_products migration warning:', err);
+  }
+
+  try {
+    // Backfill user_products from managed_products where user_id is set
+    db.exec(`
+      INSERT OR IGNORE INTO user_products (user_id, product_key, custom_title, created_at)
+      SELECT user_id, key, title, created_at
+      FROM managed_products
+      WHERE user_id IS NOT NULL;
+    `);
+
+    // Consolidate any duplicate targets by normalized URL
+    const allTargets = db.prepare('SELECT * FROM managed_targets ORDER BY id ASC').all() as ManagedTargetRow[];
+    const seenNormUrls = new Map<string, string>();
+    for (const tgt of allTargets) {
+      const norm = normalizeTargetUrl(tgt.url);
+      if (!norm) continue;
+      const canonicalKey = seenNormUrls.get(norm);
+      if (!canonicalKey) {
+        seenNormUrls.set(norm, tgt.product_key);
+      } else if (canonicalKey !== tgt.product_key) {
+        // Re-point any user_products pointing to duplicate product_key to canonicalKey
+        db.prepare(`
+          INSERT OR IGNORE INTO user_products (user_id, product_key, custom_title, created_at)
+          SELECT user_id, ?, custom_title, created_at FROM user_products WHERE product_key = ?
+        `).run(canonicalKey, tgt.product_key);
+        db.prepare('DELETE FROM user_products WHERE product_key = ?').run(tgt.product_key);
+        db.prepare('DELETE FROM managed_targets WHERE id = ?').run(tgt.id);
+        db.prepare('DELETE FROM managed_products WHERE key = ?').run(tgt.product_key);
+      }
+    }
+  } catch (err) {
+    console.warn('[DB] user_products migration warning:', err);
   }
 
   seedDefaultSourcesIfEmpty(db);
@@ -607,6 +653,33 @@ export function makeProductKey(
   return candidate;
 }
 
+export function isUserTrackingProduct(
+  db: Database.Database,
+  userId: number,
+  productKey: string
+): boolean {
+  const row = db
+    .prepare('SELECT 1 FROM user_products WHERE user_id = ? AND product_key = ? LIMIT 1')
+    .get(userId, productKey);
+  return Boolean(row);
+}
+
+export function findManagedTargetByUrl(
+  db: Database.Database,
+  rawUrl: string
+): ManagedTargetRow | undefined {
+  const norm = normalizeTargetUrl(rawUrl);
+  if (!norm) return undefined;
+
+  const direct = db.prepare('SELECT * FROM managed_targets WHERE url = ? LIMIT 1').get(rawUrl.trim()) as
+    | ManagedTargetRow
+    | undefined;
+  if (direct) return direct;
+
+  const allTargets = db.prepare('SELECT * FROM managed_targets').all() as ManagedTargetRow[];
+  return allTargets.find((t) => normalizeTargetUrl(t.url) === norm);
+}
+
 export function getManagedProducts(
   db: Database.Database,
   filter?: { userId?: number; isAdmin?: boolean }
@@ -614,7 +687,7 @@ export function getManagedProducts(
   if (filter?.isAdmin) {
     return db
       .prepare(`
-        SELECT mp.*, u.username AS owner_username
+        SELECT mp.*, u.username AS owner_username, 1 AS is_tracked_by_user
         FROM managed_products mp
         LEFT JOIN users u ON u.id = mp.user_id
         ORDER BY mp.key ASC
@@ -623,15 +696,28 @@ export function getManagedProducts(
   }
 
   if (filter?.userId !== undefined) {
-    return db
+    const rows = db
       .prepare(`
-        SELECT mp.*, u.username AS owner_username
+        SELECT mp.key,
+               COALESCE(up.custom_title, mp.title) AS title,
+               mp.user_id,
+               mp.is_public,
+               mp.created_at,
+               mp.updated_at,
+               u.username AS owner_username,
+               CASE WHEN up.user_id IS NOT NULL OR mp.user_id = ? THEN 1 ELSE 0 END AS is_tracked_by_user
         FROM managed_products mp
+        LEFT JOIN user_products up ON up.product_key = mp.key AND up.user_id = ?
         LEFT JOIN users u ON u.id = mp.user_id
-        WHERE mp.user_id = ? OR mp.is_public = 1
+        WHERE mp.is_public = 1 OR up.user_id = ? OR mp.user_id = ?
         ORDER BY mp.key ASC
       `)
-      .all(filter.userId) as ManagedProductRow[];
+      .all(filter.userId, filter.userId, filter.userId, filter.userId) as any[];
+
+    return rows.map((r) => ({
+      ...r,
+      is_tracked_by_user: Boolean(r.is_tracked_by_user),
+    })) as ManagedProductRow[];
   }
 
   return db
@@ -663,7 +749,7 @@ export function addManagedProduct(
     user_id?: number | null;
     is_public?: boolean | number;
   }
-): { product_key: string } {
+): { product_key: string; reused?: boolean } {
   const cleanTitle = options.title.trim();
   if (!cleanTitle) throw new Error('title cannot be empty');
   const cleanUrl = options.url.trim();
@@ -671,6 +757,25 @@ export function addManagedProduct(
   const sourceKey = options.source_key?.trim() || 'digikala_api';
   const userId = options.user_id ?? null;
   const isPublic = options.is_public ? 1 : 0;
+  const now = new Date().toISOString();
+
+  // Deduplication check: does a target with this URL already exist?
+  const existingTarget = findManagedTargetByUrl(db, cleanUrl);
+  if (existingTarget) {
+    const existingProd = db
+      .prepare('SELECT * FROM managed_products WHERE key = ?')
+      .get(existingTarget.product_key) as ManagedProductRow | undefined;
+    if (existingProd) {
+      if (userId != null) {
+        db.prepare(`
+          INSERT INTO user_products (user_id, product_key, custom_title, created_at)
+          VALUES (?, ?, ?, ?)
+          ON CONFLICT(user_id, product_key) DO UPDATE SET custom_title = excluded.custom_title
+        `).run(userId, existingTarget.product_key, cleanTitle, now);
+      }
+      return { product_key: existingTarget.product_key, reused: true };
+    }
+  }
 
   const existing = new Set(
     (db.prepare('SELECT key FROM managed_products').all() as Array<{ key: string }>).map((r) => r.key)
@@ -683,21 +788,26 @@ export function addManagedProduct(
     throw new Error(`product key already exists: ${productKey}`);
   }
 
-  const now = new Date().toISOString();
   const insertProd = db.prepare(
     'INSERT INTO managed_products (key, title, user_id, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
   );
   const insertTgt = db.prepare(
     'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)'
   );
+  const insertUserProd = db.prepare(
+    'INSERT OR IGNORE INTO user_products (user_id, product_key, custom_title, created_at) VALUES (?, ?, ?, ?)'
+  );
 
   const txn = db.transaction(() => {
     insertProd.run(productKey, cleanTitle, userId, isPublic, now, now);
     insertTgt.run(productKey, sourceKey, cleanUrl, '{}', now, now);
+    if (userId != null) {
+      insertUserProd.run(userId, productKey, cleanTitle, now);
+    }
   });
   txn();
 
-  return { product_key: productKey };
+  return { product_key: productKey, reused: false };
 }
 
 export function updateManagedProduct(
@@ -720,11 +830,14 @@ export function updateManagedProduct(
   const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
   if (!prod) throw new Error(`unknown product: ${productKey}`);
 
+  const isTracker = requestingUser ? isUserTrackingProduct(db, requestingUser.id, productKey) : false;
+  const isOwner = requestingUser ? prod.user_id === requestingUser.id : false;
+
   if (requestingUser && requestingUser.role !== 'admin') {
     if (prod.is_public === 1) {
       throw new Error('دسترسی غیرمجاز: محصولات عمومی بازار فقط توسط مدیر قابل ویرایش هستند.');
     }
-    if (prod.user_id !== requestingUser.id) {
+    if (!isOwner && !isTracker) {
       throw new Error('دسترسی غیرمجاز: شما فقط امکان ویرایش محصولات خود را دارید.');
     }
   }
@@ -737,6 +850,27 @@ export function updateManagedProduct(
         : 0
       : prod.is_public ?? 0;
 
+  const existingTarget = db
+    .prepare('SELECT * FROM managed_targets WHERE product_key = ? LIMIT 1')
+    .get(productKey) as ManagedTargetRow | undefined;
+
+  const isUrlChanging = existingTarget ? normalizeTargetUrl(existingTarget.url) !== normalizeTargetUrl(cleanUrl) : true;
+  const trackersCount = (
+    db.prepare('SELECT COUNT(*) as cnt FROM user_products WHERE product_key = ?').get(productKey) as { cnt: number }
+  )?.cnt ?? 0;
+
+  // If non-admin changes URL and product is tracked by multiple users, fork for this user
+  if (requestingUser && requestingUser.role !== 'admin' && isUrlChanging && trackersCount > 1) {
+    db.prepare('DELETE FROM user_products WHERE user_id = ? AND product_key = ?').run(requestingUser.id, productKey);
+    return addManagedProduct(db, {
+      title: cleanTitle,
+      url: cleanUrl,
+      source_key: sourceKey,
+      user_id: requestingUser.id,
+      is_public: false,
+    });
+  }
+
   const txn = db.transaction(() => {
     db.prepare('UPDATE managed_products SET title = ?, is_public = ?, updated_at = ? WHERE key = ?').run(
       cleanTitle,
@@ -744,9 +878,13 @@ export function updateManagedProduct(
       now,
       productKey
     );
-    const existingTarget = db
-      .prepare('SELECT id FROM managed_targets WHERE product_key = ? LIMIT 1')
-      .get(productKey) as { id: number } | undefined;
+    if (requestingUser && isTracker) {
+      db.prepare('UPDATE user_products SET custom_title = ? WHERE user_id = ? AND product_key = ?').run(
+        cleanTitle,
+        requestingUser.id,
+        productKey
+      );
+    }
     if (existingTarget) {
       db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, updated_at = ? WHERE id = ?').run(
         sourceKey,
@@ -773,16 +911,40 @@ export function deleteManagedProduct(
   const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
   if (!prod) throw new Error(`unknown product: ${productKey}`);
 
+  const isTracker = requestingUser ? isUserTrackingProduct(db, requestingUser.id, productKey) : false;
+  const isOwner = requestingUser ? prod.user_id === requestingUser.id : false;
+
   if (requestingUser && requestingUser.role !== 'admin') {
     if (prod.is_public === 1) {
       throw new Error('دسترسی غیرمجاز: محصولات عمومی بازار فقط توسط مدیر قابل حذف هستند.');
     }
-    if (prod.user_id !== requestingUser.id) {
+    if (!isOwner && !isTracker) {
       throw new Error('دسترسی غیرمجاز: شما فقط امکان حذف محصولات خود را دارید.');
     }
   }
 
   const txn = db.transaction(() => {
+    if (requestingUser && requestingUser.role !== 'admin') {
+      db.prepare('DELETE FROM user_products WHERE user_id = ? AND product_key = ?').run(requestingUser.id, productKey);
+
+      const remaining = db
+        .prepare('SELECT COUNT(*) as cnt FROM user_products WHERE product_key = ?')
+        .get(productKey) as { cnt: number };
+
+      if (remaining.cnt > 0) {
+        if (prod.user_id === requestingUser.id) {
+          const nextUser = db
+            .prepare('SELECT user_id FROM user_products WHERE product_key = ? ORDER BY id ASC LIMIT 1')
+            .get(productKey) as { user_id: number } | undefined;
+          if (nextUser) {
+            db.prepare('UPDATE managed_products SET user_id = ? WHERE key = ?').run(nextUser.user_id, productKey);
+          }
+        }
+        return;
+      }
+    }
+
+    db.prepare('DELETE FROM user_products WHERE product_key = ?').run(productKey);
     db.prepare('DELETE FROM managed_targets WHERE product_key = ?').run(productKey);
     db.prepare('DELETE FROM managed_products WHERE key = ?').run(productKey);
   });
@@ -800,11 +962,14 @@ export function setManagedProductEnabled(
   const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
   if (!prod) throw new Error(`unknown product: ${productKey}`);
 
+  const isTracker = requestingUser ? isUserTrackingProduct(db, requestingUser.id, productKey) : false;
+  const isOwner = requestingUser ? prod.user_id === requestingUser.id : false;
+
   if (requestingUser && requestingUser.role !== 'admin') {
     if (prod.is_public === 1) {
       throw new Error('دسترسی غیرمجاز: وضعیت محصولات عمومی بازار فقط توسط مدیر قابل تغییر است.');
     }
-    if (prod.user_id !== requestingUser.id) {
+    if (!isOwner && !isTracker) {
       throw new Error('دسترسی غیرمجاز: شما فقط امکان تغییر وضعیت محصولات خود را دارید.');
     }
   }
@@ -998,19 +1163,36 @@ export function recordError(
   return Number(res.lastInsertRowid);
 }
 
-export function hasSuccessfulPriceToday(db: Database.Database, productKey: string, now = new Date()): boolean {
+export function hasSuccessfulPriceToday(
+  db: Database.Database,
+  productKey: string,
+  now = new Date(),
+  url?: string
+): boolean {
   // Start of day in local time, converted to ISO / UTC
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
 
-  const row = db.prepare(`
-    SELECT id FROM price_snapshots
-    WHERE product_key = ?
-      AND price_irr IS NOT NULL
-      AND observed_at >= ?
-      AND observed_at <= ?
-    LIMIT 1
-  `).get(productKey, startOfDay, endOfDay);
+  let row;
+  if (url) {
+    row = db.prepare(`
+      SELECT id FROM price_snapshots
+      WHERE (product_key = ? OR url = ?)
+        AND price_irr IS NOT NULL
+        AND observed_at >= ?
+        AND observed_at <= ?
+      LIMIT 1
+    `).get(productKey, url, startOfDay, endOfDay);
+  } else {
+    row = db.prepare(`
+      SELECT id FROM price_snapshots
+      WHERE product_key = ?
+        AND price_irr IS NOT NULL
+        AND observed_at >= ?
+        AND observed_at <= ?
+      LIMIT 1
+    `).get(productKey, startOfDay, endOfDay);
+  }
 
   return !!row;
 }

@@ -1220,16 +1220,43 @@ tbody tr:last-child td {
 }
 
 .login-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 12px 14px;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
   margin-bottom: 20px;
+  text-align: right;
+  direction: rtl;
+  animation: loginAlertFadeIn 0.25s ease-out;
 }
 
 .login-alert.error {
   background: var(--danger-soft);
   color: var(--danger);
-  border: 1px solid rgba(180, 59, 59, 0.2);
+  border: 1px solid rgba(180, 59, 59, 0.25);
+}
+
+.login-alert-icon {
+  flex-shrink: 0;
+  color: var(--danger);
+}
+
+.login-alert-text {
+  flex: 1;
+}
+
+@keyframes loginAlertFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .login-form {

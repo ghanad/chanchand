@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, productHistoryChronological } from '@/lib/db';
+import { getDatabase, productHistoryChronological, isUserTrackingProduct } from '@/lib/db';
 import { serializeHistoryPrices, USD_HISTORY_LIMIT, USD_PRODUCT_KEY } from '@/lib/serializers';
 
 import { getAuthUserFromRequest } from '@/lib/auth';
@@ -22,10 +22,13 @@ export async function GET(req: NextRequest) {
         | { user_id: number | null; is_public: number }
         | undefined;
       if (prod && prod.user_id !== user.id && prod.is_public !== 1) {
-        return NextResponse.json(
-          { error: 'دسترسی غیرمجاز: شما اجازه دسترسی به تاریخچه این محصول را ندارید.' },
-          { status: 403 }
-        );
+        const isTracking = isUserTrackingProduct(db, user.id, productKey);
+        if (!isTracking) {
+          return NextResponse.json(
+            { error: 'دسترسی غیرمجاز: شما اجازه دسترسی به تاریخچه این محصول را ندارید.' },
+            { status: 403 }
+          );
+        }
       }
     }
 

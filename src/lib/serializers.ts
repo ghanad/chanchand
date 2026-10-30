@@ -78,6 +78,7 @@ export function productsPayload(
     user_id?: number | null;
     owner_username?: string | null;
     is_public?: number | boolean;
+    is_tracked_by_user?: boolean;
   }> = [],
   managedTargets?: Array<{
     product_key: string;
@@ -92,8 +93,9 @@ export function productsPayload(
   for (const dbProduct of dbProducts) {
     const isPublic = Boolean(dbProduct.is_public);
     const isOwner = currentUser?.id != null && dbProduct.user_id === currentUser.id;
+    const isTracked = Boolean(dbProduct.is_tracked_by_user);
     const isAdmin = currentUser?.role === 'admin';
-    const canEdit = isAdmin || (isOwner && !isPublic);
+    const canEdit = isAdmin || ((isOwner || isTracked) && !isPublic);
 
     products[dbProduct.key] = {
       key: dbProduct.key,

@@ -40,8 +40,17 @@ export interface ManagedProductRow {
   user_id?: number | null;
   is_public?: number;
   owner_username?: string | null;
+  is_tracked_by_user?: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserProductRow {
+  id: number;
+  user_id: number;
+  product_key: string;
+  custom_title: string | null;
+  created_at: string;
 }
 
 export interface ManagedTargetRow {

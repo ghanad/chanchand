@@ -1,4 +1,4 @@
-import { AppConfig, TargetConfig, SourceConfig } from './types';
+import { AppConfig, TargetConfig, SourceConfig, PriceObservation } from './types';
 import {
   getDatabase,
   startRun,
@@ -13,6 +13,7 @@ import {
 import { getAdapter } from './adapters';
 import { loadConfig } from './config';
 import { USD_PRODUCT_KEY } from './serializers';
+import { normalizeTargetUrl } from './urls';
 
 export interface RunSummary {
   run_id: number;
@@ -105,6 +106,7 @@ export class PriceRunner {
     console.log(`[Runner] run ${runId} started: ${activeTargets.length} active targets`);
 
     const sources = config?.sources || getSourcesMap(db);
+    const fetchedObservations = new Map<string, PriceObservation>();
 
     try {
       for (const target of activeTargets) {
@@ -114,8 +116,19 @@ export class PriceRunner {
           continue;
         }
 
-        if (!options?.force && source.adapter !== 'brsapi_market' && hasSuccessfulPriceToday(db, target.product_key)) {
+        if (!options?.force && source.adapter !== 'brsapi_market' && hasSuccessfulPriceToday(db, target.product_key, undefined, target.url)) {
           console.log(`[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`);
+          continue;
+        }
+
+        const normUrl = normalizeTargetUrl(target.url);
+        if (normUrl && fetchedObservations.has(normUrl)) {
+          const cachedObservation = fetchedObservations.get(normUrl)!;
+          recordPrice(db, runId, target, cachedObservation);
+          successCount++;
+          console.log(
+            `[Runner] run ${runId}: reused cached observation for ${target.product_key}/${target.source_key} price_irr=${cachedObservation.price_irr}`
+          );
           continue;
         }
 
@@ -126,6 +139,10 @@ export class PriceRunner {
         try {
           const adapter = getAdapter(source.adapter);
           const observation = await adapter.fetch({ source, target });
+
+          if (normUrl) {
+            fetchedObservations.set(normUrl, observation);
+          }
 
           recordPrice(db, runId, target, observation);
           successCount++;

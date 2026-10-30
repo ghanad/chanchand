@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PriceRunner } from '@/lib/runner';
-import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
+import { getDatabase, getManagedTargets, startRun, isUserTrackingProduct } from '@/lib/db';
 import { requireAuth } from '@/lib/api-guard';
 import { TargetConfig } from '@/lib/types';
 
@@ -32,7 +32,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    if (auth.user.role !== 'admin' && prod.user_id !== auth.user.id) {
+    const isTracking = isUserTrackingProduct(db, auth.user.id, productKey);
+    if (auth.user.role !== 'admin' && prod.user_id !== auth.user.id && !isTracking) {
       return NextResponse.json(
         { error: 'دسترسی غیرمجاز: کاربران عادی فقط مجاز به استعلام دستی محصولات اختصاصی خود هستند.' },
         { status: 403 }

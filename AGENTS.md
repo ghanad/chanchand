@@ -20,7 +20,7 @@ Core flow:
 4. `src/middleware.ts` guards public/protected routes and enforces RBAC (admin vs viewer).
 5. `src/lib/runner.ts` loops through active targets (from SQLite `managed_targets`), enforces per-source rate limits, calls adapters, and records results.
 6. `src/lib/adapters/*` fetch and parse source-specific price data into `PriceObservation`.
-7. `src/lib/db.ts` executes SQLite queries and writes with `better-sqlite3` (tables: `runs`, `sources`, `products`, `product_targets`, `managed_products`, `managed_targets`, `managed_sources`, `price_snapshots`, `fetch_errors`, `users`).
+7. `src/lib/db.ts` executes SQLite queries and writes with `better-sqlite3` (tables: `runs`, `sources`, `products`, `product_targets`, `managed_products`, `managed_targets`, `user_products`, `managed_sources`, `price_snapshots`, `fetch_errors`, `users`).
 8. `src/app/api/*` and `src/app/admin/*` serve JSON endpoints for Next.js App Router.
 9. `src/app/*` renders the modular App Router dashboard pages using `src/components/views/*` and Recharts.
 
@@ -29,7 +29,8 @@ Core flow:
 - UI Dashboard: `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/change-password/page.tsx`, `src/app/page.tsx` (`/` -> `/products`), `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/products/[key]/page.tsx`, `src/app/sources/page.tsx`, `src/app/admin/*`, `src/app/admin/products/[key]/page.tsx`, `src/components/views/*` (including `ProductDetailView`, `ProductsView`, `UsersView`, `RunsView`, `SourcesView`), `src/components/layout/*` (`AppShell`, `WorkspaceHeader` top navbar), `src/components/common/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
 - API Route Handlers: `src/app/api/auth/*` (login, logout, me, change-password), `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/products/[key]/route.ts`, `src/app/api/products/[key]/enable/route.ts`, `src/app/api/products/[key]/disable/route.ts`, `src/app/api/products/[key]/refresh/route.ts`, `src/app/api/sources/route.ts`, `src/app/api/admin/sources/*`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
 - Authentication, Security & RBAC: `src/lib/auth.ts`, `src/lib/jwt.ts`, `src/middleware.ts`, `src/lib/security.ts`, `src/lib/redirect.ts`, `src/lib/api-guard.ts`
-- Database schema & CRUD: `src/lib/db.ts` (manages `managed_products` with `user_id` and `is_public`, `managed_targets`, `managed_sources` & `users` with `must_change_password`)
+- Database schema & CRUD: `src/lib/db.ts` (manages `managed_products` with `user_id` and `is_public`, `managed_targets`, `user_products` watchlist & `users` with `must_change_password`)
+- URL normalization & deduplication: `src/lib/urls.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
 - Runner & orchestrator: `src/lib/runner.ts`

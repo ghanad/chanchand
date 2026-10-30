@@ -57,7 +57,27 @@ function LoginForm() {
         <p className="login-subtitle">ورود به حساب کاربری</p>
       </div>
 
-      {error && <div className="login-alert error">{error}</div>}
+      {error && (
+        <div className="login-alert error" role="alert">
+          <svg
+            className="login-alert-icon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span className="login-alert-text">{error}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="login-form">
         <div className="form-group">
