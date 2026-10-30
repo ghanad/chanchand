@@ -120,9 +120,6 @@ function LoginForm() {
         </button>
       </form>
 
-      <div className="login-footer">
-        <span>چن چند — سامانه پایش و تحلیل قیمت بازارهای آنلاین</span>
-      </div>
     </div>
   );
 }
