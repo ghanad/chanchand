@@ -153,6 +153,58 @@ describe('Product & Target Deduplication (Shared Catalog & User Watchlist)', () 
       db.close();
     });
 
+    it('does NOT deduplicate market sources that share the same endpoint URL but have different symbols', () => {
+      const db = getDatabase();
+
+      // Seed market source
+      db.prepare(`
+        INSERT OR REPLACE INTO managed_sources (key, adapter, timeout_seconds, rate_limit_seconds, currency, price_multiplier, headers, settings, created_at, updated_at)
+        VALUES ('servix_market', 'servix_market', 10, 0, 'IRR', 1, '{}', '{}', datetime('now'), datetime('now'))
+      `).run();
+
+      const apiUrl = 'https://servix.cc/api/v1/assets';
+
+      // Add Gold 18K
+      const resGold = addManagedProduct(db, {
+        title: 'طلای ۱۸ عیار',
+        url: apiUrl,
+        source_key: 'servix_market',
+        user_id: user1Id,
+        adapter_settings: { symbol: 'GOLD_18_RLS' },
+      });
+      expect(resGold.reused).toBe(false);
+
+      // Add USD (same API URL, different symbol)
+      const resUsd = addManagedProduct(db, {
+        title: 'دلار',
+        url: apiUrl,
+        source_key: 'servix_market',
+        user_id: user1Id,
+        adapter_settings: { symbol: 'USD_RLS' },
+      });
+      expect(resUsd.reused).toBe(false);
+      expect(resUsd.product_key).not.toBe(resGold.product_key);
+
+      // User 2 adds USD again (same URL + same symbol) -> SHOULD be reused!
+      const resUsd2 = addManagedProduct(db, {
+        title: 'دلار بازار آزاد',
+        url: apiUrl,
+        source_key: 'servix_market',
+        user_id: user2Id,
+        adapter_settings: { symbol: 'USD_RLS' },
+      });
+      expect(resUsd2.reused).toBe(true);
+      expect(resUsd2.product_key).toBe(resUsd.product_key);
+
+      // Verify database counts: 2 distinct products and 2 distinct targets
+      const products = db.prepare('SELECT * FROM managed_products WHERE key IN (?, ?)').all(resGold.product_key, resUsd.product_key);
+      const targets = db.prepare('SELECT * FROM managed_targets WHERE product_key IN (?, ?)').all(resGold.product_key, resUsd.product_key);
+      expect(products.length).toBe(2);
+      expect(targets.length).toBe(2);
+
+      db.close();
+    });
+
     it('collects price snapshot only ONCE and shares history between tracking users', async () => {
       let fetchCount = 0;
       vi.spyOn(adaptersModule, 'getAdapter').mockReturnValue({

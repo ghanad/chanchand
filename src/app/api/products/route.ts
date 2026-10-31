@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
       source_key: body.source_key,
       user_id: auth.user.id,
       is_public: isPublic,
+      adapter_settings: body.adapter_settings,
     });
 
     return NextResponse.json(result);

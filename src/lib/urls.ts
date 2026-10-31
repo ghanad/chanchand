@@ -79,3 +79,40 @@ export function normalizeTargetUrl(rawUrl: string): string {
     return trimmed.toLowerCase().replace(/\/+$/, '');
   }
 }
+
+/**
+ * Computes a deduplication key for a product target.
+ * For ecommerce links (like Digikala or generic html), this is the normalized URL.
+ * For market/API sources (like Servix or BRSAPI), multiple products share the same endpoint URL
+ * and are distinguished by their symbol/code in adapter_settings.
+ */
+export function getTargetDeduplicationKey(
+  sourceKey: string = '',
+  url: string,
+  adapterSettings?: string | Record<string, any>
+): string {
+  const norm = normalizeTargetUrl(url);
+  if (!norm) return '';
+
+  let symbol = '';
+  if (adapterSettings) {
+    try {
+      const parsed = typeof adapterSettings === 'string' ? JSON.parse(adapterSettings) : adapterSettings;
+      if (parsed && typeof parsed === 'object') {
+        symbol = String(parsed.symbol || parsed.name || parsed.code || parsed.asset || '').trim();
+      }
+    } catch {}
+  }
+
+  const isMarket =
+    sourceKey.includes('market') ||
+    sourceKey.includes('servix') ||
+    sourceKey.includes('brsapi');
+
+  if (isMarket || symbol) {
+    return `${sourceKey}::${norm}::${symbol}`;
+  }
+
+  return norm;
+}
+

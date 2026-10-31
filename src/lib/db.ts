@@ -18,7 +18,7 @@ import {
   UserRole,
   UserRow,
 } from './types';
-import { normalizeTargetUrl } from './urls';
+import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
 
 export const DEFAULT_DB_URL = 'sqlite:///data/price_getter.db';
 
@@ -245,15 +245,15 @@ export function initDatabase(db: Database.Database): void {
       WHERE user_id IS NOT NULL;
     `);
 
-    // Consolidate any duplicate targets by normalized URL
+    // Consolidate any duplicate targets using normalized URL and symbol for market endpoints
     const allTargets = db.prepare('SELECT * FROM managed_targets ORDER BY id ASC').all() as ManagedTargetRow[];
-    const seenNormUrls = new Map<string, string>();
+    const seenTargetKeys = new Map<string, string>();
     for (const tgt of allTargets) {
-      const norm = normalizeTargetUrl(tgt.url);
-      if (!norm) continue;
-      const canonicalKey = seenNormUrls.get(norm);
+      const dedupKey = getTargetDeduplicationKey(tgt.source_key, tgt.url, tgt.adapter_settings);
+      if (!dedupKey) continue;
+      const canonicalKey = seenTargetKeys.get(dedupKey);
       if (!canonicalKey) {
-        seenNormUrls.set(norm, tgt.product_key);
+        seenTargetKeys.set(dedupKey, tgt.product_key);
       } else if (canonicalKey !== tgt.product_key) {
         // Re-point any user_products pointing to duplicate product_key to canonicalKey
         db.prepare(`
@@ -263,6 +263,46 @@ export function initDatabase(db: Database.Database): void {
         db.prepare('DELETE FROM user_products WHERE product_key = ?').run(tgt.product_key);
         db.prepare('DELETE FROM managed_targets WHERE id = ?').run(tgt.id);
         db.prepare('DELETE FROM managed_products WHERE key = ?').run(tgt.product_key);
+      }
+    }
+
+    // Restore any market products from historical snapshots that were erroneously pruned by earlier URL-only deduplication
+    const adminUser = db
+      .prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
+      .get() as { id: number } | undefined;
+    const adminId = adminUser ? adminUser.id : null;
+    const now = new Date().toISOString();
+
+    const knownMarketItems = [
+      { key: 'usd', title: 'دلار', source_key: 'servix_market', url: 'https://servix.cc/api/v1/assets', symbol: 'USD_RLS' },
+      { key: 'gold-24k', title: 'طلای ۲۴ عیار', source_key: 'servix_market', url: 'https://servix.cc/api/v1/assets', symbol: 'GOLD_24_RLS' },
+      { key: 'coin-quarter', title: 'ربع سکه', source_key: 'servix_market', url: 'https://servix.cc/api/v1/assets', symbol: 'ROB_SEKKEH_RLS' },
+      { key: 'coin-half', title: 'نیم سکه', source_key: 'servix_market', url: 'https://servix.cc/api/v1/assets', symbol: 'NIM_SEKKEH_RLS' },
+      { key: 'coin-emami', title: 'سکه امامی', source_key: 'servix_market', url: 'https://servix.cc/api/v1/assets', symbol: 'SEKKEH_RLS' },
+    ];
+
+    for (const item of knownMarketItems) {
+      const existing = db.prepare('SELECT key FROM managed_products WHERE key = ?').get(item.key);
+      if (!existing) {
+        const hasHistory = db.prepare('SELECT id FROM price_snapshots WHERE product_key = ? LIMIT 1').get(item.key);
+        if (hasHistory) {
+          db.prepare(`
+            INSERT OR IGNORE INTO managed_products (key, title, user_id, is_public, created_at, updated_at)
+            VALUES (?, ?, ?, 1, ?, ?)
+          `).run(item.key, item.title, adminId, now, now);
+
+          db.prepare(`
+            INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at)
+            VALUES (?, ?, ?, 1, ?, ?, ?)
+          `).run(item.key, item.source_key, item.url, JSON.stringify({ symbol: item.symbol }), now, now);
+
+          if (adminId != null) {
+            db.prepare(`
+              INSERT OR IGNORE INTO user_products (user_id, product_key, custom_title, created_at)
+              VALUES (?, ?, ?, ?)
+            `).run(adminId, item.key, item.title, now);
+          }
+        }
       }
     }
   } catch (err) {
@@ -666,18 +706,28 @@ export function isUserTrackingProduct(
 
 export function findManagedTargetByUrl(
   db: Database.Database,
-  rawUrl: string
+  rawUrl: string,
+  sourceKey?: string | null,
+  adapterSettings?: Record<string, any> | string
 ): ManagedTargetRow | undefined {
   const norm = normalizeTargetUrl(rawUrl);
   if (!norm) return undefined;
 
-  const direct = db.prepare('SELECT * FROM managed_targets WHERE url = ? LIMIT 1').get(rawUrl.trim()) as
-    | ManagedTargetRow
-    | undefined;
-  if (direct) return direct;
+  const targetKey = getTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings);
+  const isMarket =
+    (sourceKey && (sourceKey.includes('market') || sourceKey.includes('servix') || sourceKey.includes('brsapi'))) ||
+    targetKey.includes('::');
+
+  // If it's a market endpoint without an explicit symbol, we cannot safely match by URL alone
+  if (isMarket && !adapterSettings && !targetKey.split('::')[2]) {
+    return undefined;
+  }
 
   const allTargets = db.prepare('SELECT * FROM managed_targets').all() as ManagedTargetRow[];
-  return allTargets.find((t) => normalizeTargetUrl(t.url) === norm);
+  return allTargets.find((t) => {
+    const key = getTargetDeduplicationKey(t.source_key, t.url, t.adapter_settings);
+    return key === targetKey;
+  });
 }
 
 export function getManagedProducts(
@@ -748,6 +798,7 @@ export function addManagedProduct(
     key?: string;
     user_id?: number | null;
     is_public?: boolean | number;
+    adapter_settings?: Record<string, any> | string;
   }
 ): { product_key: string; reused?: boolean } {
   const cleanTitle = options.title.trim();
@@ -759,8 +810,8 @@ export function addManagedProduct(
   const isPublic = options.is_public ? 1 : 0;
   const now = new Date().toISOString();
 
-  // Deduplication check: does a target with this URL already exist?
-  const existingTarget = findManagedTargetByUrl(db, cleanUrl);
+  // Deduplication check: does a target with this URL and symbol already exist?
+  const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, options.adapter_settings);
   if (existingTarget) {
     const existingProd = db
       .prepare('SELECT * FROM managed_products WHERE key = ?')
@@ -788,6 +839,14 @@ export function addManagedProduct(
     throw new Error(`product key already exists: ${productKey}`);
   }
 
+  let adapterSettingsStr = '{}';
+  if (options.adapter_settings) {
+    adapterSettingsStr =
+      typeof options.adapter_settings === 'string'
+        ? options.adapter_settings
+        : JSON.stringify(options.adapter_settings);
+  }
+
   const insertProd = db.prepare(
     'INSERT INTO managed_products (key, title, user_id, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
   );
@@ -800,7 +859,7 @@ export function addManagedProduct(
 
   const txn = db.transaction(() => {
     insertProd.run(productKey, cleanTitle, userId, isPublic, now, now);
-    insertTgt.run(productKey, sourceKey, cleanUrl, '{}', now, now);
+    insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, now, now);
     if (userId != null) {
       insertUserProd.run(userId, productKey, cleanTitle, now);
     }
@@ -809,6 +868,7 @@ export function addManagedProduct(
 
   return { product_key: productKey, reused: false };
 }
+
 
 export function updateManagedProduct(
   db: Database.Database,
