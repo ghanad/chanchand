@@ -10,7 +10,7 @@ interface HistoryTableProps {
   initialPageSize?: number;
 }
 
-export function HistoryTable({ rows, initialPageSize = 20 }: HistoryTableProps) {
+export function HistoryTable({ rows, initialPageSize = 10 }: HistoryTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
 
