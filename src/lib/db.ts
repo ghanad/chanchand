@@ -1227,17 +1227,24 @@ export function hasSuccessfulPriceToday(
   db: Database.Database,
   productKey: string,
   now = new Date(),
-  url?: string
+  url?: string,
+  sourceKey?: string
 ): boolean {
   // Start of day in local time, converted to ISO / UTC
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
 
+  const isMarket = sourceKey && (
+    sourceKey.includes('market') ||
+    sourceKey.includes('servix') ||
+    sourceKey.includes('brsapi')
+  );
+
   let row;
-  if (url) {
+  if (url && !isMarket) {
     row = db.prepare(`
       SELECT id FROM price_snapshots
-      WHERE (product_key = ? OR url = ?)
+      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%'))
         AND price_irr IS NOT NULL
         AND observed_at >= ?
         AND observed_at <= ?

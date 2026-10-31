@@ -288,4 +288,75 @@ describe('PriceRunner module', () => {
     const db = getDatabase(tempDbUrl);
     db.close();
   });
+
+  it('collects all market targets sharing the same endpoint URL without skipping or cache collision', async () => {
+    const runner = new PriceRunner(tempDbUrl);
+    const fetchedSymbols: string[] = [];
+
+    vi.spyOn(adaptersModule, 'getAdapter').mockReturnValue({
+      fetch: async ({ target }: adaptersModule.FetchContext) => {
+        const symbol = target.adapter_settings?.symbol || 'UNKNOWN';
+        fetchedSymbols.push(symbol);
+        const price = symbol === 'USD_RLS' ? 2700000 : 260000000;
+        return {
+          title: symbol,
+          price_irr: price,
+          seller: 'Servix',
+          availability: 'in_stock',
+          raw_observation: { symbol },
+        };
+      },
+    } as any);
+
+    const config: AppConfig = {
+      sources: {
+        servix_market: {
+          adapter: 'servix_market',
+          timeout_seconds: 5,
+          rate_limit_seconds: 0,
+          currency: 'IRR',
+          price_multiplier: 1,
+          headers: {},
+          settings: {},
+        },
+      },
+      products: {},
+      targets: [
+        {
+          product_key: 'usd',
+          source_key: 'servix_market',
+          url: 'https://servix.cc/api/v1/assets',
+          enabled: true,
+          adapter_settings: { symbol: 'USD_RLS' },
+        },
+        {
+          product_key: 'gold-18k',
+          source_key: 'servix_market',
+          url: 'https://servix.cc/api/v1/assets',
+          enabled: true,
+          adapter_settings: { symbol: 'GOLD_18_RLS' },
+        },
+      ],
+    };
+
+    // First run: collect both
+    const summary1 = await runner.run(config, undefined, config.targets);
+    expect(summary1.success_count).toBe(2);
+    expect(fetchedSymbols).toEqual(['USD_RLS', 'GOLD_18_RLS']);
+
+    // Second run with force=false: market targets are market-live, so they are not skipped by single-URL collision
+    const summary2 = await runner.run(config, undefined, config.targets, { force: false });
+    expect(summary2.success_count).toBe(2);
+    expect(fetchedSymbols).toEqual(['USD_RLS', 'GOLD_18_RLS', 'USD_RLS', 'GOLD_18_RLS']);
+
+    const db = getDatabase(tempDbUrl);
+    const snapshots = latestSnapshots(db);
+    const usdSnap = snapshots.find((s) => s.product_key === 'usd');
+    const goldSnap = snapshots.find((s) => s.product_key === 'gold-18k');
+    expect(usdSnap?.price_irr).toBe(2700000);
+    expect(goldSnap?.price_irr).toBe(260000000);
+
+    db.close();
+  });
 });
+

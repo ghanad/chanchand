@@ -13,7 +13,7 @@ import {
 import { getAdapter } from './adapters';
 import { loadConfig } from './config';
 import { USD_PRODUCT_KEY } from './serializers';
-import { normalizeTargetUrl } from './urls';
+import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
 
 export interface RunSummary {
   run_id: number;
@@ -37,7 +37,12 @@ export class PriceRunner {
     return this.run(config, configPath);
   }
 
-  async run(config?: AppConfig | null, configPath?: string, customTargets?: TargetConfig[]): Promise<RunSummary> {
+  async run(
+    config?: AppConfig | null,
+    configPath?: string,
+    customTargets?: TargetConfig[],
+    options?: { force?: boolean }
+  ): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
     let targetsToRun = customTargets;
     if (!targetsToRun) {
@@ -61,7 +66,7 @@ export class PriceRunner {
       }
     }
     const runId = startRun(db, configPath || null, config, targetsToRun);
-    return this.executeRun(config, runId, targetsToRun);
+    return this.executeRun(config, runId, targetsToRun, options);
   }
 
   async executeRun(
@@ -116,14 +121,21 @@ export class PriceRunner {
           continue;
         }
 
-        if (!options?.force && source.adapter !== 'brsapi_market' && hasSuccessfulPriceToday(db, target.product_key, undefined, target.url)) {
+        const isMarket =
+          source.adapter === 'brsapi_market' ||
+          source.adapter === 'servix_market' ||
+          target.source_key.includes('market') ||
+          target.source_key.includes('servix') ||
+          target.source_key.includes('brsapi');
+
+        if (!options?.force && !isMarket && hasSuccessfulPriceToday(db, target.product_key, undefined, target.url, target.source_key)) {
           console.log(`[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`);
           continue;
         }
 
-        const normUrl = normalizeTargetUrl(target.url);
-        if (normUrl && fetchedObservations.has(normUrl)) {
-          const cachedObservation = fetchedObservations.get(normUrl)!;
+        const dedupKey = getTargetDeduplicationKey(target.source_key, target.url, target.adapter_settings);
+        if (dedupKey && fetchedObservations.has(dedupKey)) {
+          const cachedObservation = fetchedObservations.get(dedupKey)!;
           recordPrice(db, runId, target, cachedObservation);
           successCount++;
           console.log(
@@ -140,8 +152,8 @@ export class PriceRunner {
           const adapter = getAdapter(source.adapter);
           const observation = await adapter.fetch({ source, target });
 
-          if (normUrl) {
-            fetchedObservations.set(normUrl, observation);
+          if (dedupKey) {
+            fetchedObservations.set(dedupKey, observation);
           }
 
           recordPrice(db, runId, target, observation);
