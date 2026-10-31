@@ -1,16 +1,34 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { PriceRow } from "../../types/dashboard";
 import { formatNumber, formatDate, availabilityText, productLinkUrl } from "../../lib/formatters";
 import { DataTable } from "../common/DataTable";
 import { StatusPill } from "../common/StatusPill";
+import { Pagination } from "../common/Pagination";
 
 interface HistoryTableProps {
   rows: PriceRow[];
+  initialPageSize?: number;
 }
 
-export function HistoryTable({ rows }: HistoryTableProps) {
+export function HistoryTable({ rows, initialPageSize = 20 }: HistoryTableProps) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+
+  // Reset or clamp currentPage if rows length or pageSize changes
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  const startIndex = (currentPage - 1) * pageSize;
+  const paginatedRows = rows.slice(startIndex, startIndex + pageSize);
+
   return (
-    <DataTable emptyText="برای این محصول history ثبت نشده است.">
+    <div className="history-table-container">
+      <DataTable emptyText="برای این محصول history ثبت نشده است.">
       <thead>
         <tr>
           <th>زمان</th>
@@ -25,7 +43,7 @@ export function HistoryTable({ rows }: HistoryTableProps) {
         </tr>
       </thead>
       <tbody>
-        {rows.map((row) => {
+        {paginatedRows.map((row) => {
           const url = productLinkUrl(row);
 
           return (
@@ -54,5 +72,21 @@ export function HistoryTable({ rows }: HistoryTableProps) {
         })}
       </tbody>
     </DataTable>
+
+    {rows.length > 0 && (
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        pageSize={pageSize}
+        totalItems={rows.length}
+        pageSizeOptions={[10, 20, 50, 100]}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(newSize) => {
+          setPageSize(newSize);
+          setCurrentPage(1);
+        }}
+      />
+    )}
+  </div>
   );
 }
