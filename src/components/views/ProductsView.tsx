@@ -7,7 +7,6 @@ import { ProductRow, SourceRow, ProductsPayload, PriceRow, LatestPayload } from 
 import { requestJson } from "../../lib/api-client";
 import { formatNumber, formatDate } from "../../lib/formatters";
 import { useDashboard } from "../../context/DashboardContext";
-import { Metric } from "../common/Metric";
 import { PanelHead } from "../common/PanelHead";
 import { Modal } from "../common/Modal";
 import { EmptyState } from "../common/EmptyState";
@@ -105,9 +104,6 @@ export function ProductsView() {
   }, [activeKebabKey]);
 
   const configuredSources = useMemo(() => sources.filter((source) => source.configured), [sources]);
-  const activeTargetCount = products.reduce((total, p) => total + p.enabled_target_count, 0);
-  const targetCount = products.reduce((total, p) => total + p.target_count, 0);
-  const activeProducts = products.filter((p) => p.enabled_target_count > 0).length;
   const configProducts = useMemo(() => products.filter((p) => p.configured), [products]);
   const configuredProductCount = configProducts.length;
 
@@ -425,13 +421,6 @@ export function ProductsView() {
 
   return (
     <div className="products-page">
-      <section className="product-summary-grid" aria-label="خلاصه محصولات">
-        <Metric label="کل محصول‌ها" value={formatNumber(configuredProductCount)} />
-        <Metric label="محصول فعال" value={formatNumber(activeProducts)} />
-        <Metric label="هدف‌های فعال" value={`${formatNumber(activeTargetCount)} / ${formatNumber(targetCount)}`} />
-        <Metric label="منابع قیمت‌گیری" value={formatNumber(configuredSources.length)} />
-      </section>
-
       <div className={`product-grid ${isAdmin ? "" : "read-only"}`}>
         <section className="panel product-list-panel">
           <PanelHead
