@@ -186,3 +186,93 @@ git pull origin main
 docker compose build
 docker compose up -d
 ```
+
+---
+
+## 8. Automated Price Collection & OS Scheduling (Crontab / API Trigger)
+
+Price Getter provides a dedicated, synchronous API endpoint (`/api/trigger-run`) designed specifically for operating system task schedulers (Linux `crontab`, macOS `launchd`, Windows Task Scheduler, or external webhooks like cron-job.org).
+
+The endpoint waits for all active targets to complete and returns a full JSON summary with execution time and results.
+
+### 8.1 Configure the Trigger API Key
+
+In your `.env` file, configure `TRIGGER_API_KEY`:
+
+```bash
+# Security key for automated external triggers / OS cron
+TRIGGER_API_KEY=your_secure_random_trigger_key_here
+```
+
+### 8.2 Calling the API with curl
+
+You can trigger the price collection using `curl` with a Bearer token or `x-api-key` header:
+
+```bash
+# Trigger full collection synchronously:
+curl -s -X POST http://localhost:8000/api/trigger-run \
+  -H "Authorization: Bearer your_secure_random_trigger_key_here"
+
+# Alternative using x-api-key header:
+curl -s -X POST http://localhost:8000/api/trigger-run \
+  -H "x-api-key: your_secure_random_trigger_key_here"
+
+# Trigger collection for a specific product key:
+curl -s -X POST http://localhost:8000/api/trigger-run \
+  -H "Authorization: Bearer your_secure_random_trigger_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"product_key": "gold-18k"}'
+```
+
+#### Successful JSON Response:
+```json
+{
+  "ok": true,
+  "run_id": 42,
+  "status": "success",
+  "target_count": 8,
+  "success_count": 8,
+  "error_count": 0,
+  "duration_ms": 3450,
+  "started_at": "2026-10-31T21:55:00.000Z",
+  "finished_at": "2026-10-31T21:55:03.450Z",
+  "force": true
+}
+```
+
+If another collection is already in progress, the API safely returns HTTP `409 Conflict`:
+```json
+{
+  "error": "فرآیند دیگری در حال حاضر در حال اجراست.",
+  "status": "running",
+  "active_run_id": 41,
+  "active_target_count": 8
+}
+```
+
+### 8.3 Setting up Linux / macOS Crontab
+
+Open the crontab editor on your server:
+
+```bash
+crontab -e
+```
+
+Add your desired schedule:
+
+```cron
+# Run price collection every hour at minute 0:
+0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
+
+# Or run twice a day (e.g. 10:00 and 18:00):
+0 10,18 * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
+```
+
+### 8.4 Alternative: Direct CLI Cron
+
+If your crontab runs on the same machine where Price Getter is installed and you prefer running directly without HTTP:
+
+```cron
+# Run directly via npm CLI:
+0 * * * * cd /opt/price_getter && npm run run >> /var/log/price-getter.log 2>&1
+```

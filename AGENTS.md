@@ -27,8 +27,8 @@ Core flow:
 ## Read These First
 
 - UI Dashboard: `src/app/layout.tsx`, `src/app/login/page.tsx`, `src/app/change-password/page.tsx`, `src/app/page.tsx` (`/` -> `/products`), `src/app/runs/page.tsx`, `src/app/products/page.tsx`, `src/app/products/[key]/page.tsx`, `src/app/sources/page.tsx`, `src/app/admin/*`, `src/app/admin/products/[key]/page.tsx`, `src/components/views/*` (including `ProductDetailView`, `ProductsView`, `UsersView`, `RunsView`, `SourcesView`), `src/components/layout/*` (`AppShell`, `WorkspaceHeader` top navbar), `src/components/common/*`, `src/context/DashboardContext.tsx`, `src/app/globals.css`
-- API Route Handlers: `src/app/api/auth/*` (login, logout, me, change-password), `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/products/[key]/route.ts`, `src/app/api/products/[key]/enable/route.ts`, `src/app/api/products/[key]/disable/route.ts`, `src/app/api/products/[key]/refresh/route.ts`, `src/app/api/sources/route.ts`, `src/app/api/admin/sources/*`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
-- Authentication, Security & RBAC: `src/lib/auth.ts`, `src/lib/jwt.ts`, `src/middleware.ts`, `src/lib/security.ts`, `src/lib/redirect.ts`, `src/lib/api-guard.ts`
+- API Route Handlers: `src/app/api/auth/*` (login, logout, me, change-password), `src/app/api/latest/route.ts`, `src/app/api/products/route.ts`, `src/app/api/products/[key]/route.ts`, `src/app/api/products/[key]/enable/route.ts`, `src/app/api/products/[key]/disable/route.ts`, `src/app/api/products/[key]/refresh/route.ts`, `src/app/api/trigger-run/route.ts` (synchronous OS/cron trigger), `src/app/api/sources/route.ts`, `src/app/api/admin/sources/*`, `src/app/api/history/route.ts`, `src/app/api/runs/route.ts`, `src/app/api/errors/route.ts`, `src/app/api/health/route.ts`, `src/app/admin/run-now/route.ts`, `src/app/admin/config/products/route.ts`, `src/app/api/admin/users/*`
+- Authentication, Security & RBAC: `src/lib/auth.ts`, `src/lib/jwt.ts`, `src/middleware.ts`, `src/lib/security.ts`, `src/lib/redirect.ts`, `src/lib/api-guard.ts` (includes `requireAdminOrApiKey`), `src/lib/run-lock.ts` (concurrency guard)
 - Database schema & CRUD: `src/lib/db.ts` (manages `managed_products` with `user_id` and `is_public`, `managed_targets`, `user_products` watchlist & `users` with `must_change_password`)
 - URL normalization & deduplication: `src/lib/urls.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
@@ -72,4 +72,4 @@ docker compose up -d
 - Source adapter names allowed: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`, `servix_market`.
 - Prices stored as `price_irr`.
 - `price_multiplier`: 10 for TOMAN, 1 for IRR.
-- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`.
+- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`, `TRIGGER_API_KEY`.

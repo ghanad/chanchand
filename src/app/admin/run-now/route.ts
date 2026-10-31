@@ -3,13 +3,9 @@ import { PriceRunner } from '@/lib/runner';
 import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
 import { requireAdmin } from '@/lib/api-guard';
 import { TargetConfig } from '@/lib/types';
+import { acquireRunLock, releaseRunLock, getActiveRunInfo } from '@/lib/run-lock';
 
 export const dynamic = 'force-dynamic';
-
-// Global execution tracker
-let activeRunId: number | null = null;
-let activeTargetCount = 0;
-let isRunning = false;
 
 export async function POST(req: NextRequest) {
   try {
@@ -35,10 +31,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (isRunning && activeRunId !== null) {
+    const runInfo = getActiveRunInfo();
+    if (runInfo.is_running && runInfo.run_id !== null) {
       return NextResponse.json({
-        run_id: activeRunId,
-        target_count: activeTargetCount,
+        run_id: runInfo.run_id,
+        target_count: runInfo.target_count,
         success_count: 0,
         error_count: 0,
         status: 'running',
@@ -79,11 +76,20 @@ export async function POST(req: NextRequest) {
     const runId = startRun(db, null, null, activeTargets);
     const runner = new PriceRunner();
 
+    if (!acquireRunLock(runId, activeTargets.length)) {
+      const active = getActiveRunInfo();
+      return NextResponse.json({
+        run_id: active.run_id,
+        target_count: active.target_count,
+        success_count: 0,
+        error_count: 0,
+        status: 'running',
+        message: 'فرآیند دیگری در حال اجراست.',
+      });
+    }
+
     // If specific product is requested, execute synchronously and return fresh result
     if (productKey) {
-      isRunning = true;
-      activeRunId = runId;
-      activeTargetCount = activeTargets.length;
       try {
         const summary = await runner.executeRun(null, runId, activeTargets, { force: true });
         return NextResponse.json({
@@ -95,29 +101,23 @@ export async function POST(req: NextRequest) {
           product_key: productKey,
         });
       } finally {
-        isRunning = false;
-        activeRunId = null;
+        releaseRunLock();
       }
     }
 
     // Otherwise, execute all targets in background
-    isRunning = true;
-    activeRunId = runId;
-    activeTargetCount = activeTargets.length;
-
     runner
       .executeRun(null, runId, activeTargets)
       .catch((err) => {
         console.error('[RunNow] background run error:', err);
       })
       .finally(() => {
-        isRunning = false;
-        activeRunId = null;
+        releaseRunLock();
       });
 
     return NextResponse.json({
       run_id: runId,
-      target_count: activeTargetCount,
+      target_count: activeTargets.length,
       success_count: 0,
       error_count: 0,
       status: 'running',
