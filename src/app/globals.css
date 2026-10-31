@@ -355,6 +355,165 @@ label {
   opacity: 1;
 }
 
+/* Admin Dropdown inside Top Navbar */
+.top-nav-dropdown {
+  position: relative;
+  display: inline-flex;
+}
+
+.top-nav-dropdown-trigger {
+  cursor: pointer;
+  background: transparent;
+  font-family: inherit;
+  border: 1px solid transparent;
+}
+
+.top-nav-chevron {
+  opacity: 0.65;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.top-nav-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.admin-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 200px;
+  max-width: calc(100vw - 32px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px -4px rgba(24, 36, 38, 0.16), 0 6px 18px -2px rgba(24, 36, 38, 0.08);
+  padding: 6px;
+  z-index: 1000;
+  direction: rtl;
+  text-align: right;
+  animation: adminDropdownEnter 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@keyframes adminDropdownEnter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.admin-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: right;
+  transition: all 0.15s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.admin-dropdown-item:hover,
+.admin-dropdown-item:focus-visible {
+  background: var(--surface-soft);
+  color: var(--text);
+  outline: none;
+}
+
+.admin-dropdown-item:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.admin-dropdown-item.active {
+  background: rgba(15, 118, 110, 0.1);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.admin-dropdown-item .top-nav-icon {
+  opacity: 0.8;
+  color: inherit;
+}
+
+.admin-dropdown-item:hover .top-nav-icon,
+.admin-dropdown-item.active .top-nav-icon {
+  opacity: 1;
+  color: var(--accent);
+}
+
+/* Mobile Drawer Admin Section */
+.mobile-admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobile-admin-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7e9493;
+  padding: 8px 14px 4px;
+  letter-spacing: 0.5px;
+}
+
+/* Confirm Dialog & Run Collection Button */
+.confirm-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 0;
+}
+
+.confirm-modal-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.run-collection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 14px;
+  height: 34px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.spinner-sm {
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: topNavSpin 0.7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 /* Mobile Nav Drawer / Panel */
 .mobile-nav-panel {
   display: none;
@@ -1081,8 +1240,9 @@ tbody tr:last-child td {
     display: inline-flex;
   }
 
-  /* Desktop nav hidden on mobile */
-  .top-navbar-nav {
+  /* Desktop nav and dropdown hidden on mobile */
+  .top-navbar-nav,
+  .top-nav-dropdown {
     display: none;
   }
 
