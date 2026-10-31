@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_COOKIE_NAME, verifyAuthToken } from '@/lib/jwt';
-import { sanitizeInternalRedirect } from '@/lib/security';
+import { sanitizeInternalRedirect } from '@/lib/redirect';
 
 const PUBLIC_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.svg', '.webp', '.woff2', '.woff', '.ttf', '.ico'];
 
