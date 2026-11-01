@@ -68,9 +68,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(result);
   } catch (err: any) {
     const message = err.message || String(err);
-    const isQuota = message.includes('سقف ظرفیت محصولات شما');
+    const isQuota = message.includes('سقف ظرفیت محصولات شما') || err.code === 'QUOTA_EXCEEDED';
     return NextResponse.json(
-      { error: message, quota_exceeded: isQuota },
+      {
+        error: message,
+        code: isQuota ? 'QUOTA_EXCEEDED' : 'PRODUCT_CREATION_FAILED',
+        quota_exceeded: isQuota,
+      },
       { status: isQuota ? 403 : 400 }
     );
   }

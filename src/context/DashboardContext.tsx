@@ -19,6 +19,7 @@ export interface CurrentUser {
   id: number;
   username: string;
   email: string | null;
+  mobile?: string | null;
   role: "admin" | "viewer";
   must_change_password?: boolean;
   wallet_balance?: number;

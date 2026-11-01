@@ -10,7 +10,7 @@ import { useDashboard } from "../../context/DashboardContext";
 import { PanelHead } from "../common/PanelHead";
 import { Modal } from "../common/Modal";
 import { EmptyState } from "../common/EmptyState";
-import { BuySlotModal } from "../common/BuySlotModal";
+import { UpgradeQuotaModal } from "../common/UpgradeQuotaModal";
 
 interface ProductItemWithPrice extends ProductRow {
   latestSnapshot?: PriceRow | null;
@@ -255,11 +255,12 @@ export function ProductsView() {
       triggerRefresh();
     } catch (error: any) {
       const errMsg = error instanceof Error ? error.message : "خطا در افزودن محصول";
-      if (errMsg.includes("ظرفیت") || error?.quota_exceeded) {
+      if (errMsg.includes("ظرفیت") || error?.quota_exceeded || error?.code === "QUOTA_EXCEEDED") {
         setShowAddProductModal(false);
         setShowBuySlotModal(true);
+      } else {
+        showToast(errMsg);
       }
-      showToast(errMsg);
     } finally {
       setBusyAction(null);
     }
@@ -830,8 +831,8 @@ export function ProductsView() {
         </form>
       </Modal>
 
-      {/* Modal: Buy Slot / Upgrade Quota */}
-      <BuySlotModal
+      {/* Modal: Upgrade Quota */}
+      <UpgradeQuotaModal
         isOpen={showBuySlotModal}
         onClose={() => setShowBuySlotModal(false)}
       />

@@ -21,6 +21,7 @@ export async function middleware(req: NextRequest) {
   const isAuthLoginApi = pathname === '/api/auth/login';
   const isHealthApi = pathname === '/api/health';
   const isTriggerRunApi = pathname === '/api/trigger-run';
+  const isPaymentCallbackApi = pathname === '/api/payments/callback';
 
   const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = token ? await verifyAuthToken(token) : null;
@@ -37,8 +38,8 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(redirectUrl, req.url));
   }
 
-  // Allow login page, login API endpoint, health check, and trigger-run (which validates its own API key) without session
-  if (isLoginPage || isAuthLoginApi || isHealthApi || isTriggerRunApi) {
+  // Allow login page, login API endpoint, health check, payment callback, and trigger-run (which validates its own API key) without session
+  if (isLoginPage || isAuthLoginApi || isHealthApi || isTriggerRunApi || isPaymentCallbackApi) {
     return NextResponse.next();
   }
 

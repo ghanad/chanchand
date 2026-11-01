@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useDashboard } from "../../context/DashboardContext";
+import { formatNumber } from "../../lib/formatters";
 
 export function UserMenu() {
   const { currentUser, logout } = useDashboard();
@@ -128,6 +129,12 @@ export function UserMenu() {
   const initialLetter = firstChar.toUpperCase();
   const roleLabel = currentUser.role === "admin" ? "مدیر سیستم" : "کاربر عادی";
 
+  const quota = currentUser.quota;
+  const usedCount = quota?.usedCount ?? 0;
+  const totalLimit = quota?.totalLimit ?? 3;
+  const isQuotaFull = quota ? !quota.canAdd || usedCount >= totalLimit : false;
+  const quotaPercent = Math.min(100, Math.round((usedCount / Math.max(1, totalLimit)) * 100));
+
   return (
     <div
       className="user-menu-container"
@@ -181,7 +188,7 @@ export function UserMenu() {
           className="user-dropdown-menu"
           tabIndex={-1}
         >
-          {/* بخش بالای منو: آواتار، نام و نقش کاربر */}
+          {/* بخش بالای منو: آواتار، نام و نقش کاربر و وضعیت سهمیه */}
           <div className="user-dropdown-header">
             <span className="user-avatar user-avatar-lg" aria-hidden="true">
               {initialLetter}
@@ -192,6 +199,33 @@ export function UserMenu() {
               {currentUser.email ? (
                 <span className="user-dropdown-email">{currentUser.email}</span>
               ) : null}
+
+              {currentUser.role !== "admin" && quota && (
+                <div className="user-dropdown-quota">
+                  <div className="user-dropdown-quota-label">
+                    <span>مصرف سهمیه:</span>
+                    <strong>{formatNumber(usedCount)} از {formatNumber(totalLimit)} محصول</strong>
+                  </div>
+                  <div className="user-dropdown-quota-track" role="progressbar" aria-valuenow={usedCount} aria-valuemin={0} aria-valuemax={totalLimit}>
+                    <div
+                      className={`user-dropdown-quota-fill ${isQuotaFull ? "is-full" : ""}`}
+                      style={{ width: `${quotaPercent}%` }}
+                    />
+                  </div>
+                  {isQuotaFull && (
+                    <Link
+                      href="/account?tab=quota"
+                      role="menuitem"
+                      tabIndex={isOpen ? 0 : -1}
+                      onClick={() => setIsOpen(false)}
+                      className="user-dropdown-upgrade-link"
+                    >
+                      <span>⚡ ارتقای ظرفیت پایش</span>
+                      <span aria-hidden="true">←</span>
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -199,9 +233,9 @@ export function UserMenu() {
 
           {/* گزینه‌های منو */}
           <div className="user-dropdown-group" role="group">
-            {/* گزینه پروفایل و کیف پول */}
+            {/* گزینه حساب من */}
             <Link
-              href="/profile"
+              href="/account"
               role="menuitem"
               className="user-dropdown-item"
               tabIndex={isOpen ? 0 : -1}
@@ -221,32 +255,7 @@ export function UserMenu() {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
-              <span>پروفایل و کیف پول</span>
-            </Link>
-
-            {/* گزینه تغییر کلمه عبور */}
-            <Link
-              href="/change-password"
-              role="menuitem"
-              className="user-dropdown-item"
-              tabIndex={isOpen ? 0 : -1}
-              onClick={() => setIsOpen(false)}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              <span>تغییر کلمه عبور</span>
+              <span>حساب من</span>
             </Link>
           </div>
 

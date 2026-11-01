@@ -1711,6 +1711,63 @@ tbody tr:last-child td {
   letter-spacing: -0.2px;
 }
 
+.user-dropdown-quota {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.user-dropdown-quota-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.user-dropdown-quota-label strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.user-dropdown-quota-track {
+  width: 100%;
+  height: 5px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.user-dropdown-quota-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.user-dropdown-quota-fill.is-full {
+  background: #f59e0b;
+}
+
+.user-dropdown-upgrade-link {
+  font-size: 11px;
+  color: var(--primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-top: 2px;
+}
+
+.user-dropdown-upgrade-link:hover {
+  text-decoration: underline;
+}
+
 .user-dropdown-divider {
   height: 1px;
   background: var(--line);

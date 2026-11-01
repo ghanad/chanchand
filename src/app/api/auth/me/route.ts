@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         id: user.id,
         username: user.username,
         email: user.email,
+        mobile: user.mobile ?? null,
         role: user.role,
         must_change_password: Boolean(user.must_change_password),
         wallet_balance: user.wallet_balance ?? 0,

@@ -122,6 +122,7 @@ export interface UserRow {
   id: number;
   username: string;
   email: string | null;
+  mobile?: string | null;
   password_hash: string;
   role: UserRole;
   must_change_password: number;
@@ -135,6 +136,7 @@ export interface SafeUser {
   id: number;
   username: string;
   email: string | null;
+  mobile?: string | null;
   role: UserRole;
   must_change_password: boolean;
   wallet_balance: number;
@@ -161,6 +163,38 @@ export interface UserQuota {
   remaining: number;
   canAdd: boolean;
 }
+
+export interface PackageRow {
+  id: number;
+  key: string;
+  title: string;
+  slots: number;
+  price_toman: number;
+  description: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PaymentStatus = 'pending' | 'paid' | 'failed';
+
+export interface PaymentTransactionRow {
+  id: number;
+  user_id: number;
+  package_id: number | null;
+  package_title: string;
+  slots: number;
+  amount_toman: number;
+  gateway: string;
+  authority: string | null;
+  ref_id: string | null;
+  status: PaymentStatus;
+  meta: string;
+  paid_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 
 
 

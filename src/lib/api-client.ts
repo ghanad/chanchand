@@ -1,3 +1,10 @@
+export interface ApiError extends Error {
+  code?: string;
+  status?: number;
+  quota_exceeded?: boolean;
+  [key: string]: any;
+}
+
 export async function requestJson<T>(url: string, options: RequestInit = {}): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.body && !headers.has("Content-Type")) {
@@ -20,7 +27,13 @@ export async function requestJson<T>(url: string, options: RequestInit = {}): Pr
         detail = response.statusText || "خطایی در برقراری ارتباط با سرور رخ داده است.";
       }
     }
-    throw new Error(Array.isArray(detail) ? detail.map((item: { msg: string }) => item.msg).join("، ") : detail);
+    const msg = Array.isArray(detail) ? detail.map((item: { msg: string }) => item.msg).join("، ") : detail;
+    const error: ApiError = new Error(msg);
+    if (typeof payload === "object" && payload !== null) {
+      Object.assign(error, payload);
+    }
+    error.status = response.status;
+    throw error;
   }
   return payload as T;
 }

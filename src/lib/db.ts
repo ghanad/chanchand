@@ -10,6 +10,9 @@ import {
   PriceObservation,
   PriceSnapshotRow,
   ProductConfig,
+  PackageRow,
+  PaymentStatus,
+  PaymentTransactionRow,
   RunRow,
   SafeUser,
   SourceConfig,
@@ -211,7 +214,39 @@ export function initDatabase(db: Database.Database): void {
       created_at DATETIME NOT NULL
     );
     CREATE INDEX IF NOT EXISTS ix_wallet_transactions_user_id ON wallet_transactions(user_id);
-    CREATE INDEX IF NOT EXISTS ix_wallet_transactions_created_at ON wallet_transactions(created_at);
+    CREATE TABLE IF NOT EXISTS packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key VARCHAR(64) UNIQUE NOT NULL,
+      title VARCHAR(128) NOT NULL,
+      slots INTEGER NOT NULL,
+      price_toman INTEGER NOT NULL,
+      description TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_packages_key ON packages(key);
+    CREATE INDEX IF NOT EXISTS ix_packages_is_active ON packages(is_active);
+
+    CREATE TABLE IF NOT EXISTS payment_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      package_id INTEGER REFERENCES packages(id),
+      package_title VARCHAR(128) NOT NULL,
+      slots INTEGER NOT NULL,
+      amount_toman INTEGER NOT NULL,
+      gateway VARCHAR(64) NOT NULL,
+      authority VARCHAR(128) UNIQUE,
+      ref_id VARCHAR(128),
+      status VARCHAR(32) NOT NULL DEFAULT 'pending',
+      meta JSON NOT NULL DEFAULT '{}',
+      paid_at DATETIME,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_payment_transactions_user_id ON payment_transactions(user_id);
+    CREATE INDEX IF NOT EXISTS ix_payment_transactions_authority ON payment_transactions(authority);
+    CREATE INDEX IF NOT EXISTS ix_payment_transactions_status ON payment_transactions(status);
   `);
 
   try {
@@ -241,9 +276,28 @@ export function initDatabase(db: Database.Database): void {
       if (!userColumns.some((col) => col.name === 'extra_slots')) {
         db.prepare('ALTER TABLE users ADD COLUMN extra_slots INTEGER NOT NULL DEFAULT 0').run();
       }
+      if (!userColumns.some((col) => col.name === 'mobile')) {
+        db.prepare('ALTER TABLE users ADD COLUMN mobile VARCHAR(32)').run();
+      }
     }
   } catch {
     // Migration skipped if already present or table not yet accessible
+  }
+
+  try {
+    const pkgCount = (db.prepare('SELECT count(*) as count FROM packages').get() as { count: number })?.count ?? 0;
+    if (pkgCount === 0) {
+      const now = new Date().toISOString();
+      const insertPkg = db.prepare(`
+        INSERT INTO packages (key, title, slots, price_toman, description, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+      `);
+      insertPkg.run('pkg_5', 'بسته ۵ تایی محصول', 5, 75000, 'امکان پایش ۵ محصول جدید اضافه به صورت دائمی', now, now);
+      insertPkg.run('pkg_10', 'بسته ۱۰ تایی محصول', 10, 140000, 'امکان پایش ۱۰ محصول جدید اضافه به صورت دائمی (تخفیف ویژه)', now, now);
+      insertPkg.run('pkg_25', 'بسته ۲۵ تایی محصول', 25, 300000, 'امکان پایش ۲۵ محصول جدید اضافه برای کاربران حرفه‌ای', now, now);
+    }
+  } catch (err) {
+    console.warn('[DB] packages seed warning:', err);
   }
 
   try {
@@ -1594,6 +1648,7 @@ export function getUserByUsername(db: Database.Database, username: string): User
   if (!row) return null;
   return {
     ...row,
+    mobile: row.mobile ?? null,
     wallet_balance: row.wallet_balance ?? 0,
     extra_slots: row.extra_slots ?? 0,
   };
@@ -1604,6 +1659,7 @@ export function getUserById(db: Database.Database, id: number): UserRow | null {
   if (!row) return null;
   return {
     ...row,
+    mobile: row.mobile ?? null,
     wallet_balance: row.wallet_balance ?? 0,
     extra_slots: row.extra_slots ?? 0,
   };
@@ -1611,12 +1667,13 @@ export function getUserById(db: Database.Database, id: number): UserRow | null {
 
 export function listUsers(db: Database.Database): SafeUser[] {
   const rows = db.prepare(`
-    SELECT id, username, email, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at
+    SELECT id, username, email, mobile, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at
     FROM users
     ORDER BY id ASC
   `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number })[];
   return rows.map((r) => ({
     ...r,
+    mobile: r.mobile ?? null,
     wallet_balance: r.wallet_balance ?? 0,
     extra_slots: r.extra_slots ?? 0,
     must_change_password: Boolean(r.must_change_password),
@@ -1639,6 +1696,7 @@ export function createUser(
     username: string;
     password_hash: string;
     email?: string | null;
+    mobile?: string | null;
     role?: UserRole;
     must_change_password?: boolean;
     wallet_balance?: number;
@@ -1648,22 +1706,24 @@ export function createUser(
   const now = new Date().toISOString();
   const role = params.role || 'viewer';
   const email = params.email || null;
+  const mobile = params.mobile || null;
   const username = params.username.trim();
   const mustChange = params.must_change_password ? 1 : 0;
   const walletBalance = params.wallet_balance ?? 0;
   const extraSlots = params.extra_slots ?? 0;
 
   const stmt = db.prepare(`
-    INSERT INTO users (username, email, password_hash, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, mobile, password_hash, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(username, email, params.password_hash, role, mustChange, walletBalance, extraSlots, now, now);
+  const result = stmt.run(username, email, mobile, params.password_hash, role, mustChange, walletBalance, extraSlots, now, now);
   const id = Number(result.lastInsertRowid);
 
   return {
     id,
     username,
     email,
+    mobile,
     role,
     must_change_password: Boolean(mustChange),
     wallet_balance: walletBalance,
@@ -1676,7 +1736,7 @@ export function createUser(
 export function updateUser(
   db: Database.Database,
   id: number,
-  params: { password_hash?: string; role?: UserRole; email?: string | null; must_change_password?: boolean }
+  params: { password_hash?: string; role?: UserRole; email?: string | null; mobile?: string | null; must_change_password?: boolean }
 ): SafeUser {
   const existing = getUserById(db, id);
   if (!existing) {
@@ -1687,6 +1747,7 @@ export function updateUser(
   const nextPasswordHash = params.password_hash !== undefined ? params.password_hash : existing.password_hash;
   const nextRole = params.role !== undefined ? params.role : existing.role;
   const nextEmail = params.email !== undefined ? params.email : existing.email;
+  const nextMobile = params.mobile !== undefined ? params.mobile : (existing.mobile ?? null);
   const nextMustChange = params.must_change_password !== undefined
     ? (params.must_change_password ? 1 : 0)
     : (existing.must_change_password ?? 0);
@@ -1700,16 +1761,51 @@ export function updateUser(
 
   db.prepare(`
     UPDATE users
-    SET password_hash = ?, role = ?, email = ?, must_change_password = ?, updated_at = ?
+    SET password_hash = ?, role = ?, email = ?, mobile = ?, must_change_password = ?, updated_at = ?
     WHERE id = ?
-  `).run(nextPasswordHash, nextRole, nextEmail, nextMustChange, now, id);
+  `).run(nextPasswordHash, nextRole, nextEmail, nextMobile, nextMustChange, now, id);
 
   return {
     id,
     username: existing.username,
     email: nextEmail,
+    mobile: nextMobile,
     role: nextRole,
     must_change_password: Boolean(nextMustChange),
+    wallet_balance: existing.wallet_balance,
+    extra_slots: existing.extra_slots,
+    created_at: existing.created_at,
+    updated_at: now,
+  };
+}
+
+export function updateUserProfile(
+  db: Database.Database,
+  id: number,
+  params: { email?: string | null; mobile?: string | null }
+): SafeUser {
+  const existing = getUserById(db, id);
+  if (!existing) {
+    throw new Error(`کاربر با شناسه ${id} یافت نشد.`);
+  }
+
+  const now = new Date().toISOString();
+  const nextEmail = params.email !== undefined ? (params.email?.trim() || null) : existing.email;
+  const nextMobile = params.mobile !== undefined ? (params.mobile?.trim() || null) : (existing.mobile ?? null);
+
+  db.prepare(`
+    UPDATE users
+    SET email = ?, mobile = ?, updated_at = ?
+    WHERE id = ?
+  `).run(nextEmail, nextMobile, now, id);
+
+  return {
+    id,
+    username: existing.username,
+    email: nextEmail,
+    mobile: nextMobile,
+    role: existing.role,
+    must_change_password: Boolean(existing.must_change_password),
     wallet_balance: existing.wallet_balance,
     extra_slots: existing.extra_slots,
     created_at: existing.created_at,
@@ -1898,5 +1994,170 @@ export function getUserWalletTransactions(
     `)
     .all(userId, limit) as WalletTransactionRow[];
 }
+
+export function getActivePackages(db: Database.Database): PackageRow[] {
+  return db.prepare('SELECT * FROM packages WHERE is_active = 1 ORDER BY slots ASC').all() as PackageRow[];
+}
+
+export function getPackageById(db: Database.Database, id: number): PackageRow | null {
+  const row = db.prepare('SELECT * FROM packages WHERE id = ?').get(id) as PackageRow | undefined;
+  return row ?? null;
+}
+
+export function getPackageByKey(db: Database.Database, key: string): PackageRow | null {
+  const row = db.prepare('SELECT * FROM packages WHERE key = ?').get(key) as PackageRow | undefined;
+  return row ?? null;
+}
+
+export function createPaymentTransaction(
+  db: Database.Database,
+  params: {
+    user_id: number;
+    package_id: number | null;
+    package_title: string;
+    slots: number;
+    amount_toman: number;
+    gateway: string;
+    authority?: string | null;
+    meta?: any;
+  }
+): PaymentTransactionRow {
+  const now = new Date().toISOString();
+  const metaStr = params.meta ? (typeof params.meta === 'string' ? params.meta : JSON.stringify(params.meta)) : '{}';
+  const stmt = db.prepare(`
+    INSERT INTO payment_transactions (user_id, package_id, package_title, slots, amount_toman, gateway, authority, status, meta, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+  `);
+  const result = stmt.run(
+    params.user_id,
+    params.package_id,
+    params.package_title,
+    params.slots,
+    params.amount_toman,
+    params.gateway,
+    params.authority || null,
+    metaStr,
+    now,
+    now
+  );
+  const id = Number(result.lastInsertRowid);
+  return getPaymentTransactionById(db, id)!;
+}
+
+export function updatePaymentTransactionAuthority(
+  db: Database.Database,
+  id: number,
+  authority: string,
+  meta?: any
+): void {
+  const now = new Date().toISOString();
+  if (meta) {
+    const metaStr = typeof meta === 'string' ? meta : JSON.stringify(meta);
+    db.prepare('UPDATE payment_transactions SET authority = ?, meta = ?, updated_at = ? WHERE id = ?').run(authority, metaStr, now, id);
+  } else {
+    db.prepare('UPDATE payment_transactions SET authority = ?, updated_at = ? WHERE id = ?').run(authority, now, id);
+  }
+}
+
+export function getPaymentTransactionById(db: Database.Database, id: number): PaymentTransactionRow | null {
+  const row = db.prepare('SELECT * FROM payment_transactions WHERE id = ?').get(id) as PaymentTransactionRow | undefined;
+  return row ?? null;
+}
+
+export function getPaymentTransactionByAuthority(db: Database.Database, authority: string): PaymentTransactionRow | null {
+  const row = db.prepare('SELECT * FROM payment_transactions WHERE authority = ?').get(authority) as PaymentTransactionRow | undefined;
+  return row ?? null;
+}
+
+export function markPaymentTransactionPaid(
+  db: Database.Database,
+  id: number,
+  refId: string,
+  meta?: any
+): { success: boolean; alreadyPaid: boolean; extraSlots: number } {
+  const txn = db.transaction(() => {
+    const current = db.prepare('SELECT * FROM payment_transactions WHERE id = ?').get(id) as PaymentTransactionRow | undefined;
+    if (!current) {
+      throw new Error(`تراکنش با شناسه ${id} یافت نشد.`);
+    }
+
+    const user = getUserById(db, current.user_id);
+    if (!user) {
+      throw new Error(`کاربر صاحب تراکنش با شناسه ${current.user_id} یافت نشد.`);
+    }
+
+    // Idempotency: if already marked paid, return safely without granting slots again
+    if (current.status === 'paid') {
+      return { success: true, alreadyPaid: true, extraSlots: user.extra_slots };
+    }
+
+    const now = new Date().toISOString();
+    let nextMeta = current.meta || '{}';
+    if (meta) {
+      try {
+        const parsedCurrent = JSON.parse(current.meta || '{}');
+        const parsedNew = typeof meta === 'string' ? JSON.parse(meta) : meta;
+        nextMeta = JSON.stringify({ ...parsedCurrent, ...parsedNew });
+      } catch {
+        nextMeta = typeof meta === 'string' ? meta : JSON.stringify(meta);
+      }
+    }
+
+    db.prepare(`
+      UPDATE payment_transactions
+      SET status = 'paid', ref_id = ?, paid_at = ?, meta = ?, updated_at = ?
+      WHERE id = ?
+    `).run(refId, now, nextMeta, now, id);
+
+    const newExtraSlots = (user.extra_slots || 0) + current.slots;
+    db.prepare('UPDATE users SET extra_slots = ?, updated_at = ? WHERE id = ?').run(newExtraSlots, now, user.id);
+
+    return { success: true, alreadyPaid: false, extraSlots: newExtraSlots };
+  });
+
+  return txn();
+}
+
+export function markPaymentTransactionFailed(
+  db: Database.Database,
+  id: number,
+  meta?: any
+): void {
+  const current = db.prepare('SELECT * FROM payment_transactions WHERE id = ?').get(id) as PaymentTransactionRow | undefined;
+  if (!current) return;
+  if (current.status === 'paid') return; // Do not fail an already paid transaction
+
+  const now = new Date().toISOString();
+  let nextMeta = current.meta || '{}';
+  if (meta) {
+    try {
+      const parsedCurrent = JSON.parse(current.meta || '{}');
+      const parsedNew = typeof meta === 'string' ? JSON.parse(meta) : meta;
+      nextMeta = JSON.stringify({ ...parsedCurrent, ...parsedNew });
+    } catch {
+      nextMeta = typeof meta === 'string' ? meta : JSON.stringify(meta);
+    }
+  }
+
+  db.prepare(`
+    UPDATE payment_transactions
+    SET status = 'failed', meta = ?, updated_at = ?
+    WHERE id = ?
+  `).run(nextMeta, now, id);
+}
+
+export function getUserPaymentTransactions(
+  db: Database.Database,
+  userId: number,
+  limit = 50
+): PaymentTransactionRow[] {
+  return db.prepare(`
+    SELECT * FROM payment_transactions
+    WHERE user_id = ?
+    ORDER BY id DESC
+    LIMIT ?
+  `).all(userId, limit) as PaymentTransactionRow[];
+}
+
 
 
