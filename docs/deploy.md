@@ -276,3 +276,34 @@ If your crontab runs on the same machine where Price Getter is installed and you
 # Run directly via npm CLI:
 0 * * * * cd /opt/price_getter && npm run run >> /var/log/price-getter.log 2>&1
 ```
+
+---
+
+## 9. CI/CD: Automated Docker Hub Publishing on Git Tag
+
+A GitHub Actions workflow (`.github/workflows/ci.yml`) is configured to automatically test, build, and publish the Docker image to Docker Hub whenever a new tag is pushed.
+
+### 9.1 Required GitHub Repository Secrets
+
+In your GitHub repository, navigate to **Settings** > **Secrets and variables** > **Actions** and add the following repository secrets:
+
+- `DOCKERHUB_USERNAME`: Your Docker Hub account username.
+- `DOCKERHUB_TOKEN`: Your Docker Hub Personal Access Token (or password).
+- `DOCKERHUB_REPO` *(optional)*: Custom repository name on Docker Hub (defaults to `<DOCKERHUB_USERNAME>/chanchand`).
+
+### 9.2 Triggering a Release
+
+To release a new Docker image, create and push a git tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow will:
+1. Run automated tests, type checking, and linting.
+2. Build the Next.js application.
+3. Authenticate with Docker Hub using your credentials.
+4. Automatically tag the image with the version (e.g. `1.0.0`, `1.0`, `v1.0.0`) and `latest`.
+5. Push the image to Docker Hub with GitHub Actions layer caching enabled.
+
