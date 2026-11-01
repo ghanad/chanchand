@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { LatestPayload, RunStatus } from "../types/dashboard";
 import { requestJson } from "../lib/api-client";
 import { statusText, formatNumber } from "../lib/formatters";
@@ -33,6 +33,7 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | null>(null);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
@@ -91,9 +92,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       setCurrentUser(null);
-      window.location.href = "/login";
+      router.push("/login");
+      router.refresh();
     }
-  }, []);
+  }, [router]);
 
   const runNow = useCallback(async () => {
     if (!isAdmin) return;

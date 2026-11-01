@@ -2,10 +2,12 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { requestJson } from "@/lib/api-client";
 import { useDashboard } from "@/context/DashboardContext";
 
 export default function ChangePasswordPage() {
+  const router = useRouter();
   const { showToast, logout, currentUser } = useDashboard();
 
   const [newPassword, setNewPassword] = useState("");
@@ -43,7 +45,8 @@ export default function ChangePasswordPage() {
 
       showToast(response.message || "کلمه عبور با موفقیت به‌روزرسانی شد.");
       const target = response.user.role === "admin" ? "/admin" : "/";
-      window.location.href = target;
+      router.push(target);
+      router.refresh();
     } catch (err: any) {
       setError(err instanceof Error ? err.message : "خطا در تغییر کلمه عبور");
     } finally {

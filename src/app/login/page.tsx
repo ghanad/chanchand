@@ -33,7 +33,7 @@ function LoginForm() {
 
       if (response.user.must_change_password) {
         showToast("لطفاً کلمه عبور جدید خود را تعیین نمایید.");
-        window.location.href = "/change-password";
+        router.push("/change-password");
         return;
       }
 
@@ -42,7 +42,8 @@ function LoginForm() {
       const rawRedirect = searchParams.get("redirect");
       const defaultTarget = response.user.role === "admin" ? "/admin" : "/";
       const redirectPath = sanitizeInternalRedirect(rawRedirect, defaultTarget);
-      window.location.href = redirectPath;
+      router.push(redirectPath);
+      router.refresh();
     } catch (err: any) {
       setError(err instanceof Error ? err.message : "خطا در ورود به سیستم");
     } finally {
