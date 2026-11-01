@@ -6,12 +6,25 @@ import { LatestPayload, RunStatus } from "../types/dashboard";
 import { requestJson } from "../lib/api-client";
 import { statusText, formatNumber } from "../lib/formatters";
 
+export interface UserQuotaInfo {
+  freeLimit: number;
+  extraSlots: number;
+  totalLimit: number;
+  usedCount: number;
+  remaining: number;
+  canAdd: boolean;
+}
+
 export interface CurrentUser {
   id: number;
   username: string;
   email: string | null;
   role: "admin" | "viewer";
   must_change_password?: boolean;
+  wallet_balance?: number;
+  extra_slots?: number;
+  quota?: UserQuotaInfo;
+  slot_price?: number;
 }
 
 interface DashboardContextType {
@@ -25,6 +38,7 @@ interface DashboardContextType {
   setLoading: React.Dispatch<React.SetStateAction<boolean>>;
   refreshTick: number;
   triggerRefresh: () => void;
+  refreshCurrentUser: () => Promise<void>;
   isCollecting: boolean;
   runNow: () => Promise<void>;
   logout: () => Promise<void>;
@@ -85,7 +99,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     fetchCurrentUser();
-  }, [fetchCurrentUser]);
+  }, [fetchCurrentUser, refreshTick]);
 
   const logout = useCallback(async () => {
     try {
@@ -126,6 +140,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setLoading,
         refreshTick,
         triggerRefresh,
+        refreshCurrentUser: fetchCurrentUser,
         isCollecting,
         runNow,
         logout,

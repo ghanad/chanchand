@@ -17,6 +17,8 @@ async function handleTrigger(req: NextRequest) {
     let productKey: string | null = null;
     let force = true; // Default to true so OS cron executes fresh fetches
 
+    let explicitSource: string | null = null;
+
     // Try reading body for POST requests
     if (req.method === 'POST') {
       try {
@@ -26,6 +28,9 @@ async function handleTrigger(req: NextRequest) {
         }
         if (body && typeof body.force === 'boolean') {
           force = body.force;
+        }
+        if (body && typeof (body.source || body.trigger_source) === 'string') {
+          explicitSource = (body.source || body.trigger_source).trim();
         }
       } catch {
         // Body may be empty or not JSON
@@ -42,6 +47,14 @@ async function handleTrigger(req: NextRequest) {
     if (queryForce !== null) {
       force = queryForce === 'true' || queryForce === '1';
     }
+
+    const querySource = req.nextUrl.searchParams.get('source') || req.nextUrl.searchParams.get('trigger_source') || req.headers.get('x-trigger-source');
+    if (querySource && querySource.trim()) {
+      explicitSource = querySource.trim();
+    }
+
+    // Default trigger_source: if called with api_key, defaults to 'cron'; if called by admin session, defaults to 'api'
+    const effectiveSource = explicitSource || (auth.type === 'api_key' ? 'cron' : 'api');
 
     const activeInfo = getActiveRunInfo();
     if (activeInfo.is_running && activeInfo.run_id !== null) {
@@ -92,7 +105,16 @@ async function handleTrigger(req: NextRequest) {
       );
     }
 
-    const runId = startRun(db, null, null, activeTargets);
+    const triggerDetails = {
+      auth_type: auth.type,
+      user: (auth as any).user?.username || undefined,
+      user_agent: req.headers.get('user-agent') || undefined,
+      ip: req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || undefined,
+      product_key: productKey || undefined,
+      force,
+    };
+
+    const runId = startRun(db, null, null, activeTargets, undefined, effectiveSource, triggerDetails);
     if (!acquireRunLock(runId, activeTargets.length)) {
       const current = getActiveRunInfo();
       return NextResponse.json(
@@ -119,6 +141,7 @@ async function handleTrigger(req: NextRequest) {
         ok: true,
         run_id: summary.run_id,
         status: summary.status,
+        trigger_source: effectiveSource,
         target_count: summary.target_count,
         success_count: summary.success_count,
         error_count: summary.error_count,

@@ -27,6 +27,7 @@ interface AdminNavItem {
 const adminNavItems: AdminNavItem[] = [
   { id: "admin-products", label: "مدیریت محصولات", href: "/admin/products" },
   { id: "admin-runs", label: "اجرا و خطا", href: "/admin/runs" },
+  { id: "admin-cron-runs", label: "وضعیت کرون و API", href: "/admin/cron-runs" },
   { id: "admin-sources", label: "منابع قیمت‌گیری", href: "/admin/sources" },
   { id: "admin-users", label: "مدیریت کاربران", href: "/admin/users" },
 ];
@@ -88,6 +89,25 @@ function renderNavIcon(id: string) {
           aria-hidden="true"
         >
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      );
+    case "admin-cron-runs":
+    case "cron-runs":
+      return (
+        <svg
+          className="top-nav-icon"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <polyline points="12 6 12 12 16 14" />
         </svg>
       );
     case "admin-sources":
@@ -176,6 +196,12 @@ export function WorkspaceHeader() {
         pathname === "/admin/runs" ||
         pathname.startsWith("/runs/") ||
         pathname.startsWith("/admin/runs/")
+      );
+    }
+    if (id === "admin-cron-runs") {
+      return (
+        pathname === "/admin/cron-runs" ||
+        pathname.startsWith("/admin/cron-runs/")
       );
     }
     if (id === "admin-sources") {

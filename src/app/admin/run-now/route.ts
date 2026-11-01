@@ -73,7 +73,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'هیچ هدف فعالی برای این استعلام وجود ندارد.' }, { status: 400 });
     }
 
-    const runId = startRun(db, null, null, activeTargets);
+    const runId = startRun(db, null, null, activeTargets, undefined, 'manual', {
+      initiated_by: auth.user.username,
+      role: auth.user.role,
+    });
     const runner = new PriceRunner();
 
     if (!acquireRunLock(runId, activeTargets.length)) {

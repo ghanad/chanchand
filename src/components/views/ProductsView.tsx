@@ -10,6 +10,7 @@ import { useDashboard } from "../../context/DashboardContext";
 import { PanelHead } from "../common/PanelHead";
 import { Modal } from "../common/Modal";
 import { EmptyState } from "../common/EmptyState";
+import { BuySlotModal } from "../common/BuySlotModal";
 
 interface ProductItemWithPrice extends ProductRow {
   latestSnapshot?: PriceRow | null;
@@ -21,7 +22,7 @@ type ProductTab = "all" | "personal" | "public";
 
 export function ProductsView() {
   const router = useRouter();
-  const { isAdmin, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
+  const { isAdmin, currentUser, setLoading, showToast, refreshTick, triggerRefresh } = useDashboard();
   const basePath = isAdmin ? "/admin" : "";
   const [products, setProducts] = useState<ProductRow[]>([]);
   const [sources, setSources] = useState<SourceRow[]>([]);
@@ -32,6 +33,7 @@ export function ProductsView() {
 
   // Modals state
   const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showBuySlotModal, setShowBuySlotModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
 
   // Forms state
@@ -251,8 +253,13 @@ export function ProductsView() {
       setForm((current) => ({ title: "", url: "", source_key: current.source_key, is_public: false }));
       setShowAddProductModal(false);
       triggerRefresh();
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : "خطا در افزودن محصول");
+    } catch (error: any) {
+      const errMsg = error instanceof Error ? error.message : "خطا در افزودن محصول";
+      if (errMsg.includes("ظرفیت") || error?.quota_exceeded) {
+        setShowAddProductModal(false);
+        setShowBuySlotModal(true);
+      }
+      showToast(errMsg);
     } finally {
       setBusyAction(null);
     }
@@ -430,7 +437,13 @@ export function ProductsView() {
               <button
                 className="primary-button"
                 type="button"
-                onClick={() => setShowAddProductModal(true)}
+                onClick={() => {
+                  if (!isAdmin && currentUser?.quota && !currentUser.quota.canAdd) {
+                    setShowBuySlotModal(true);
+                  } else {
+                    setShowAddProductModal(true);
+                  }
+                }}
               >
                 + افزودن محصول
               </button>
@@ -508,7 +521,13 @@ export function ProductsView() {
                 <button
                   type="button"
                   className="primary-button"
-                  onClick={() => setShowAddProductModal(true)}
+                  onClick={() => {
+                    if (!isAdmin && currentUser?.quota && !currentUser.quota.canAdd) {
+                      setShowBuySlotModal(true);
+                    } else {
+                      setShowAddProductModal(true);
+                    }
+                  }}
                   style={{ marginTop: "1rem" }}
                 >
                   + افزودن محصول
@@ -810,6 +829,12 @@ export function ProductsView() {
           </div>
         </form>
       </Modal>
+
+      {/* Modal: Buy Slot / Upgrade Quota */}
+      <BuySlotModal
+        isOpen={showBuySlotModal}
+        onClose={() => setShowBuySlotModal(false)}
+      />
 
       {/* Modal: Edit Product */}
       <Modal

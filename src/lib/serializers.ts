@@ -65,6 +65,12 @@ export function serializeRun(row: RunRow): Record<string, any> {
     target_count: row.target_count,
     success_count: row.success_count,
     error_count: row.error_count,
+    trigger_source: row.trigger_source || null,
+    trigger_details: row.trigger_details || null,
+    duration_ms:
+      row.started_at && row.finished_at
+        ? Math.max(0, new Date(row.finished_at).getTime() - new Date(row.started_at).getTime())
+        : null,
   };
 }
 

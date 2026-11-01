@@ -58,3 +58,22 @@ export function statusText(value: RunStatus | null | undefined): string {
   };
   return value ? labels[value] || value : "-";
 }
+
+export function formatDuration(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined || ms < 0) return "-";
+  if (ms < 1000) return `${formatNumber(ms)} میلی‌ثانیه`;
+  const seconds = (ms / 1000).toFixed(1);
+  return `${formatNumber(Number(seconds))} ثانیه`;
+}
+
+export function triggerSourceText(value: string | null | undefined): string {
+  const labels: Record<string, string> = {
+    cron: "کرون (Cron)",
+    api: "فراخوانی API",
+    manual: "دستی (پنل ادمین)",
+    product_refresh: "بروزرسانی تکی محصول",
+    cli: "خط فرمان (CLI)",
+  };
+  return value ? labels[value] || value : "نامشخص";
+}
+

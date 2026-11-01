@@ -702,7 +702,13 @@ label {
 
 .primary-button {
   background: var(--accent);
-  color: #fff;
+  color: #ffffff;
+}
+
+.primary-button,
+.primary-button span,
+.primary-button svg {
+  color: #ffffff;
 }
 
 .primary-button:hover {
@@ -790,7 +796,8 @@ label {
   font-size: 17px;
 }
 
-.panel-head span {
+.panel-head-titles span,
+.panel-head > span {
   color: var(--muted);
   font-size: 12px;
 }

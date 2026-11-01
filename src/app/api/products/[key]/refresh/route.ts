@@ -72,7 +72,10 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       );
     }
 
-    const runId = startRun(db, null, null, activeTargets);
+    const runId = startRun(db, null, null, activeTargets, undefined, 'product_refresh', {
+      product_key: productKey,
+      initiated_by: auth.user.username,
+    });
     const runner = new PriceRunner();
     const summary = await runner.executeRun(null, runId, activeTargets, { force: true });
 

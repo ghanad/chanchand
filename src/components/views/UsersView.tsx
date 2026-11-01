@@ -15,6 +15,8 @@ interface UserItem {
   email: string | null;
   role: "admin" | "viewer";
   must_change_password?: boolean;
+  wallet_balance?: number;
+  extra_slots?: number;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +42,11 @@ export function UsersView() {
 
   // Delete user modal state
   const [userToDelete, setUserToDelete] = useState<UserItem | null>(null);
+
+  // Charge wallet modal state
+  const [walletUser, setWalletUser] = useState<UserItem | null>(null);
+  const [chargeAmount, setChargeAmount] = useState<string>("50000");
+  const [chargeDescription, setChargeDescription] = useState<string>("");
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -255,6 +262,38 @@ export function UsersView() {
     }
   };
 
+  const handleChargeWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!walletUser) return;
+    const amt = parseInt(chargeAmount, 10);
+    if (isNaN(amt) || amt === 0) {
+      showToast("مبلغ وارد شده نامعتبر است.");
+      return;
+    }
+
+    setBusyAction(`wallet:${walletUser.id}`);
+    try {
+      const res = await requestJson<{ success: boolean; message: string; balance: number }>(
+        `/api/admin/users/${walletUser.id}/wallet`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            amount: amt,
+            description: chargeDescription.trim() || undefined,
+          }),
+        }
+      );
+      showToast(res.message || "کیف پول با موفقیت به‌روزرسانی شد.");
+      setWalletUser(null);
+      loadUsers();
+      triggerRefresh();
+    } catch (err: any) {
+      showToast(err instanceof Error ? err.message : "خطا در شارژ کیف پول");
+    } finally {
+      setBusyAction(null);
+    }
+  };
+
   return (
     <div className="users-page">
       <section className="product-summary-grid" aria-label="خلاصه آمار کاربران">
@@ -368,6 +407,7 @@ export function UsersView() {
                     <th scope="col">کاربر و مشخصات</th>
                     <th scope="col">نقش کاربری</th>
                     <th scope="col">دسترسی مدیریت</th>
+                    <th scope="col">کیف پول و اسلات</th>
                     <th scope="col">الزام تغییر رمز</th>
                     <th scope="col">تاریخ عضویت</th>
                     <th scope="col" className="th-actions">عملیات</th>
@@ -450,6 +490,20 @@ export function UsersView() {
                             </button>
                             <span className={`status-toggle-label ${isAdminUser ? "active" : ""}`}>
                               {isAdminUser ? "مدیر" : "بیننده"}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* ۳.۵. کیف پول و اسلات */}
+                        <td className="user-col-wallet">
+                          <div className="product-info-text">
+                            <span className="font-bold text-[var(--foreground)]">
+                              {formatNumber(user.wallet_balance ?? 0)} تومان
+                            </span>
+                            <span className="text-xs text-[var(--text-muted)] block">
+                              {isAdminUser
+                                ? "ظرفیت نامحدود"
+                                : `${formatNumber(user.extra_slots ?? 0)} اسلات اضافه (${formatNumber(3 + (user.extra_slots ?? 0))} کل)`}
                             </span>
                           </div>
                         </td>
@@ -573,6 +627,34 @@ export function UsersView() {
                                   aria-orientation="vertical"
                                   tabIndex={-1}
                                 >
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="kebab-menu-item text-[var(--primary)] font-medium"
+                                    onClick={() => {
+                                      setActiveKebabKey(null);
+                                      setWalletUser(user);
+                                      setChargeAmount("50000");
+                                      setChargeDescription("");
+                                    }}
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                                      <line x1="12" y1="8" x2="12" y2="16" />
+                                      <line x1="8" y1="12" x2="16" y2="12" />
+                                    </svg>
+                                    <span>شارژ کیف پول</span>
+                                  </button>
                                   <button
                                     type="button"
                                     role="menuitem"
@@ -800,6 +882,84 @@ export function UsersView() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Modal: Charge Wallet Dialog */}
+      <Modal
+        isOpen={walletUser !== null}
+        onClose={() => setWalletUser(null)}
+        title={`شارژ کیف پول: ${walletUser?.username}`}
+        maxWidth="460px"
+      >
+        <form className="modal-form" onSubmit={handleChargeWallet}>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-xs space-y-1.5 mb-3">
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-muted)]">نام کاربر:</span>
+              <span className="font-bold">{walletUser?.username}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-muted)]">موجودی فعلی:</span>
+              <span className="font-bold text-[var(--primary)]">{formatNumber(walletUser?.wallet_balance ?? 0)} تومان</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-[var(--text-muted)]">اسلات‌های اضافه:</span>
+              <span>{formatNumber(walletUser?.extra_slots ?? 0)}</span>
+            </div>
+          </div>
+
+          <label>
+            مبلغ شارژ به تومان (برای کسر، عدد منفی وارد کنید)
+            <input
+              type="number"
+              value={chargeAmount}
+              onChange={(e) => setChargeAmount(e.target.value)}
+              placeholder="مثلاً: 50000"
+              required
+              autoFocus
+            />
+          </label>
+
+          {/* دکمه‌های سریع */}
+          <div className="flex flex-wrap gap-1.5 my-2">
+            {[50000, 100000, 200000, 500000].map((quickAmt) => (
+              <button
+                key={quickAmt}
+                type="button"
+                className="btn btn-secondary btn-sm text-xs py-1 px-2.5"
+                onClick={() => setChargeAmount(String(quickAmt))}
+              >
+                +{formatNumber(quickAmt)}
+              </button>
+            ))}
+          </div>
+
+          <label>
+            توضیحات (اختیاری)
+            <input
+              type="text"
+              value={chargeDescription}
+              onChange={(e) => setChargeDescription(e.target.value)}
+              placeholder="مثلاً: شارژ دستی از طریق کارت‌به‌کارت"
+            />
+          </label>
+
+          <div className="modal-form-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => setWalletUser(null)}
+            >
+              انصراف
+            </button>
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={busyAction?.startsWith("wallet:")}
+            >
+              {busyAction?.startsWith("wallet:") ? "در حال ثبت..." : "ثبت شارژ کیف پول"}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

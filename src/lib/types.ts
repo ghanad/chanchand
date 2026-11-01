@@ -86,6 +86,8 @@ export interface RunRow {
   target_count: number;
   success_count: number;
   error_count: number;
+  trigger_source?: string | null;
+  trigger_details?: string | null;
 }
 
 export interface PriceSnapshotRow {
@@ -123,6 +125,8 @@ export interface UserRow {
   password_hash: string;
   role: UserRole;
   must_change_password: number;
+  wallet_balance: number;
+  extra_slots: number;
   created_at: string;
   updated_at: string;
 }
@@ -133,8 +137,30 @@ export interface SafeUser {
   email: string | null;
   role: UserRole;
   must_change_password: boolean;
+  wallet_balance: number;
+  extra_slots: number;
   created_at: string;
   updated_at: string;
 }
+
+export interface WalletTransactionRow {
+  id: number;
+  user_id: number;
+  amount: number;
+  balance_after: number;
+  type: 'admin_charge' | 'admin_adjustment' | 'slot_purchase';
+  description: string | null;
+  created_at: string;
+}
+
+export interface UserQuota {
+  freeLimit: number;
+  extraSlots: number;
+  totalLimit: number;
+  usedCount: number;
+  remaining: number;
+  canAdd: boolean;
+}
+
 
 

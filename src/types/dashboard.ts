@@ -58,6 +58,37 @@ export interface RunRow {
   target_count: number;
   success_count: number;
   error_count: number;
+  trigger_source?: string | null;
+  trigger_details?: string | null;
+  duration_ms?: number | null;
+}
+
+export interface CronStats {
+  last_run: RunRow | null;
+  total_runs_24h: number;
+  success_runs_24h: number;
+  error_runs_24h: number;
+  success_rate_24h: number;
+  is_active_running: boolean;
+  active_run_id: number | null;
+  cron_configured: boolean;
+}
+
+export interface CronRunDetail {
+  run: RunRow;
+  snapshots: Array<{
+    id: number;
+    product_key: string;
+    source_key: string;
+    url: string;
+    title: string | null;
+    seller: string | null;
+    price_irr: number | null;
+    price_toman?: number | null;
+    availability: string;
+    observed_at: string;
+  }>;
+  errors: ErrorRow[];
 }
 
 export interface ErrorRow {

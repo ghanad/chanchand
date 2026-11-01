@@ -65,7 +65,9 @@ export class PriceRunner {
         targetsToRun = config?.targets || [];
       }
     }
-    const runId = startRun(db, configPath || null, config, targetsToRun);
+    const runId = startRun(db, configPath || null, config, targetsToRun, undefined, 'cli', {
+      config_path: configPath || null,
+    });
     return this.executeRun(config, runId, targetsToRun, options);
   }
 

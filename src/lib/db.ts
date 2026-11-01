@@ -15,12 +15,25 @@ import {
   SourceConfig,
   TargetConfig,
   UserProductRow,
+  UserQuota,
   UserRole,
   UserRow,
+  WalletTransactionRow,
 } from './types';
 import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
 
 export const DEFAULT_DB_URL = 'sqlite:///data/price_getter.db';
+export const FREE_PRODUCT_LIMIT = 3;
+export const DEFAULT_SLOT_PRICE_TOMAN = 50000;
+
+export function getSlotPriceToman(): number {
+  const envVal = process.env.SLOT_PRICE_TOMAN;
+  if (envVal) {
+    const parsed = parseInt(envVal, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return DEFAULT_SLOT_PRICE_TOMAN;
+}
 
 export function resolveDbPath(dbUrl?: string): string {
   const url = dbUrl || process.env.PRICE_GETTER_DB_URL || DEFAULT_DB_URL;
@@ -56,7 +69,9 @@ export function initDatabase(db: Database.Database): void {
       config_path TEXT,
       target_count INTEGER NOT NULL DEFAULT 0,
       success_count INTEGER NOT NULL DEFAULT 0,
-      error_count INTEGER NOT NULL DEFAULT 0
+      error_count INTEGER NOT NULL DEFAULT 0,
+      trigger_source VARCHAR(64) DEFAULT 'manual',
+      trigger_details TEXT
     );
 
     CREATE TABLE IF NOT EXISTS sources (
@@ -168,6 +183,8 @@ export function initDatabase(db: Database.Database): void {
       password_hash VARCHAR(255) NOT NULL,
       role VARCHAR(32) NOT NULL DEFAULT 'viewer',
       must_change_password INTEGER NOT NULL DEFAULT 0,
+      wallet_balance INTEGER NOT NULL DEFAULT 0,
+      extra_slots INTEGER NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     );
@@ -183,12 +200,47 @@ export function initDatabase(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS ix_user_products_user_id ON user_products(user_id);
     CREATE INDEX IF NOT EXISTS ix_user_products_product_key ON user_products(product_key);
+
+    CREATE TABLE IF NOT EXISTS wallet_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      amount INTEGER NOT NULL,
+      balance_after INTEGER NOT NULL,
+      type VARCHAR(32) NOT NULL,
+      description TEXT,
+      created_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_wallet_transactions_user_id ON wallet_transactions(user_id);
+    CREATE INDEX IF NOT EXISTS ix_wallet_transactions_created_at ON wallet_transactions(created_at);
   `);
 
   try {
+    const runColumns = db.prepare('PRAGMA table_info(runs)').all() as { name: string }[];
+    if (runColumns.length > 0) {
+      if (!runColumns.some((col) => col.name === 'trigger_source')) {
+        db.prepare("ALTER TABLE runs ADD COLUMN trigger_source VARCHAR(64) DEFAULT 'manual'").run();
+      }
+      if (!runColumns.some((col) => col.name === 'trigger_details')) {
+        db.prepare('ALTER TABLE runs ADD COLUMN trigger_details TEXT').run();
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS ix_runs_trigger_source ON runs(trigger_source);');
+    }
+  } catch (err) {
+    console.warn('[DB] runs table migration warning:', err);
+  }
+
+  try {
     const userColumns = db.prepare('PRAGMA table_info(users)').all() as { name: string }[];
-    if (userColumns.length > 0 && !userColumns.some((col) => col.name === 'must_change_password')) {
-      db.prepare('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0').run();
+    if (userColumns.length > 0) {
+      if (!userColumns.some((col) => col.name === 'must_change_password')) {
+        db.prepare('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0').run();
+      }
+      if (!userColumns.some((col) => col.name === 'wallet_balance')) {
+        db.prepare('ALTER TABLE users ADD COLUMN wallet_balance INTEGER NOT NULL DEFAULT 0').run();
+      }
+      if (!userColumns.some((col) => col.name === 'extra_slots')) {
+        db.prepare('ALTER TABLE users ADD COLUMN extra_slots INTEGER NOT NULL DEFAULT 0').run();
+      }
     }
   } catch {
     // Migration skipped if already present or table not yet accessible
@@ -818,6 +870,18 @@ export function addManagedProduct(
       .get(existingTarget.product_key) as ManagedProductRow | undefined;
     if (existingProd) {
       if (userId != null) {
+        const alreadyLinked = db
+          .prepare('SELECT 1 FROM user_products WHERE user_id = ? AND product_key = ?')
+          .get(userId, existingTarget.product_key);
+        if (!alreadyLinked) {
+          const userRow = getUserById(db, userId);
+          if (userRow && userRow.role !== 'admin') {
+            const quota = getUserQuota(db, userId, false);
+            if (!quota.canAdd) {
+              throw new Error(`سقف ظرفیت محصولات شما (${quota.totalLimit} محصول) تکمیل شده است. لطفاً ابتدا ظرفیت اضافه خریداری کنید.`);
+            }
+          }
+        }
         db.prepare(`
           INSERT INTO user_products (user_id, product_key, custom_title, created_at)
           VALUES (?, ?, ?, ?)
@@ -825,6 +889,17 @@ export function addManagedProduct(
         `).run(userId, existingTarget.product_key, cleanTitle, now);
       }
       return { product_key: existingTarget.product_key, reused: true };
+    }
+  }
+
+  // Check quota for new product creation if user is not admin
+  if (userId != null) {
+    const userRow = getUserById(db, userId);
+    if (userRow && userRow.role !== 'admin') {
+      const quota = getUserQuota(db, userId, false);
+      if (!quota.canAdd) {
+        throw new Error(`سقف ظرفیت محصولات شما (${quota.totalLimit} محصول) تکمیل شده است. لطفاً ابتدا ظرفیت اضافه خریداری کنید.`);
+      }
     }
   }
 
@@ -1049,7 +1124,9 @@ export function startRun(
   configPath: string | null,
   config?: AppConfig | null,
   targets?: TargetConfig[],
-  products?: Record<string, ProductConfig>
+  products?: Record<string, ProductConfig>,
+  triggerSource: string = 'manual',
+  triggerDetails?: Record<string, any> | string | null
 ): number {
   let effectiveSources = config?.sources;
   if (!effectiveSources || Object.keys(effectiveSources).length === 0) {
@@ -1094,11 +1171,16 @@ export function startRun(
   const activeTargetsCount = effectiveTargets.filter((t) => t.enabled).length;
   const startedAt = new Date().toISOString();
 
+  let detailsStr: string | null = null;
+  if (triggerDetails) {
+    detailsStr = typeof triggerDetails === 'string' ? triggerDetails : JSON.stringify(triggerDetails);
+  }
+
   const insertRun = db.prepare(`
-    INSERT INTO runs (started_at, status, config_path, target_count, success_count, error_count)
-    VALUES (?, 'running', ?, ?, 0, 0)
+    INSERT INTO runs (started_at, status, config_path, target_count, success_count, error_count, trigger_source, trigger_details)
+    VALUES (?, 'running', ?, ?, 0, 0, ?, ?)
   `);
-  const result = insertRun.run(startedAt, configPath, activeTargetsCount);
+  const result = insertRun.run(startedAt, configPath, activeTargetsCount, triggerSource || 'manual', detailsStr);
   const runId = Number(result.lastInsertRowid);
 
   const insertSource = db.prepare(`
@@ -1358,6 +1440,127 @@ export function recentRuns(db: Database.Database, limit = 20): RunRow[] {
   `).all(limit) as RunRow[];
 }
 
+export function getCronRuns(
+  db: Database.Database,
+  limit = 50,
+  filterSource?: string,
+  filterStatus?: string
+): RunRow[] {
+  let query = 'SELECT * FROM runs WHERE 1=1';
+  const params: any[] = [];
+
+  if (filterSource && filterSource !== 'all') {
+    if (filterSource === 'automated') {
+      query += " AND (trigger_source IN ('cron', 'api') OR trigger_source IS NULL)";
+    } else {
+      query += ' AND trigger_source = ?';
+      params.push(filterSource);
+    }
+  }
+
+  if (filterStatus && filterStatus !== 'all') {
+    query += ' AND status = ?';
+    params.push(filterStatus);
+  }
+
+  query += ' ORDER BY started_at DESC, id DESC LIMIT ?';
+  params.push(limit);
+
+  return db.prepare(query).all(...params) as RunRow[];
+}
+
+export function getCronRunStats(db: Database.Database): {
+  last_run: RunRow | null;
+  total_runs_24h: number;
+  success_runs_24h: number;
+  error_runs_24h: number;
+  success_rate_24h: number;
+  is_active_running: boolean;
+  active_run_id: number | null;
+  cron_configured: boolean;
+} {
+  const lastRunCron = (db.prepare(`
+    SELECT * FROM runs
+    WHERE trigger_source IN ('cron', 'api')
+    ORDER BY started_at DESC, id DESC
+    LIMIT 1
+  `).get() as RunRow | undefined) || null;
+
+  const lastRunAny = lastRunCron || latestRun(db);
+
+  const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+  const stats24h = db.prepare(`
+    SELECT
+      COUNT(*) as total_runs,
+      SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END) as success_runs,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as error_runs,
+      SUM(target_count) as total_targets,
+      SUM(success_count) as total_success_targets
+    FROM runs
+    WHERE started_at >= ?
+  `).get(twentyFourHoursAgo) as {
+    total_runs: number;
+    success_runs: number;
+    error_runs: number;
+    total_targets: number;
+    total_success_targets: number;
+  } | undefined;
+
+  const totalRuns24h = stats24h?.total_runs || 0;
+  const successRuns24h = stats24h?.success_runs || 0;
+  const errorRuns24h = stats24h?.error_runs || 0;
+  const totalTargets = stats24h?.total_targets || 0;
+  const totalSuccessTargets = stats24h?.total_success_targets || 0;
+
+  const successRate = totalTargets > 0
+    ? Math.round((totalSuccessTargets / totalTargets) * 100)
+    : totalRuns24h > 0
+    ? Math.round((successRuns24h / totalRuns24h) * 100)
+    : 100;
+
+  const cronConfigured = Boolean(
+    (process.env.TRIGGER_API_KEY && process.env.TRIGGER_API_KEY.trim().length > 0) ||
+    (process.env.CRON_SECRET && process.env.CRON_SECRET.trim().length > 0)
+  );
+
+  return {
+    last_run: lastRunAny,
+    total_runs_24h: totalRuns24h,
+    success_runs_24h: successRuns24h,
+    error_runs_24h: errorRuns24h,
+    success_rate_24h: successRate,
+    is_active_running: false,
+    active_run_id: null,
+    cron_configured: cronConfigured,
+  };
+}
+
+export function getRunDetails(db: Database.Database, runId: number) {
+  const run = (db.prepare('SELECT * FROM runs WHERE id = ?').get(runId) as RunRow | undefined) || null;
+  if (!run) return null;
+
+  const snapshots = db.prepare(`
+    SELECT id, product_key, source_key, url, title, seller, price_irr, availability, observed_at
+    FROM price_snapshots
+    WHERE run_id = ?
+    ORDER BY id DESC
+  `).all(runId);
+
+  const errors = db.prepare(`
+    SELECT id, run_id, product_key, source_key, url, error_type, message, observed_at
+    FROM fetch_errors
+    WHERE run_id = ?
+    ORDER BY id DESC
+  `).all(runId) as FetchErrorRow[];
+
+  return {
+    run,
+    snapshots,
+    errors,
+  };
+}
+
 export function latestRun(db: Database.Database): RunRow | null {
   return (db.prepare(`
     SELECT * FROM runs
@@ -1388,22 +1591,34 @@ export function sourcesFromLatestRun(db: Database.Database): Array<{ id: number;
 
 export function getUserByUsername(db: Database.Database, username: string): UserRow | null {
   const row = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username) as UserRow | undefined;
-  return row || null;
+  if (!row) return null;
+  return {
+    ...row,
+    wallet_balance: row.wallet_balance ?? 0,
+    extra_slots: row.extra_slots ?? 0,
+  };
 }
 
 export function getUserById(db: Database.Database, id: number): UserRow | null {
   const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id) as UserRow | undefined;
-  return row || null;
+  if (!row) return null;
+  return {
+    ...row,
+    wallet_balance: row.wallet_balance ?? 0,
+    extra_slots: row.extra_slots ?? 0,
+  };
 }
 
 export function listUsers(db: Database.Database): SafeUser[] {
   const rows = db.prepare(`
-    SELECT id, username, email, role, must_change_password, created_at, updated_at
+    SELECT id, username, email, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at
     FROM users
     ORDER BY id ASC
   `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number })[];
   return rows.map((r) => ({
     ...r,
+    wallet_balance: r.wallet_balance ?? 0,
+    extra_slots: r.extra_slots ?? 0,
     must_change_password: Boolean(r.must_change_password),
   }));
 }
@@ -1420,19 +1635,29 @@ export function countAdmins(db: Database.Database): number {
 
 export function createUser(
   db: Database.Database,
-  params: { username: string; password_hash: string; email?: string | null; role?: UserRole; must_change_password?: boolean }
+  params: {
+    username: string;
+    password_hash: string;
+    email?: string | null;
+    role?: UserRole;
+    must_change_password?: boolean;
+    wallet_balance?: number;
+    extra_slots?: number;
+  }
 ): SafeUser {
   const now = new Date().toISOString();
   const role = params.role || 'viewer';
   const email = params.email || null;
   const username = params.username.trim();
   const mustChange = params.must_change_password ? 1 : 0;
+  const walletBalance = params.wallet_balance ?? 0;
+  const extraSlots = params.extra_slots ?? 0;
 
   const stmt = db.prepare(`
-    INSERT INTO users (username, email, password_hash, role, must_change_password, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, password_hash, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(username, email, params.password_hash, role, mustChange, now, now);
+  const result = stmt.run(username, email, params.password_hash, role, mustChange, walletBalance, extraSlots, now, now);
   const id = Number(result.lastInsertRowid);
 
   return {
@@ -1441,6 +1666,8 @@ export function createUser(
     email,
     role,
     must_change_password: Boolean(mustChange),
+    wallet_balance: walletBalance,
+    extra_slots: extraSlots,
     created_at: now,
     updated_at: now,
   };
@@ -1483,6 +1710,8 @@ export function updateUser(
     email: nextEmail,
     role: nextRole,
     must_change_password: Boolean(nextMustChange),
+    wallet_balance: existing.wallet_balance,
+    extra_slots: existing.extra_slots,
     created_at: existing.created_at,
     updated_at: now,
   };
@@ -1504,4 +1733,170 @@ export function deleteUser(db: Database.Database, id: number): boolean {
   const res = db.prepare('DELETE FROM users WHERE id = ?').run(id);
   return res.changes > 0;
 }
+
+export function getUserQuota(db: Database.Database, userId: number, isAdmin = false): UserQuota {
+  const usedCount = (
+    db.prepare('SELECT COUNT(*) as cnt FROM user_products WHERE user_id = ?').get(userId) as { cnt: number }
+  )?.cnt ?? 0;
+
+  if (isAdmin) {
+    return {
+      freeLimit: FREE_PRODUCT_LIMIT,
+      extraSlots: 999999,
+      totalLimit: 999999,
+      usedCount,
+      remaining: 999999,
+      canAdd: true,
+    };
+  }
+
+  const user = getUserById(db, userId);
+  const extraSlots = user?.extra_slots ?? 0;
+  const totalLimit = FREE_PRODUCT_LIMIT + extraSlots;
+  const remaining = Math.max(0, totalLimit - usedCount);
+
+  return {
+    freeLimit: FREE_PRODUCT_LIMIT,
+    extraSlots,
+    totalLimit,
+    usedCount,
+    remaining,
+    canAdd: usedCount < totalLimit,
+  };
+}
+
+export function chargeUserWallet(
+  db: Database.Database,
+  params: {
+    userId: number;
+    amount: number;
+    description?: string;
+    type?: 'admin_charge' | 'admin_adjustment';
+  }
+): { balance: number; transaction: WalletTransactionRow } {
+  const { userId, amount, description, type = 'admin_charge' } = params;
+  if (!amount || isNaN(amount)) {
+    throw new Error('مبلغ شارژ نامعتبر است.');
+  }
+
+  const txn = db.transaction(() => {
+    const user = getUserById(db, userId);
+    if (!user) {
+      throw new Error(`کاربر با شناسه ${userId} یافت نشد.`);
+    }
+
+    const currentBalance = user.wallet_balance || 0;
+    const newBalance = currentBalance + amount;
+    if (newBalance < 0) {
+      throw new Error('موجودی کیف پول نمی‌تواند منفی شود.');
+    }
+
+    const now = new Date().toISOString();
+    db.prepare('UPDATE users SET wallet_balance = ?, updated_at = ? WHERE id = ?').run(newBalance, now, userId);
+
+    const desc = description || (amount >= 0 ? `شارژ کیف پول توسط مدیر سیستم` : `کسر از کیف پول توسط مدیر سیستم`);
+    const insertTxn = db.prepare(`
+      INSERT INTO wallet_transactions (user_id, amount, balance_after, type, description, created_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const res = insertTxn.run(userId, amount, newBalance, type, desc, now);
+
+    return {
+      balance: newBalance,
+      transaction: {
+        id: Number(res.lastInsertRowid),
+        user_id: userId,
+        amount,
+        balance_after: newBalance,
+        type,
+        description: desc,
+        created_at: now,
+      },
+    };
+  });
+
+  return txn();
+}
+
+export function purchaseProductSlot(
+  db: Database.Database,
+  params: {
+    userId: number;
+    slotPrice?: number;
+  }
+): { extra_slots: number; wallet_balance: number; transaction: WalletTransactionRow; quota: UserQuota } {
+  const price = params.slotPrice ?? getSlotPriceToman();
+  if (price <= 0) {
+    throw new Error('قیمت اسلات نامعتبر است.');
+  }
+
+  const txn = db.transaction(() => {
+    const user = getUserById(db, params.userId);
+    if (!user) {
+      throw new Error(`کاربر یافت نشد.`);
+    }
+
+    const currentBalance = user.wallet_balance || 0;
+    if (currentBalance < price) {
+      throw new Error(
+        `موجودی کیف پول شما (${currentBalance.toLocaleString('fa-IR')} تومان) برای خرید اسلات (${price.toLocaleString('fa-IR')} تومان) کافی نیست.`
+      );
+    }
+
+    const newBalance = currentBalance - price;
+    const newSlots = (user.extra_slots || 0) + 1;
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE users
+      SET wallet_balance = ?, extra_slots = ?, updated_at = ?
+      WHERE id = ?
+    `).run(newBalance, newSlots, now, params.userId);
+
+    const desc = `خرید ۱ اسلات ظرفیت پایش محصول`;
+    const insertTxn = db.prepare(`
+      INSERT INTO wallet_transactions (user_id, amount, balance_after, type, description, created_at)
+      VALUES (?, ?, ?, 'slot_purchase', ?, ?)
+    `);
+    const res = insertTxn.run(params.userId, -price, newBalance, desc, now);
+
+    const transaction: WalletTransactionRow = {
+      id: Number(res.lastInsertRowid),
+      user_id: params.userId,
+      amount: -price,
+      balance_after: newBalance,
+      type: 'slot_purchase',
+      description: desc,
+      created_at: now,
+    };
+
+    const quota = getUserQuota(db, params.userId, user.role === 'admin');
+
+    return {
+      extra_slots: newSlots,
+      wallet_balance: newBalance,
+      transaction,
+      quota,
+    };
+  });
+
+  return txn();
+}
+
+export function getUserWalletTransactions(
+  db: Database.Database,
+  userId: number,
+  limit = 20
+): WalletTransactionRow[] {
+  return db
+    .prepare(`
+      SELECT id, user_id, amount, balance_after, type, description, created_at
+      FROM wallet_transactions
+      WHERE user_id = ?
+      ORDER BY id DESC
+      LIMIT ?
+    `)
+    .all(userId, limit) as WalletTransactionRow[];
+}
+
 

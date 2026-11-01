@@ -67,7 +67,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || String(err) }, { status: 400 });
+    const message = err.message || String(err);
+    const isQuota = message.includes('سقف ظرفیت محصولات شما');
+    return NextResponse.json(
+      { error: message, quota_exceeded: isQuota },
+      { status: isQuota ? 403 : 400 }
+    );
   }
 }
 
