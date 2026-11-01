@@ -7,24 +7,34 @@ x-price-getter-environment: &price-getter-environment
   JWT_SECRET: "${JWT_SECRET:-change_this_to_a_random_secure_secret_in_production_32chars}"
   ADMIN_USERNAME: "${ADMIN_USERNAME:-admin}"
   ADMIN_INITIAL_PASSWORD: "${ADMIN_INITIAL_PASSWORD:-admin123456}"
+  TRIGGER_API_KEY: "${TRIGGER_API_KEY:-}"
+  brsapi_api: "${brsapi_api:-}"
+  SERVIX_API_KEY: "${SERVIX_API_KEY:-}"
 
 x-price-getter-volumes: &price-getter-volumes
   - ./data:/data
-  - ./data/config.yml:/data/config.yml
-  - ./data/price_getter.db:/data/price_getter.db
+
+x-price-getter-logging: &price-getter-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   app:
+    container_name: price-getter-app
     build:
       context: .
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       <<: *price-getter-environment
     ports:
-      - "${PRICE_GETTER_PORT:-8000}:8000"
+      - "${PRICE_GETTER_PUBLIC_PORT:-${PRICE_GETTER_PORT:-8000}}:8000"
     volumes: *price-getter-volumes
     restart: unless-stopped
+    logging: *price-getter-logging
     healthcheck:
       test:
         [
@@ -39,21 +49,33 @@ services:
       start_period: 20s
 
   scheduler:
+    container_name: price-getter-scheduler
     build:
       context: .
+    depends_on:
+      app:
+        condition: service_healthy
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       <<: *price-getter-environment
       PRICE_GETTER_RUN_INTERVAL_SECONDS: "${PRICE_GETTER_RUN_INTERVAL_SECONDS:-3600}"
     volumes: *price-getter-volumes
+    logging: *price-getter-logging
     command:
       - sh
       - -c
       - |
         while true; do
-          date -Iseconds
-          npm run cli -- run --config /data/config.yml
+          echo "[`date -Iseconds 2>/dev/null || date`] Starting scheduled price collection..."
+          if [ -f /data/config.yml ]; then
+            npm run cli -- run --config /data/config.yml || true
+          else
+            npm run cli -- run || true
+          fi
+          echo "[`date -Iseconds 2>/dev/null || date`] Collection finished. Sleeping for $${PRICE_GETTER_RUN_INTERVAL_SECONDS:-3600}s..."
           sleep "$${PRICE_GETTER_RUN_INTERVAL_SECONDS:-3600}"
         done
     restart: unless-stopped
+
