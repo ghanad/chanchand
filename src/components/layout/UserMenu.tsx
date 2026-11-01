@@ -130,10 +130,10 @@ export function UserMenu() {
   const roleLabel = currentUser.role === "admin" ? "مدیر سیستم" : "کاربر عادی";
 
   const quota = currentUser.quota;
-  const usedCount = quota?.usedCount ?? 0;
-  const totalLimit = quota?.totalLimit ?? 3;
+  const usedCount = Math.max(0, quota?.usedCount ?? 0);
+  const totalLimit = Math.max(1, quota?.totalLimit ?? 3);
   const isQuotaFull = quota ? !quota.canAdd || usedCount >= totalLimit : false;
-  const quotaPercent = Math.min(100, Math.round((usedCount / Math.max(1, totalLimit)) * 100));
+  const quotaPercent = Math.min(100, Math.max(0, Math.round((usedCount / totalLimit) * 100)));
 
   return (
     <div
@@ -206,7 +206,7 @@ export function UserMenu() {
                     <span>مصرف سهمیه:</span>
                     <strong>{formatNumber(usedCount)} از {formatNumber(totalLimit)} محصول</strong>
                   </div>
-                  <div className="user-dropdown-quota-track" role="progressbar" aria-valuenow={usedCount} aria-valuemin={0} aria-valuemax={totalLimit}>
+                  <div className="user-dropdown-quota-track" dir="rtl" role="progressbar" aria-valuenow={usedCount} aria-valuemin={0} aria-valuemax={totalLimit}>
                     <div
                       className={`user-dropdown-quota-fill ${isQuotaFull ? "is-full" : ""}`}
                       style={{ width: `${quotaPercent}%` }}
@@ -214,7 +214,7 @@ export function UserMenu() {
                   </div>
                   {isQuotaFull && (
                     <Link
-                      href="/account?tab=quota"
+                      href="/account/wallet"
                       role="menuitem"
                       tabIndex={isOpen ? 0 : -1}
                       onClick={() => setIsOpen(false)}
@@ -226,16 +226,35 @@ export function UserMenu() {
                   )}
                 </div>
               )}
+
+              {/* ردیف موجودی کیف پول و دکمه شارژ */}
+              <div className="user-dropdown-wallet">
+                <div className="user-dropdown-wallet-info">
+                  <span className="user-dropdown-wallet-title">موجودی کیف پول</span>
+                  <span className="user-dropdown-wallet-amount" dir="ltr">
+                    {formatNumber(currentUser.wallet_balance ?? 0)} تومان
+                  </span>
+                </div>
+                <Link
+                  href="/account/wallet?focus=topup"
+                  role="menuitem"
+                  tabIndex={isOpen ? 0 : -1}
+                  onClick={() => setIsOpen(false)}
+                  className="user-dropdown-wallet-btn"
+                >
+                  شارژ
+                </Link>
+              </div>
             </div>
           </div>
 
           <div className="user-dropdown-divider" role="separator" />
 
-          {/* گزینه‌های منو */}
+          {/* گزینه‌های منو: دیپ‌لینک به بخش‌های حساب کاربری */}
           <div className="user-dropdown-group" role="group">
-            {/* گزینه حساب من */}
+            {/* گزینه پروفایل */}
             <Link
-              href="/account"
+              href="/account/profile"
               role="menuitem"
               className="user-dropdown-item"
               tabIndex={isOpen ? 0 : -1}
@@ -255,7 +274,57 @@ export function UserMenu() {
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
-              <span>حساب من</span>
+              <span>پروفایل</span>
+            </Link>
+
+            {/* گزینه امنیت (تغییر کلمه عبور) */}
+            <Link
+              href="/account/security"
+              role="menuitem"
+              className="user-dropdown-item"
+              tabIndex={isOpen ? 0 : -1}
+              onClick={() => setIsOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>امنیت (تغییر کلمه عبور)</span>
+            </Link>
+
+            {/* گزینه کیف پول و تراکنشها */}
+            <Link
+              href="/account/wallet"
+              role="menuitem"
+              className="user-dropdown-item"
+              tabIndex={isOpen ? 0 : -1}
+              onClick={() => setIsOpen(false)}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+              </svg>
+              <span>کیف پول و تراکنشها</span>
             </Link>
           </div>
 

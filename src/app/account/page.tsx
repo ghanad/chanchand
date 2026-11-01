@@ -1,15 +1,24 @@
-import React, { Suspense } from "react";
-import { AccountView } from "@/components/views/AccountView";
+import { redirect } from "next/navigation";
 
-export const metadata = {
-  title: "حساب من — چن چند",
-  description: "مدیریت حساب کاربری، سهمیه پایش و بسته‌ها",
-};
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const params = await searchParams;
+  const tab = params?.tab;
+  const paymentStatus = params?.payment_status;
 
-export default function AccountPage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-muted)]">در حال بارگذاری حساب من...</div>}>
-      <AccountView />
-    </Suspense>
-  );
+  if (tab === "payments" || tab === "quota" || paymentStatus) {
+    const sp = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === "string") {
+        sp.set(key, value);
+      }
+    }
+    const query = sp.toString() ? `?${sp.toString()}` : "";
+    redirect(`/account/wallet${query}`);
+  }
+
+  redirect("/account/profile");
 }

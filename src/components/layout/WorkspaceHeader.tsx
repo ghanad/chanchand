@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "../../context/DashboardContext";
+import { formatNumber } from "../../lib/formatters";
 import { UserMenu } from "./UserMenu";
 
 interface MainNavItem {
@@ -158,7 +159,7 @@ function renderNavIcon(id: string) {
 
 export function WorkspaceHeader() {
   const pathname = usePathname();
-  const { isAdmin } = useDashboard();
+  const { isAdmin, currentUser } = useDashboard();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAdminDropdownOpen, setIsAdminDropdownOpen] = useState(false);
 
@@ -546,6 +547,21 @@ export function WorkspaceHeader() {
         </div>
 
         <div className="top-navbar-end">
+          {currentUser && (
+            <div className="header-wallet-chip" title="موجودی کیف پول">
+              <span className="header-wallet-label">موجودی:</span>
+              <span className="header-wallet-amount" dir="ltr">
+                {formatNumber(currentUser.wallet_balance ?? 0)} تومان
+              </span>
+              <Link
+                href="/account/wallet?focus=topup"
+                className="header-wallet-btn"
+                title="افزایش اعتبار کیف پول"
+              >
+                + شارژ
+              </Link>
+            </div>
+          )}
           <UserMenu />
         </div>
       </div>
