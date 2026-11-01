@@ -209,7 +209,7 @@ export function UserMenu() {
                   <div className="user-dropdown-quota-track" dir="rtl" role="progressbar" aria-valuenow={usedCount} aria-valuemin={0} aria-valuemax={totalLimit}>
                     <div
                       className={`user-dropdown-quota-fill ${isQuotaFull ? "is-full" : ""}`}
-                      style={{ width: `${quotaPercent}%` }}
+                      style={{ width: `${quotaPercent}%`, insetInlineStart: 0 }}
                     />
                   </div>
                   {isQuotaFull && (
