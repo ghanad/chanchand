@@ -2,9 +2,7 @@
 
 This guide covers deploying Price Getter on a public VPS (Ubuntu/Debian) using Docker Compose with user management and role-based access control.
 
-It runs two isolated container services:
-- `app`: Next.js web application and API on port `8000` (Node.js 22 runtime).
-- `scheduler`: background worker that runs price collection periodically.
+It runs the web application and API container (`app`) using the prebuilt image `ghanad/chanchand:latest` on port `8000` (Node.js 22 runtime). Periodic price collection is triggered via OS cron using the `/api/trigger-run` endpoint.
 
 ---
 
@@ -68,16 +66,10 @@ Edit `data/config.yml` with your desired target URLs, sources, and alert thresho
 
 ### B. Secrets & Environment File (`.env`)
 
-Create `.env` in the repository root:
+Create `.env` in the repository root (or copy from `.env.example`):
 
 ```bash
 cat > .env <<'EOF'
-# API keys
-brsapi_api=your_brsapi_key_here
-
-# Scheduler interval in seconds (default: 3600 = 1 hour)
-PRICE_GETTER_RUN_INTERVAL_SECONDS=3600
-
 # Public web port (80 for standard HTTP, or custom port behind reverse proxy)
 PRICE_GETTER_PUBLIC_PORT=80
 
@@ -85,6 +77,13 @@ PRICE_GETTER_PUBLIC_PORT=80
 JWT_SECRET=change_this_to_a_random_32_character_secret_string_now
 ADMIN_USERNAME=admin
 ADMIN_INITIAL_PASSWORD=YourStrongPasswordHere!
+
+# OS Cron / Scheduler Secret Key
+TRIGGER_API_KEY=your_secure_random_trigger_key_here
+
+# API keys for market sources
+brsapi_api=your_brsapi_key_here
+SERVIX_API_KEY=your_servix_key_here
 EOF
 ```
 
@@ -93,12 +92,12 @@ EOF
 
 ---
 
-## 4. Build and Start Services
+## 4. Pull Image and Start Services
 
-Build container images:
+Pull the latest Docker image:
 
 ```bash
-docker compose build
+docker compose pull
 ```
 
 Start services in detached background mode:
