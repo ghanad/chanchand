@@ -7,10 +7,20 @@ import { PanelHead } from "@/components/common/PanelHead";
 
 export default function AccountProfilePage() {
   const { currentUser, showToast, refreshCurrentUser } = useDashboard();
+
+  // Profile form state
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Change password form state
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -21,47 +31,81 @@ export default function AccountProfilePage() {
 
   if (!currentUser) return null;
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
-    setMessage(null);
+    setProfileSaving(true);
+    setProfileMessage(null);
     try {
       const res = await requestJson<{ success: boolean; message: string }>("/api/user/profile", {
         method: "PATCH",
         body: JSON.stringify({ email, mobile }),
       });
-      setMessage({ type: "success", text: res.message || "اطلاعات با موفقیت ذخیره شد." });
+      setProfileMessage({ type: "success", text: res.message || "اطلاعات با موفقیت ذخیره شد." });
       showToast("مشخصات حساب ذخیره شد.");
       await refreshCurrentUser();
     } catch (err: any) {
-      setMessage({
+      setProfileMessage({
         type: "error",
         text: err instanceof Error ? err.message : "خطا در ذخیره اطلاعات",
       });
     } finally {
-      setSaving(false);
+      setProfileSaving(false);
+    }
+  }
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordMessage(null);
+
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: "error", text: "کلمه عبور باید حداقل ۶ کاراکتر باشد." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: "error", text: "کلمه عبور جدید و تکرار آن یکسان نیستند." });
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await requestJson<{ success: boolean; message: string }>("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ newPassword }),
+      });
+      setPasswordMessage({ type: "success", text: res.message || "کلمه عبور با موفقیت به‌روزرسانی شد." });
+      setNewPassword("");
+      setConfirmPassword("");
+      showToast("کلمه عبور تغییر یافت.");
+    } catch (err: any) {
+      setPasswordMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "خطا در تغییر کلمه عبور",
+      });
+    } finally {
+      setPasswordSaving(false);
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* بخش ۱: مشخصات کاربری */}
       <div className="panel p-6 space-y-5">
         <PanelHead title="مشخصات کاربری" meta="مدیریت آدرس ایمیل و شماره موبایل" />
 
-        {message && (
+        {profileMessage && (
           <div
             className={`p-3 rounded-lg text-xs ${
-              message.type === "success"
+              profileMessage.type === "success"
                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20"
                 : "bg-rose-500/10 text-rose-600 dark:text-rose-300 border border-rose-500/20"
             }`}
             role="alert"
           >
-            {message.text}
+            {profileMessage.text}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleProfileSubmit} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
               نام کاربری (غیرقابل تغییر)
@@ -106,10 +150,94 @@ export default function AccountProfilePage() {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={saving}
+              disabled={profileSaving}
               className="btn btn-primary text-xs w-full py-2.5 font-bold"
             >
-              {saving ? "در حال ذخیره..." : "ذخیره تغییرات مشخصات"}
+              {profileSaving ? "در حال ذخیره..." : "ذخیره تغییرات مشخصات"}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* بخش ۲: تغییر کلمه عبور */}
+      <div className="panel p-6 space-y-5">
+        <PanelHead title="تغییر کلمه عبور" meta="امنیت و کلمه عبور حساب کاربری" />
+
+        {passwordMessage && (
+          <div
+            className={`p-3 rounded-lg text-xs ${
+              passwordMessage.type === "success"
+                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20"
+                : "bg-rose-500/10 text-rose-600 dark:text-rose-300 border border-rose-500/20"
+            }`}
+            role="alert"
+          >
+            {passwordMessage.text}
+          </div>
+        )}
+
+        <form onSubmit={handlePasswordSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
+              کلمه عبور جدید
+            </label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                dir="ltr"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="حداقل ۶ کاراکتر"
+                required
+                minLength={6}
+                className="w-full text-xs p-2.5 pl-9 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowNewPassword((prev) => !prev)}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
+                title={showNewPassword ? "مخفی کردن" : "نمایش"}
+              >
+                {showNewPassword ? "👁️" : "🙈"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
+              تکرار کلمه عبور جدید
+            </label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                dir="ltr"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="تکرار دقیق کلمه عبور"
+                required
+                minLength={6}
+                className="w-full text-xs p-2.5 pl-9 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
+                title={showConfirmPassword ? "مخفی کردن" : "نمایش"}
+              >
+                {showConfirmPassword ? "👁️" : "🙈"}
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={passwordSaving}
+              className="btn btn-secondary text-xs w-full py-2.5 font-bold"
+            >
+              {passwordSaving ? "در حال به‌روزرسانی..." : "به‌روزرسانی کلمه عبور"}
             </button>
           </div>
         </form>

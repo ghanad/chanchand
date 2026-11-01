@@ -60,7 +60,6 @@ export default function AccountLayout({
 
   const tabs = [
     { href: "/account/profile", label: "پروفایل", icon: "👤" },
-    { href: "/account/security", label: "امنیت", icon: "🔒" },
     { href: "/account/wallet", label: "کیف پول", icon: "💳" },
   ];
 
