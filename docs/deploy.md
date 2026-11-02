@@ -260,11 +260,11 @@ crontab -e
 Add your desired schedule:
 
 ```cron
-# Run price collection every hour at minute 0:
-0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
+# Run price collection once a day at 04:00 AM (Recommended):
+0 4 * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
 
-# Or run twice a day (e.g. 10:00 and 18:00):
-0 10,18 * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
+# Or run every hour at minute 0 (already collected items today will automatically be skipped unless force=true):
+0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
 ```
 
 ### 8.4 Alternative: Direct CLI Cron

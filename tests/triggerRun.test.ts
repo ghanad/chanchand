@@ -9,6 +9,8 @@ import {
   createUser,
   addManagedProduct,
   addManagedSource,
+  startRun,
+  recordPrice,
 } from '../src/lib/db';
 import { signAuthToken, AUTH_COOKIE_NAME } from '../src/lib/jwt';
 import { POST as triggerRunPost, GET as triggerRunGet } from '../src/app/api/trigger-run/route';
@@ -178,5 +180,55 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
     const res = await middleware(req);
     expect(res.status).toBe(200);
     expect(res.headers.get('location')).toBeNull();
+  });
+
+  it('defaults force to false and skips products already collected today unless force=true', async () => {
+    const db = getDatabase();
+    // Simulate that product was already collected today
+    const dummyRunId = startRun(db, null, null, undefined, undefined, 'manual');
+    recordPrice(
+      db,
+      dummyRunId,
+      {
+        product_key: 'test-product',
+        source_key: 'test_mock_source',
+        url: 'https://example.com/item/1',
+        enabled: true,
+      },
+      {
+        title: 'Already collected product',
+        price_irr: 120000,
+        availability: 'in_stock',
+        seller: 'Shop A',
+        raw_observation: {},
+      }
+    );
+    db.close();
+
+    // 1. Calling trigger-run with default force (which is false):
+    const req1 = new NextRequest('https://example.com/api/trigger-run', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res1 = await triggerRunPost(req1);
+    expect(res1.status).toBe(200);
+    const json1 = await res1.json();
+    expect(json1.force).toBe(false);
+    expect(json1.success_count).toBe(0); // skipped because already collected today!
+
+    // 2. Calling trigger-run with explicit force=true query param
+    const req2 = new NextRequest('https://example.com/api/trigger-run?force=true', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res2 = await triggerRunPost(req2);
+    expect(res2.status).toBe(200);
+    const json2 = await res2.json();
+    expect(json2.force).toBe(true);
+    expect(json2.target_count).toBe(1);
   });
 });

@@ -15,7 +15,7 @@ async function handleTrigger(req: NextRequest) {
     }
 
     let productKey: string | null = null;
-    let force = true; // Default to true so OS cron executes fresh fetches
+    let force = false; // Default to false so daily collection is respected (skips targets already collected today)
 
     let explicitSource: string | null = null;
 
