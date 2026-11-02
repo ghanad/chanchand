@@ -7,6 +7,7 @@ import {
   recordPrice,
   recordError,
   hasSuccessfulPriceToday,
+  isMarketSource,
   getManagedTargets,
   getSourcesMap,
 } from './db';
@@ -123,12 +124,7 @@ export class PriceRunner {
           continue;
         }
 
-        const isMarket =
-          source.adapter === 'brsapi_market' ||
-          source.adapter === 'servix_market' ||
-          target.source_key.includes('market') ||
-          target.source_key.includes('servix') ||
-          target.source_key.includes('brsapi');
+        const isMarket = isMarketSource(target.source_key, source.adapter) || target.product_key === USD_PRODUCT_KEY;
 
         if (!options?.force && !isMarket && hasSuccessfulPriceToday(db, target.product_key, undefined, target.url, target.source_key)) {
           console.log(`[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`);
@@ -208,7 +204,9 @@ export class PriceRunner {
       const elapsed = (Date.now() - last) / 1000;
       const waitTime = rateLimitSeconds - elapsed;
       if (waitTime > 0) {
-        await sleep(waitTime * 1000);
+        // Add subtle random jitter for realistic intervals when rate_limit_seconds >= 1s
+        const jitterMs = rateLimitSeconds >= 1 ? Math.floor(Math.random() * 600) + 200 : 0;
+        await sleep(waitTime * 1000 + jitterMs);
       }
     }
   }

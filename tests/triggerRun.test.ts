@@ -231,4 +231,81 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
     expect(json2.force).toBe(true);
     expect(json2.target_count).toBe(1);
   });
+
+  it('staggers collection across 24 hours using LRU batching and keeps market targets in every batch', async () => {
+    const db = getDatabase();
+    // Add market source & product
+    addManagedSource(db, {
+      key: 'servix_market',
+      adapter: 'servix_market',
+      rate_limit_seconds: 0,
+      price_multiplier: 1,
+      currency: 'IRR',
+    });
+    addManagedProduct(db, {
+      title: 'USD Currency',
+      url: 'https://example.com/usd',
+      source_key: 'servix_market',
+      user_id: 1,
+      is_public: true,
+      adapter_settings: {},
+    });
+
+    // Add 12 regular products (total 13 regular products including the one from beforeEach)
+    for (let i = 2; i <= 13; i++) {
+      addManagedProduct(db, {
+        title: `Product ${i}`,
+        url: `https://example.com/item/${i}`,
+        source_key: 'test_mock_source',
+        user_id: 1,
+        is_public: true,
+        adapter_settings: { selector: '.price' },
+      });
+    }
+
+    db.close();
+
+    // 1. First hourly call without parameters (Math.ceil(13 / 24) = 1 non-market + 1 market target = 2 total)
+    const req1 = new NextRequest('https://example.com/api/trigger-run', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res1 = await triggerRunPost(req1);
+    expect(res1.status).toBe(200);
+    const json1 = await res1.json();
+    expect(json1.ok).toBe(true);
+    expect(json1.batch_size).toBe(1); // Math.ceil(13 / 24) = 1
+    expect(json1.target_count).toBe(2); // 1 market + 1 non-market
+    expect(json1.total_eligible_today).toBe(13);
+    expect(json1.remaining_today).toBe(12);
+
+    // 2. Custom limit override (e.g. limit=5)
+    const req2 = new NextRequest('https://example.com/api/trigger-run?limit=5', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res2 = await triggerRunPost(req2);
+    expect(res2.status).toBe(200);
+    const json2 = await res2.json();
+    expect(json2.ok).toBe(true);
+    expect(json2.batch_size).toBe(5);
+    expect(json2.target_count).toBe(6); // 1 market + 5 non-market
+
+    // 3. Force=true runs all active targets without batch limit
+    const req3 = new NextRequest('https://example.com/api/trigger-run?force=true', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res3 = await triggerRunPost(req3);
+    expect(res3.status).toBe(200);
+    const json3 = await res3.json();
+    expect(json3.force).toBe(true);
+    expect(json3.target_count).toBe(14); // 13 regular + 1 market
+  });
 });

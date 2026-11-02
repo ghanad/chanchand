@@ -24,6 +24,7 @@ import {
   WalletTransactionRow,
 } from './types';
 import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
+import { USD_PRODUCT_KEY } from './serializers';
 
 export const DEFAULT_DB_URL = 'sqlite:///data/price_getter.db';
 export const FREE_PRODUCT_LIMIT = 3;
@@ -1359,6 +1360,125 @@ export function recordError(
   return Number(res.lastInsertRowid);
 }
 
+export function isMarketSource(sourceKey?: string, adapter?: string): boolean {
+  if (adapter === 'brsapi_market' || adapter === 'servix_market') return true;
+  if (!sourceKey) return false;
+  const lower = sourceKey.toLowerCase();
+  return lower.includes('market') || lower.includes('servix') || lower.includes('brsapi');
+}
+
+export interface ScheduledBatchOptions {
+  limit?: number;
+  force?: boolean;
+  spread?: boolean;
+  runsPerDay?: number;
+}
+
+export interface ScheduledBatchResult {
+  targets: TargetConfig[];
+  batchSize: number;
+  totalManagedTargets: number;
+  totalMarketTargets: number;
+  totalNonMarketTargets: number;
+  totalEligibleNonMarket: number;
+  remainingToday: number;
+}
+
+export function getScheduledBatchTargets(
+  db: Database.Database,
+  allActiveTargets: TargetConfig[],
+  options: ScheduledBatchOptions = {}
+): ScheduledBatchResult {
+  const { limit, force = false, spread = true, runsPerDay = 24 } = options;
+
+  const marketTargets: TargetConfig[] = [];
+  const nonMarketTargets: TargetConfig[] = [];
+
+  for (const t of allActiveTargets) {
+    if (isMarketSource(t.source_key) || t.product_key === USD_PRODUCT_KEY) {
+      marketTargets.push(t);
+    } else {
+      nonMarketTargets.push(t);
+    }
+  }
+
+  if (force || !spread) {
+    return {
+      targets: allActiveTargets,
+      batchSize: allActiveTargets.length,
+      totalManagedTargets: allActiveTargets.length,
+      totalMarketTargets: marketTargets.length,
+      totalNonMarketTargets: nonMarketTargets.length,
+      totalEligibleNonMarket: nonMarketTargets.length,
+      remainingToday: 0,
+    };
+  }
+
+  const eligibleNonMarket = nonMarketTargets.filter(
+    (t) => !hasSuccessfulPriceToday(db, t.product_key, undefined, t.url, t.source_key)
+  );
+
+  if (eligibleNonMarket.length === 0) {
+    return {
+      targets: marketTargets,
+      batchSize: 0,
+      totalManagedTargets: allActiveTargets.length,
+      totalMarketTargets: marketTargets.length,
+      totalNonMarketTargets: nonMarketTargets.length,
+      totalEligibleNonMarket: 0,
+      remainingToday: 0,
+    };
+  }
+
+  // Find last attempt timestamp for eligible targets to prioritize LRU
+  const attempts = db.prepare(`
+    SELECT product_key, url, MAX(observed_at) as last_time
+    FROM (
+      SELECT product_key, url, observed_at FROM price_snapshots
+      UNION ALL
+      SELECT product_key, url, observed_at FROM fetch_errors
+    )
+    GROUP BY product_key, url
+  `).all() as { product_key: string; url: string; last_time: string }[];
+
+  const lastAttemptMap = new Map<string, string>();
+  for (const row of attempts) {
+    lastAttemptMap.set(`${row.product_key}:::${row.url}`, row.last_time);
+  }
+
+  eligibleNonMarket.sort((a, b) => {
+    const timeA = lastAttemptMap.get(`${a.product_key}:::${a.url}`) || '';
+    const timeB = lastAttemptMap.get(`${b.product_key}:::${b.url}`) || '';
+    if (!timeA && !timeB) return 0;
+    if (!timeA) return -1; // null/unattempted first
+    if (!timeB) return 1;
+    return timeA.localeCompare(timeB); // oldest first
+  });
+
+  let effectiveBatchSize: number;
+  if (typeof limit === 'number' && limit > 0) {
+    effectiveBatchSize = limit;
+  } else if (process.env.PRICE_GETTER_BATCH_SIZE && parseInt(process.env.PRICE_GETTER_BATCH_SIZE, 10) > 0) {
+    effectiveBatchSize = parseInt(process.env.PRICE_GETTER_BATCH_SIZE, 10);
+  } else {
+    const rpd = process.env.CRON_RUNS_PER_DAY ? parseInt(process.env.CRON_RUNS_PER_DAY, 10) : runsPerDay;
+    effectiveBatchSize = Math.max(1, Math.ceil(nonMarketTargets.length / Math.max(1, rpd)));
+  }
+
+  const selectedNonMarket = eligibleNonMarket.slice(0, effectiveBatchSize);
+  const remainingToday = Math.max(0, eligibleNonMarket.length - selectedNonMarket.length);
+
+  return {
+    targets: [...marketTargets, ...selectedNonMarket],
+    batchSize: effectiveBatchSize,
+    totalManagedTargets: allActiveTargets.length,
+    totalMarketTargets: marketTargets.length,
+    totalNonMarketTargets: nonMarketTargets.length,
+    totalEligibleNonMarket: eligibleNonMarket.length,
+    remainingToday,
+  };
+}
+
 export function hasSuccessfulPriceToday(
   db: Database.Database,
   productKey: string,
@@ -1370,11 +1490,7 @@ export function hasSuccessfulPriceToday(
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
 
-  const isMarket = sourceKey && (
-    sourceKey.includes('market') ||
-    sourceKey.includes('servix') ||
-    sourceKey.includes('brsapi')
-  );
+  const isMarket = isMarketSource(sourceKey);
 
   let row;
   if (url && !isMarket) {

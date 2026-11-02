@@ -208,8 +208,12 @@ TRIGGER_API_KEY=your_secure_random_trigger_key_here
 You can trigger the price collection using `curl` with a Bearer token or `x-api-key` header:
 
 ```bash
-# Trigger full collection synchronously:
+# Trigger staggered collection (runs hourly batch of non-market items + all market items):
 curl -s -X POST http://localhost:8000/api/trigger-run \
+  -H "Authorization: Bearer your_secure_random_trigger_key_here"
+
+# Alternative using custom batch limit:
+curl -s -X POST "http://localhost:8000/api/trigger-run?limit=25" \
   -H "Authorization: Bearer your_secure_random_trigger_key_here"
 
 # Alternative using x-api-key header:
@@ -229,13 +233,18 @@ curl -s -X POST http://localhost:8000/api/trigger-run \
   "ok": true,
   "run_id": 42,
   "status": "success",
-  "target_count": 8,
-  "success_count": 8,
+  "trigger_source": "cron",
+  "target_count": 43,
+  "success_count": 43,
   "error_count": 0,
+  "batch_size": 42,
+  "total_eligible_today": 958,
+  "remaining_today": 916,
+  "total_managed_targets": 1001,
   "duration_ms": 3450,
   "started_at": "2026-10-31T21:55:00.000Z",
   "finished_at": "2026-10-31T21:55:03.450Z",
-  "force": true
+  "force": false
 }
 ```
 
@@ -260,10 +269,9 @@ crontab -e
 Add your desired schedule:
 
 ```cron
-# Run price collection once a day at 04:00 AM (Recommended):
-0 4 * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
-
-# Or run every hour at minute 0 (already collected items today will automatically be skipped unless force=true):
+# Hourly cron (Recommended for multi-product catalogs):
+# Automatically distributes non-market products across the 24 hours of the day using LRU batching (~N/24 items per hour)
+# while checking market currencies (gold/USD) on every hourly run:
 0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
 ```
 
