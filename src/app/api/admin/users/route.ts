@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     const password = body?.password;
     const role = body?.role === 'admin' ? 'admin' : 'viewer';
     const email = body?.email ? String(body.email).trim() : null;
+    const mobile = body?.mobile ? String(body.mobile).trim() : null;
     const mustChangePassword = Boolean(body?.must_change_password);
 
     if (!username || username.length < 3) {
@@ -53,6 +54,7 @@ export async function POST(req: NextRequest) {
       password_hash: passwordHash,
       role,
       email,
+      mobile,
       must_change_password: mustChangePassword,
     });
 

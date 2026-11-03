@@ -224,14 +224,6 @@ export function WorkspaceHeader() {
     return false;
   }
 
-  const isAdminSectionActive =
-    pathname.startsWith("/admin") ||
-    pathname === "/runs" ||
-    pathname.startsWith("/runs/") ||
-    pathname === "/sources" ||
-    pathname.startsWith("/sources/") ||
-    pathname === "/users" ||
-    pathname.startsWith("/users/");
 
   // Close menus on route transition
   useEffect(() => {
@@ -466,8 +458,8 @@ export function WorkspaceHeader() {
                 id="admin-menu-button"
                 type="button"
                 className={`top-nav-link top-nav-dropdown-trigger ${
-                  isAdminSectionActive ? "active" : ""
-                } ${isAdminDropdownOpen ? "is-open" : ""}`}
+                  isAdminDropdownOpen ? "is-open" : ""
+                }`}
                 onClick={() => {
                   if (isAdminDropdownOpen) {
                     setIsAdminDropdownOpen(false);
