@@ -269,9 +269,9 @@ crontab -e
 Add your desired schedule:
 
 ```cron
-# Hourly cron (Recommended for multi-product catalogs):
-# Automatically distributes non-market products across the 24 hours of the day using LRU batching (~N/24 items per hour)
-# while checking market currencies (gold/USD) on every hourly run:
+# Hourly cron (Recommended):
+# Automatically collects public products every hour between 08:00 and 23:00,
+# while checking market currencies (gold/USD) and staggering private products across the 24 hours of the day:
 0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer your_secure_random_trigger_key_here" >> /var/log/price-getter-cron.log 2>&1
 ```
 
