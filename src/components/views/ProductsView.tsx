@@ -451,6 +451,37 @@ export function ProductsView() {
             }
           />
 
+          {currentUser && currentUser.role !== "admin" && currentUser.quota?.isExpired && (
+            <div
+              style={{
+                margin: "12px 16px",
+                padding: "12px 16px",
+                borderRadius: "8px",
+                background: "rgba(180, 59, 59, 0.08)",
+                border: "1px solid rgba(180, 59, 59, 0.25)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                fontSize: "12.5px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)" }}>
+                <span aria-hidden="true" style={{ fontSize: "16px" }}>⚠️</span>
+                <span>
+                  <strong>اشتراک ماهانه ظرفیت شما منقضی شده است.</strong> پایش محصولات مازاد متوقف شده است. جهت ادامه پایش خودکار، اشتراک خود را تمدید فرمایید.
+                </span>
+              </div>
+              <Link
+                href="/account/wallet"
+                className="btn btn-primary btn-sm"
+                style={{ whiteSpace: "nowrap" }}
+              >
+                تمدید / شارژ اشتراک
+              </Link>
+            </div>
+          )}
+
           {/* Search & Filter Toolbar */}
           <div className="product-table-toolbar">
             <div className="product-search-wrapper">

@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'اسلات محصول با موفقیت خریداری شد.',
+      message: 'شارژ ماهانه ۱ اسلات ظرفیت پایش (۳۰ روزه) با موفقیت فعال شد.',
       ...result,
     });
   } catch (err: any) {

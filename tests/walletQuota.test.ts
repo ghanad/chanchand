@@ -14,6 +14,7 @@ import {
   getUserWalletTransactions,
   getSlotPriceToman,
   FREE_PRODUCT_LIMIT,
+  isProductEligibleForCollection,
 } from '../src/lib/db';
 import { hashPassword, signAuthToken, AUTH_COOKIE_NAME } from '../src/lib/auth';
 import { POST as postProduct } from '../src/app/api/products/route';
@@ -219,5 +220,83 @@ describe('User Product Quota and Wallet Monetization', () => {
     expect(buyRes.status).toBe(400);
     const buyData = await buyRes.json();
     expect(buyData.error).toContain('کافی نیست');
+  });
+
+  it('sets 30-day expiration date upon purchasing slot and creates user_subscriptions entry', async () => {
+    const db = getDatabase();
+    // Admin charges user wallet with 50,000
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+
+    const purchaseRes = purchaseProductSlot(db, { userId: viewerId });
+    expect(purchaseRes.extra_slots).toBe(1);
+    expect(purchaseRes.slot_expires_at).toBeDefined();
+
+    const expiryDate = new Date(purchaseRes.slot_expires_at);
+    const now = new Date();
+    const diffDays = Math.round((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    expect(diffDays).toBe(30);
+
+    const quota = getUserQuota(db, viewerId, false);
+    expect(quota.extraSlots).toBe(1);
+    expect(quota.isExpired).toBe(false);
+    expect(quota.daysRemaining).toBe(30);
+
+    // Verify subscription record was created
+    const subs = db.prepare('SELECT * FROM user_subscriptions WHERE user_id = ?').all(viewerId) as any[];
+    expect(subs.length).toBe(1);
+    expect(subs[0].slots).toBe(1);
+    expect(subs[0].duration_days).toBe(30);
+    expect(subs[0].source_type).toBe('wallet_slot');
+    expect(subs[0].status).toBe('active');
+
+    db.close();
+  });
+
+  it('treats expired extra slots as 0 and flags isExpired when slot_expires_at is in the past', () => {
+    const db = getDatabase();
+    const pastDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+
+    db.prepare('UPDATE users SET extra_slots = 5, slot_expires_at = ? WHERE id = ?').run(pastDate, viewerId);
+
+    const quota = getUserQuota(db, viewerId, false);
+    expect(quota.extraSlots).toBe(0);
+    expect(quota.isExpired).toBe(true);
+    expect(quota.daysRemaining).toBe(0);
+    expect(quota.totalLimit).toBe(3); // Falls back to 3 free limit
+
+    db.close();
+  });
+
+  it('pauses collection for excess products when user subscription expires', () => {
+    const db = getDatabase();
+
+    // User adds 4 products
+    const p1 = addManagedProduct(db, { title: 'P1', url: 'https://digikala.com/p1', user_id: viewerId }).product_key;
+    const p2 = addManagedProduct(db, { title: 'P2', url: 'https://digikala.com/p2', user_id: viewerId }).product_key;
+    const p3 = addManagedProduct(db, { title: 'P3', url: 'https://digikala.com/p3', user_id: viewerId }).product_key;
+
+    // Grant 1 extra slot valid in the future
+    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE users SET extra_slots = 1, slot_expires_at = ? WHERE id = ?').run(futureDate, viewerId);
+
+    const p4 = addManagedProduct(db, { title: 'P4', url: 'https://digikala.com/p4', user_id: viewerId }).product_key;
+
+    // Both p1 (free) and p4 (extra) are eligible while subscription is active
+    expect(isProductEligibleForCollection(db, p1)).toBe(true);
+    expect(isProductEligibleForCollection(db, p4)).toBe(true);
+
+    // Now simulate subscription expiration
+    const pastDate = new Date(Date.now() - 1000).toISOString();
+    db.prepare('UPDATE users SET slot_expires_at = ? WHERE id = ?').run(pastDate, viewerId);
+
+    // p1, p2, p3 (first 3 free products) are still eligible
+    expect(isProductEligibleForCollection(db, p1)).toBe(true);
+    expect(isProductEligibleForCollection(db, p2)).toBe(true);
+    expect(isProductEligibleForCollection(db, p3)).toBe(true);
+
+    // p4 (excess product beyond free 3) is now ineligible / paused!
+    expect(isProductEligibleForCollection(db, p4)).toBe(false);
+
+    db.close();
   });
 });

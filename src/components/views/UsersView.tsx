@@ -19,6 +19,7 @@ interface UserItem {
   must_change_password?: boolean;
   wallet_balance?: number;
   extra_slots?: number;
+  slot_expires_at?: string | null;
   used_slots?: number;
   total_slots?: number;
   created_at: string;
@@ -27,6 +28,7 @@ interface UserItem {
 
 export function UsersView() {
   const { currentUser, showToast, setLoading, refreshTick, triggerRefresh } = useDashboard();
+  const [nowMs] = useState(() => Date.now());
   const [users, setUsers] = useState<UserItem[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
 
@@ -580,9 +582,24 @@ export function UsersView() {
                             {formatNumber(user.wallet_balance ?? 0)} تومان
                           </span>
                           <span className="wallet-slots-sub">
-                            {isAdminUser
-                              ? "ظرفیت نامحدود"
-                              : `${formatNumber(user.extra_slots ?? 0)} اسلات اضافه (${formatNumber(3 + (user.extra_slots ?? 0))} کل)`}
+                            {isAdminUser ? (
+                              "ظرفیت نامحدود"
+                            ) : (
+                              <>
+                                <span>{formatNumber(user.extra_slots ?? 0)} اسلات ماهانه ({formatNumber(3 + (user.extra_slots ?? 0))} کل)</span>
+                                {user.slot_expires_at && (
+                                  new Date(user.slot_expires_at).getTime() <= nowMs ? (
+                                    <span style={{ color: "var(--danger)", display: "block", fontSize: "11px" }}>
+                                      (منقضی شده)
+                                    </span>
+                                  ) : (
+                                    <span style={{ color: "var(--ok)", display: "block", fontSize: "11px" }}>
+                                      ({Math.max(1, Math.ceil((new Date(user.slot_expires_at).getTime() - nowMs) / (1000 * 60 * 60 * 24)))} روز مانده)
+                                    </span>
+                                  )
+                                )}
+                              </>
+                            )}
                           </span>
                         </div>
                       </td>

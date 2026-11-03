@@ -6,6 +6,7 @@ import {
   getUserQuota,
   getSlotPriceToman,
   getUserWalletTransactions,
+  getUserSubscriptions,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -25,14 +26,17 @@ export async function GET(req: NextRequest) {
 
     const quota = getUserQuota(db, user.id, user.role === 'admin');
     const transactions = getUserWalletTransactions(db, user.id, 20);
+    const subscriptions = getUserSubscriptions(db, user.id);
     const slotPrice = getSlotPriceToman();
 
     return NextResponse.json({
       wallet_balance: user.wallet_balance ?? 0,
       extra_slots: user.extra_slots ?? 0,
+      slot_expires_at: user.slot_expires_at ?? null,
       slot_price: slotPrice,
       quota,
       transactions,
+      subscriptions,
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'خطا در دریافت اطلاعات کیف پول' }, { status: 500 });

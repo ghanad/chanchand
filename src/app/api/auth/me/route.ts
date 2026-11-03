@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
         must_change_password: Boolean(user.must_change_password),
         wallet_balance: user.wallet_balance ?? 0,
         extra_slots: user.extra_slots ?? 0,
+        slot_expires_at: user.slot_expires_at ?? null,
         quota,
         slot_price: getSlotPriceToman(),
         created_at: user.created_at,

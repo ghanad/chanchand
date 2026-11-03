@@ -13,6 +13,9 @@ export interface UserQuotaInfo {
   usedCount: number;
   remaining: number;
   canAdd: boolean;
+  slotExpiresAt?: string | null;
+  daysRemaining?: number | null;
+  isExpired?: boolean;
 }
 
 export interface CurrentUser {
@@ -24,6 +27,7 @@ export interface CurrentUser {
   must_change_password?: boolean;
   wallet_balance?: number;
   extra_slots?: number;
+  slot_expires_at?: string | null;
   quota?: UserQuotaInfo;
   slot_price?: number;
 }

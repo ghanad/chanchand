@@ -128,6 +128,7 @@ export interface UserRow {
   must_change_password: number;
   wallet_balance: number;
   extra_slots: number;
+  slot_expires_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,6 +142,7 @@ export interface SafeUser {
   must_change_password: boolean;
   wallet_balance: number;
   extra_slots: number;
+  slot_expires_at?: string | null;
   used_slots?: number;
   total_slots?: number;
   created_at: string;
@@ -164,6 +166,9 @@ export interface UserQuota {
   usedCount: number;
   remaining: number;
   canAdd: boolean;
+  slotExpiresAt?: string | null;
+  daysRemaining?: number | null;
+  isExpired?: boolean;
 }
 
 export interface PackageRow {
@@ -172,10 +177,28 @@ export interface PackageRow {
   title: string;
   slots: number;
   price_toman: number;
+  duration_days?: number;
   description: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface UserSubscriptionRow {
+  id: number;
+  user_id: number;
+  slots: number;
+  price_toman: number;
+  duration_days: number;
+  source_type: 'package' | 'wallet_slot' | 'admin';
+  package_id?: number | null;
+  package_key?: string | null;
+  package_title?: string | null;
+  payment_transaction_id?: number | null;
+  starts_at: string;
+  expires_at: string;
+  status: 'active' | 'expired' | 'canceled';
+  created_at: string;
 }
 
 export type PaymentStatus = 'pending' | 'paid' | 'failed';

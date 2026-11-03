@@ -33,6 +33,8 @@ export async function PUT(
       role?: 'admin' | 'viewer';
       email?: string | null;
       must_change_password?: boolean;
+      extra_slots?: number;
+      slot_expires_at?: string | null;
     } = {};
 
     if (body.role && (body.role === 'admin' || body.role === 'viewer')) {
@@ -45,6 +47,14 @@ export async function PUT(
 
     if (body.must_change_password !== undefined) {
       updateParams.must_change_password = Boolean(body.must_change_password);
+    }
+
+    if (body.extra_slots !== undefined) {
+      updateParams.extra_slots = Math.max(0, parseInt(body.extra_slots, 10) || 0);
+    }
+
+    if (body.slot_expires_at !== undefined) {
+      updateParams.slot_expires_at = body.slot_expires_at ? String(body.slot_expires_at) : null;
     }
 
     if (body.password) {

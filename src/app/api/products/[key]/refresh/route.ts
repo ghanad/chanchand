@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PriceRunner } from '@/lib/runner';
-import { getDatabase, getManagedTargets, startRun, isUserTrackingProduct } from '@/lib/db';
+import { getDatabase, getManagedTargets, startRun, isUserTrackingProduct, isProductEligibleForCollection } from '@/lib/db';
 import { requireAuth } from '@/lib/api-guard';
 import { TargetConfig } from '@/lib/types';
 
@@ -38,6 +38,15 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
         { error: 'دسترسی غیرمجاز: کاربران عادی فقط مجاز به استعلام دستی محصولات اختصاصی خود هستند.' },
         { status: 403 }
       );
+    }
+
+    if (auth.user.role !== 'admin' && prod.is_public !== 1) {
+      if (!isProductEligibleForCollection(db, productKey)) {
+        return NextResponse.json(
+          { error: 'اشتراک ظرفیت پایش شما منقضی شده است و این محصول خارج از سهمیه پایه شما قرار دارد. لطفاً جهت استعلام دستی، اشتراک خود را تمدید فرمایید.' },
+          { status: 403 }
+        );
+      }
     }
 
     const managedTargets = getManagedTargets(db);

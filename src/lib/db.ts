@@ -21,6 +21,7 @@ import {
   UserQuota,
   UserRole,
   UserRow,
+  UserSubscriptionRow,
   WalletTransactionRow,
 } from './types';
 import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
@@ -189,6 +190,7 @@ export function initDatabase(db: Database.Database): void {
       must_change_password INTEGER NOT NULL DEFAULT 0,
       wallet_balance INTEGER NOT NULL DEFAULT 0,
       extra_slots INTEGER NOT NULL DEFAULT 0,
+      slot_expires_at DATETIME DEFAULT NULL,
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     );
@@ -221,6 +223,7 @@ export function initDatabase(db: Database.Database): void {
       title VARCHAR(128) NOT NULL,
       slots INTEGER NOT NULL,
       price_toman INTEGER NOT NULL,
+      duration_days INTEGER NOT NULL DEFAULT 30,
       description TEXT,
       is_active INTEGER NOT NULL DEFAULT 1,
       created_at DATETIME NOT NULL,
@@ -248,6 +251,26 @@ export function initDatabase(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS ix_payment_transactions_user_id ON payment_transactions(user_id);
     CREATE INDEX IF NOT EXISTS ix_payment_transactions_authority ON payment_transactions(authority);
     CREATE INDEX IF NOT EXISTS ix_payment_transactions_status ON payment_transactions(status);
+
+    CREATE TABLE IF NOT EXISTS user_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      slots INTEGER NOT NULL,
+      price_toman INTEGER NOT NULL,
+      duration_days INTEGER NOT NULL DEFAULT 30,
+      source_type VARCHAR(32) NOT NULL,
+      package_id INTEGER REFERENCES packages(id),
+      package_key VARCHAR(64),
+      package_title VARCHAR(128),
+      payment_transaction_id INTEGER REFERENCES payment_transactions(id),
+      starts_at DATETIME NOT NULL,
+      expires_at DATETIME NOT NULL,
+      status VARCHAR(32) NOT NULL DEFAULT 'active',
+      created_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_user_subscriptions_user_id ON user_subscriptions(user_id);
+    CREATE INDEX IF NOT EXISTS ix_user_subscriptions_status ON user_subscriptions(status);
+    CREATE INDEX IF NOT EXISTS ix_user_subscriptions_expires_at ON user_subscriptions(expires_at);
   `);
 
   try {
@@ -280,25 +303,62 @@ export function initDatabase(db: Database.Database): void {
       if (!userColumns.some((col) => col.name === 'mobile')) {
         db.prepare('ALTER TABLE users ADD COLUMN mobile VARCHAR(32)').run();
       }
+      if (!userColumns.some((col) => col.name === 'slot_expires_at')) {
+        db.prepare('ALTER TABLE users ADD COLUMN slot_expires_at DATETIME DEFAULT NULL').run();
+      }
     }
   } catch {
     // Migration skipped if already present or table not yet accessible
   }
 
   try {
+    const pkgColumns = db.prepare('PRAGMA table_info(packages)').all() as { name: string }[];
+    if (pkgColumns.length > 0 && !pkgColumns.some((col) => col.name === 'duration_days')) {
+      db.prepare('ALTER TABLE packages ADD COLUMN duration_days INTEGER NOT NULL DEFAULT 30').run();
+    }
+
     const pkgCount = (db.prepare('SELECT count(*) as count FROM packages').get() as { count: number })?.count ?? 0;
     if (pkgCount === 0) {
       const now = new Date().toISOString();
       const insertPkg = db.prepare(`
-        INSERT INTO packages (key, title, slots, price_toman, description, is_active, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+        INSERT INTO packages (key, title, slots, price_toman, duration_days, description, is_active, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 30, ?, 1, ?, ?)
       `);
-      insertPkg.run('pkg_5', 'بسته ۵ تایی محصول', 5, 75000, 'امکان پایش ۵ محصول جدید اضافه به صورت دائمی', now, now);
-      insertPkg.run('pkg_10', 'بسته ۱۰ تایی محصول', 10, 140000, 'امکان پایش ۱۰ محصول جدید اضافه به صورت دائمی (تخفیف ویژه)', now, now);
-      insertPkg.run('pkg_25', 'بسته ۲۵ تایی محصول', 25, 300000, 'امکان پایش ۲۵ محصول جدید اضافه برای کاربران حرفه‌ای', now, now);
+      insertPkg.run('pkg_5', 'بسته ۵ تایی محصول (ماهانه)', 5, 75000, 'امکان پایش ۵ محصول جدید اضافه به مدت ۳۰ روز', now, now);
+      insertPkg.run('pkg_10', 'بسته ۱۰ تایی محصول (ماهانه)', 10, 140000, 'امکان پایش ۱۰ محصول جدید اضافه به مدت ۳۰ روز (تخفیف ویژه)', now, now);
+      insertPkg.run('pkg_25', 'بسته ۲۵ تایی محصول (ماهانه)', 25, 300000, 'امکان پایش ۲۵ محصول جدید اضافه برای کاربران حرفه‌ای (۳۰ روزه)', now, now);
+    } else {
+      // Update existing packages descriptions if they mention "دائمی"
+      db.prepare(`
+        UPDATE packages
+        SET description = REPLACE(description, 'به صورت دائمی', 'به مدت ۳۰ روز (ماهانه)'),
+            title = CASE 
+              WHEN title NOT LIKE '%ماهانه%' THEN title || ' (ماهانه)'
+              ELSE title 
+            END
+        WHERE description LIKE '%به صورت دائمی%' OR title NOT LIKE '%ماهانه%'
+      `).run();
+    }
+
+    // Migrate existing users who have extra_slots > 0 but null slot_expires_at
+    const usersNeedingExpiry = db
+      .prepare('SELECT id, extra_slots FROM users WHERE extra_slots > 0 AND slot_expires_at IS NULL')
+      .all() as Array<{ id: number; extra_slots: number }>;
+    if (usersNeedingExpiry.length > 0) {
+      const futureExpiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const nowIso = new Date().toISOString();
+      for (const u of usersNeedingExpiry) {
+        db.prepare('UPDATE users SET slot_expires_at = ? WHERE id = ?').run(futureExpiry, u.id);
+        db.prepare(`
+          INSERT INTO user_subscriptions (
+            user_id, slots, price_toman, duration_days, source_type,
+            package_title, starts_at, expires_at, status, created_at
+          ) VALUES (?, ?, 0, 30, 'admin', 'اشتراک اولیه (مهاجرت ۳۰ روزه)', ?, ?, 'active', ?)
+        `).run(u.id, u.extra_slots, nowIso, futureExpiry, nowIso);
+      }
     }
   } catch (err) {
-    console.warn('[DB] packages seed warning:', err);
+    console.warn('[DB] packages seed/migration warning:', err);
   }
 
   try {
@@ -1481,6 +1541,49 @@ export function isPublicProduct(db: Database.Database, productKey: string): bool
   return Boolean(row && row.is_public === 1);
 }
 
+export function isProductEligibleForCollection(db: Database.Database, productKey: string): boolean {
+  if (isPublicProduct(db, productKey)) return true;
+
+  const users = db.prepare(`
+    SELECT DISTINCT u.id, u.role, u.extra_slots, u.slot_expires_at
+    FROM users u
+    JOIN user_products up ON up.user_id = u.id
+    WHERE up.product_key = ?
+    UNION
+    SELECT u.id, u.role, u.extra_slots, u.slot_expires_at
+    FROM managed_products mp
+    JOIN users u ON u.id = mp.user_id
+    WHERE mp.key = ?
+  `).all(productKey, productKey) as Array<{ id: number; role: string; extra_slots: number; slot_expires_at: string | null }>;
+
+  if (users.length === 0) {
+    return true;
+  }
+
+  for (const user of users) {
+    if (user.role === 'admin') return true;
+
+    const isSubscriptionActive = Boolean(
+      (user.extra_slots || 0) > 0 &&
+      (!user.slot_expires_at || new Date(user.slot_expires_at).getTime() > Date.now())
+    );
+    if (isSubscriptionActive) return true;
+
+    const userFirstThree = db.prepare(`
+      SELECT product_key FROM user_products
+      WHERE user_id = ?
+      ORDER BY id ASC
+      LIMIT ?
+    `).pluck().all(user.id, FREE_PRODUCT_LIMIT) as string[];
+
+    if (userFirstThree.length === 0 || userFirstThree.includes(productKey)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export interface ScheduledBatchOptions {
   limit?: number;
   force?: boolean;
@@ -1530,9 +1633,10 @@ export function getScheduledBatchTargets(
   const nonMarketTargets = [...publicTargets, ...privateTargets];
 
   if (force || !spread) {
+    const validTargets = force ? allActiveTargets : allActiveTargets.filter((t) => isProductEligibleForCollection(db, t.product_key));
     return {
-      targets: allActiveTargets,
-      batchSize: allActiveTargets.length,
+      targets: validTargets,
+      batchSize: validTargets.length,
       totalManagedTargets: allActiveTargets.length,
       totalMarketTargets: marketTargets.length,
       totalNonMarketTargets: nonMarketTargets.length,
@@ -1559,7 +1663,7 @@ export function getScheduledBatchTargets(
 
   // 2. Daily check for private targets: collected once a day across 24h
   const eligiblePrivate = privateTargets.filter(
-    (t) => !hasSuccessfulPriceToday(db, t.product_key, now, t.url, t.source_key)
+    (t) => isProductEligibleForCollection(db, t.product_key) && !hasSuccessfulPriceToday(db, t.product_key, now, t.url, t.source_key)
   );
 
   // If there are eligible private targets, prioritize LRU based on last attempt timestamp
@@ -1937,6 +2041,7 @@ export function getUserByUsername(db: Database.Database, username: string): User
     mobile: row.mobile ?? null,
     wallet_balance: row.wallet_balance ?? 0,
     extra_slots: row.extra_slots ?? 0,
+    slot_expires_at: row.slot_expires_at ?? null,
   };
 }
 
@@ -1948,13 +2053,14 @@ export function getUserById(db: Database.Database, id: number): UserRow | null {
     mobile: row.mobile ?? null,
     wallet_balance: row.wallet_balance ?? 0,
     extra_slots: row.extra_slots ?? 0,
+    slot_expires_at: row.slot_expires_at ?? null,
   };
 }
 
 export function listUsers(db: Database.Database): SafeUser[] {
   const rows = db.prepare(`
     SELECT 
-      u.id, u.username, u.email, u.mobile, u.role, u.must_change_password, u.wallet_balance, u.extra_slots, u.created_at, u.updated_at,
+      u.id, u.username, u.email, u.mobile, u.role, u.must_change_password, u.wallet_balance, u.extra_slots, u.slot_expires_at, u.created_at, u.updated_at,
       COALESCE((SELECT COUNT(*) FROM user_products up WHERE up.user_id = u.id), 0) AS used_slots
     FROM users u
     ORDER BY u.id ASC
@@ -1967,6 +2073,7 @@ export function listUsers(db: Database.Database): SafeUser[] {
       mobile: r.mobile ?? null,
       wallet_balance: r.wallet_balance ?? 0,
       extra_slots: extraSlots,
+      slot_expires_at: r.slot_expires_at ?? null,
       used_slots: Number(r.used_slots ?? 0),
       total_slots: isAdmin ? 999999 : FREE_PRODUCT_LIMIT + extraSlots,
       must_change_password: Boolean(r.must_change_password),
@@ -1995,6 +2102,7 @@ export function createUser(
     must_change_password?: boolean;
     wallet_balance?: number;
     extra_slots?: number;
+    slot_expires_at?: string | null;
   }
 ): SafeUser {
   const now = new Date().toISOString();
@@ -2005,12 +2113,13 @@ export function createUser(
   const mustChange = params.must_change_password ? 1 : 0;
   const walletBalance = params.wallet_balance ?? 0;
   const extraSlots = params.extra_slots ?? 0;
+  const slotExpiresAt = params.slot_expires_at || null;
 
   const stmt = db.prepare(`
-    INSERT INTO users (username, email, mobile, password_hash, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO users (username, email, mobile, password_hash, role, must_change_password, wallet_balance, extra_slots, slot_expires_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const result = stmt.run(username, email, mobile, params.password_hash, role, mustChange, walletBalance, extraSlots, now, now);
+  const result = stmt.run(username, email, mobile, params.password_hash, role, mustChange, walletBalance, extraSlots, slotExpiresAt, now, now);
   const id = Number(result.lastInsertRowid);
 
   return {
@@ -2022,6 +2131,7 @@ export function createUser(
     must_change_password: Boolean(mustChange),
     wallet_balance: walletBalance,
     extra_slots: extraSlots,
+    slot_expires_at: slotExpiresAt,
     created_at: now,
     updated_at: now,
   };
@@ -2030,7 +2140,15 @@ export function createUser(
 export function updateUser(
   db: Database.Database,
   id: number,
-  params: { password_hash?: string; role?: UserRole; email?: string | null; mobile?: string | null; must_change_password?: boolean }
+  params: {
+    password_hash?: string;
+    role?: UserRole;
+    email?: string | null;
+    mobile?: string | null;
+    must_change_password?: boolean;
+    extra_slots?: number;
+    slot_expires_at?: string | null;
+  }
 ): SafeUser {
   const existing = getUserById(db, id);
   if (!existing) {
@@ -2045,6 +2163,8 @@ export function updateUser(
   const nextMustChange = params.must_change_password !== undefined
     ? (params.must_change_password ? 1 : 0)
     : (existing.must_change_password ?? 0);
+  const nextExtraSlots = params.extra_slots !== undefined ? params.extra_slots : existing.extra_slots;
+  const nextSlotExpiresAt = params.slot_expires_at !== undefined ? params.slot_expires_at : (existing.slot_expires_at ?? null);
 
   if (existing.role === 'admin' && nextRole !== 'admin') {
     const adminCount = countAdmins(db);
@@ -2055,9 +2175,9 @@ export function updateUser(
 
   db.prepare(`
     UPDATE users
-    SET password_hash = ?, role = ?, email = ?, mobile = ?, must_change_password = ?, updated_at = ?
+    SET password_hash = ?, role = ?, email = ?, mobile = ?, must_change_password = ?, extra_slots = ?, slot_expires_at = ?, updated_at = ?
     WHERE id = ?
-  `).run(nextPasswordHash, nextRole, nextEmail, nextMobile, nextMustChange, now, id);
+  `).run(nextPasswordHash, nextRole, nextEmail, nextMobile, nextMustChange, nextExtraSlots, nextSlotExpiresAt, now, id);
 
   return {
     id,
@@ -2067,7 +2187,8 @@ export function updateUser(
     role: nextRole,
     must_change_password: Boolean(nextMustChange),
     wallet_balance: existing.wallet_balance,
-    extra_slots: existing.extra_slots,
+    extra_slots: nextExtraSlots,
+    slot_expires_at: nextSlotExpiresAt,
     created_at: existing.created_at,
     updated_at: now,
   };
@@ -2102,6 +2223,7 @@ export function updateUserProfile(
     must_change_password: Boolean(existing.must_change_password),
     wallet_balance: existing.wallet_balance,
     extra_slots: existing.extra_slots,
+    slot_expires_at: existing.slot_expires_at ?? null,
     created_at: existing.created_at,
     updated_at: now,
   };
@@ -2137,21 +2259,51 @@ export function getUserQuota(db: Database.Database, userId: number, isAdmin = fa
       usedCount,
       remaining: 999999,
       canAdd: true,
+      slotExpiresAt: null,
+      daysRemaining: null,
+      isExpired: false,
     };
   }
 
   const user = getUserById(db, userId);
-  const extraSlots = user?.extra_slots ?? 0;
-  const totalLimit = FREE_PRODUCT_LIMIT + extraSlots;
+  const rawSlots = user?.extra_slots ?? 0;
+  const slotExpiresAt = user?.slot_expires_at ?? null;
+
+  let isExpired = false;
+  let daysRemaining: number | null = null;
+  let activeExtraSlots = 0;
+
+  if (rawSlots > 0) {
+    if (slotExpiresAt) {
+      const expiryTime = new Date(slotExpiresAt).getTime();
+      const nowTime = Date.now();
+      if (expiryTime <= nowTime) {
+        isExpired = true;
+        daysRemaining = 0;
+        activeExtraSlots = 0;
+      } else {
+        isExpired = false;
+        daysRemaining = Math.max(1, Math.ceil((expiryTime - nowTime) / (1000 * 60 * 60 * 24)));
+        activeExtraSlots = rawSlots;
+      }
+    } else {
+      activeExtraSlots = rawSlots;
+    }
+  }
+
+  const totalLimit = FREE_PRODUCT_LIMIT + activeExtraSlots;
   const remaining = Math.max(0, totalLimit - usedCount);
 
   return {
     freeLimit: FREE_PRODUCT_LIMIT,
-    extraSlots,
+    extraSlots: activeExtraSlots,
     totalLimit,
     usedCount,
     remaining,
     canAdd: usedCount < totalLimit,
+    slotExpiresAt,
+    daysRemaining,
+    isExpired,
   };
 }
 
@@ -2213,12 +2365,14 @@ export function purchaseProductSlot(
   params: {
     userId: number;
     slotPrice?: number;
+    durationDays?: number;
   }
-): { extra_slots: number; wallet_balance: number; transaction: WalletTransactionRow; quota: UserQuota } {
+): { extra_slots: number; slot_expires_at: string; wallet_balance: number; transaction: WalletTransactionRow; quota: UserQuota } {
   const price = params.slotPrice ?? getSlotPriceToman();
   if (price <= 0) {
     throw new Error('قیمت اسلات نامعتبر است.');
   }
+  const durationDays = params.durationDays ?? 30;
 
   const txn = db.transaction(() => {
     const user = getUserById(db, params.userId);
@@ -2229,26 +2383,48 @@ export function purchaseProductSlot(
     const currentBalance = user.wallet_balance || 0;
     if (currentBalance < price) {
       throw new Error(
-        `موجودی کیف پول شما (${currentBalance.toLocaleString('fa-IR')} تومان) برای خرید اسلات (${price.toLocaleString('fa-IR')} تومان) کافی نیست.`
+        `موجودی کیف پول شما (${currentBalance.toLocaleString('fa-IR')} تومان) برای شارژ ماهانه اسلات (${price.toLocaleString('fa-IR')} تومان) کافی نیست.`
       );
     }
 
     const newBalance = currentBalance - price;
-    const newSlots = (user.extra_slots || 0) + 1;
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    let newExpiry: Date;
+    let newSlots = 1;
+
+    if (user.slot_expires_at && new Date(user.slot_expires_at).getTime() > now.getTime() && (user.extra_slots || 0) > 0) {
+      newSlots = (user.extra_slots || 0) + 1;
+      const currentExpiry = new Date(user.slot_expires_at);
+      newExpiry = new Date(Math.max(currentExpiry.getTime(), now.getTime() + durationDays * 24 * 60 * 60 * 1000));
+    } else {
+      newSlots = 1;
+      newExpiry = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    }
+
+    const newExpiryIso = newExpiry.toISOString();
 
     db.prepare(`
       UPDATE users
-      SET wallet_balance = ?, extra_slots = ?, updated_at = ?
+      SET wallet_balance = ?, extra_slots = ?, slot_expires_at = ?, updated_at = ?
       WHERE id = ?
-    `).run(newBalance, newSlots, now, params.userId);
+    `).run(newBalance, newSlots, newExpiryIso, nowIso, params.userId);
 
-    const desc = `خرید ۱ اسلات ظرفیت پایش محصول`;
+    const desc = `شارژ ماهانه ۱ اسلات ظرفیت پایش محصول (${durationDays} روزه)`;
     const insertTxn = db.prepare(`
       INSERT INTO wallet_transactions (user_id, amount, balance_after, type, description, created_at)
       VALUES (?, ?, ?, 'slot_purchase', ?, ?)
     `);
-    const res = insertTxn.run(params.userId, -price, newBalance, desc, now);
+    const res = insertTxn.run(params.userId, -price, newBalance, desc, nowIso);
+
+    // Record subscription
+    db.prepare(`
+      INSERT INTO user_subscriptions (
+        user_id, slots, price_toman, duration_days, source_type,
+        starts_at, expires_at, status, created_at
+      ) VALUES (?, ?, ?, ?, 'wallet_slot', ?, ?, 'active', ?)
+    `).run(params.userId, 1, price, durationDays, nowIso, newExpiryIso, nowIso);
 
     const transaction: WalletTransactionRow = {
       id: Number(res.lastInsertRowid),
@@ -2257,13 +2433,14 @@ export function purchaseProductSlot(
       balance_after: newBalance,
       type: 'slot_purchase',
       description: desc,
-      created_at: now,
+      created_at: nowIso,
     };
 
     const quota = getUserQuota(db, params.userId, user.role === 'admin');
 
     return {
       extra_slots: newSlots,
+      slot_expires_at: newExpiryIso,
       wallet_balance: newBalance,
       transaction,
       quota,
@@ -2368,7 +2545,7 @@ export function markPaymentTransactionPaid(
   id: number,
   refId: string,
   meta?: any
-): { success: boolean; alreadyPaid: boolean; extraSlots: number } {
+): { success: boolean; alreadyPaid: boolean; extraSlots: number; slotExpiresAt?: string } {
   const txn = db.transaction(() => {
     const current = db.prepare('SELECT * FROM payment_transactions WHERE id = ?').get(id) as PaymentTransactionRow | undefined;
     if (!current) {
@@ -2382,10 +2559,11 @@ export function markPaymentTransactionPaid(
 
     // Idempotency: if already marked paid, return safely without granting slots again
     if (current.status === 'paid') {
-      return { success: true, alreadyPaid: true, extraSlots: user.extra_slots };
+      return { success: true, alreadyPaid: true, extraSlots: user.extra_slots, slotExpiresAt: user.slot_expires_at ?? undefined };
     }
 
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
     let nextMeta = current.meta || '{}';
     if (meta) {
       try {
@@ -2401,15 +2579,61 @@ export function markPaymentTransactionPaid(
       UPDATE payment_transactions
       SET status = 'paid', ref_id = ?, paid_at = ?, meta = ?, updated_at = ?
       WHERE id = ?
-    `).run(refId, now, nextMeta, now, id);
+    `).run(refId, nowIso, nextMeta, nowIso, id);
 
-    const newExtraSlots = (user.extra_slots || 0) + current.slots;
-    db.prepare('UPDATE users SET extra_slots = ?, updated_at = ? WHERE id = ?').run(newExtraSlots, now, user.id);
+    const pkg = current.package_id ? getPackageById(db, current.package_id) : null;
+    const durationDays = pkg?.duration_days || 30;
 
-    return { success: true, alreadyPaid: false, extraSlots: newExtraSlots };
+    let newExpiry: Date;
+    let newExtraSlots: number;
+
+    if (user.slot_expires_at && new Date(user.slot_expires_at).getTime() > now.getTime() && (user.extra_slots || 0) > 0) {
+      newExtraSlots = (user.extra_slots || 0) + current.slots;
+      const currentExpiry = new Date(user.slot_expires_at);
+      newExpiry = new Date(Math.max(currentExpiry.getTime(), now.getTime() + durationDays * 24 * 60 * 60 * 1000));
+    } else {
+      newExtraSlots = current.slots;
+      newExpiry = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
+    }
+    const newExpiryIso = newExpiry.toISOString();
+
+    db.prepare('UPDATE users SET extra_slots = ?, slot_expires_at = ?, updated_at = ? WHERE id = ?').run(
+      newExtraSlots,
+      newExpiryIso,
+      nowIso,
+      user.id
+    );
+
+    // Record subscription grant
+    db.prepare(`
+      INSERT INTO user_subscriptions (
+        user_id, slots, price_toman, duration_days, source_type,
+        package_id, package_title, payment_transaction_id,
+        starts_at, expires_at, status, created_at
+      ) VALUES (?, ?, ?, ?, 'package', ?, ?, ?, ?, ?, 'active', ?)
+    `).run(
+      user.id,
+      current.slots,
+      current.amount_toman,
+      durationDays,
+      current.package_id,
+      current.package_title,
+      id,
+      nowIso,
+      newExpiryIso,
+      nowIso
+    );
+
+    return { success: true, alreadyPaid: false, extraSlots: newExtraSlots, slotExpiresAt: newExpiryIso };
   });
 
   return txn();
+}
+
+export function getUserSubscriptions(db: Database.Database, userId: number): UserSubscriptionRow[] {
+  return db
+    .prepare('SELECT * FROM user_subscriptions WHERE user_id = ? ORDER BY id DESC')
+    .all(userId) as UserSubscriptionRow[];
 }
 
 export function markPaymentTransactionFailed(

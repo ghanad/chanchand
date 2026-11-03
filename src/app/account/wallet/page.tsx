@@ -7,7 +7,7 @@ import { useDashboard } from "@/context/DashboardContext";
 import { requestJson } from "@/lib/api-client";
 import { formatNumber, formatDate } from "@/lib/formatters";
 import { EmptyState } from "@/components/common/EmptyState";
-import { PackageRow, PaymentTransactionRow, WalletTransactionRow } from "@/lib/types";
+import { PackageRow, PaymentTransactionRow, UserSubscriptionRow, WalletTransactionRow } from "@/lib/types";
 
 function PaymentCallbackBanner() {
   const searchParams = useSearchParams();
@@ -43,6 +43,7 @@ function PaymentCallbackBanner() {
 interface WalletData {
   wallet_balance: number;
   extra_slots: number;
+  slot_expires_at?: string | null;
   slot_price: number;
   quota: {
     freeLimit: number;
@@ -51,8 +52,12 @@ interface WalletData {
     usedCount: number;
     remaining: number;
     canAdd: boolean;
+    slotExpiresAt?: string | null;
+    daysRemaining?: number | null;
+    isExpired?: boolean;
   };
   transactions: WalletTransactionRow[];
+  subscriptions?: UserSubscriptionRow[];
 }
 
 function WalletContent() {
@@ -68,8 +73,9 @@ function WalletContent() {
   const [loading, setLoading] = useState(true);
 
   // Action states
+  const [nowMs] = useState(() => Date.now());
   const [buyingSlot, setBuyingSlot] = useState(false);
-  const [activeTxTab, setActiveTxTab] = useState<"wallet" | "payments">("wallet");
+  const [activeTxTab, setActiveTxTab] = useState<"wallet" | "payments" | "subscriptions">("wallet");
   const [copiedRefId, setCopiedRefId] = useState<string | null>(null);
 
   // Focus packages section if query param focus=topup
@@ -284,9 +290,41 @@ function WalletContent() {
               </span>
             </div>
 
-            <div className="wallet-quota-pill">
+            <div
+              className="wallet-quota-pill"
+              style={{
+                background:
+                  currentUser.role === "admin"
+                    ? undefined
+                    : quota.isExpired
+                    ? "rgba(180, 59, 59, 0.12)"
+                    : quota.daysRemaining != null
+                    ? "rgba(19, 118, 79, 0.12)"
+                    : undefined,
+                color:
+                  currentUser.role === "admin"
+                    ? undefined
+                    : quota.isExpired
+                    ? "var(--danger)"
+                    : quota.daysRemaining != null
+                    ? "var(--ok)"
+                    : undefined,
+                borderColor:
+                  currentUser.role === "admin"
+                    ? undefined
+                    : quota.isExpired
+                    ? "rgba(180, 59, 59, 0.3)"
+                    : quota.daysRemaining != null
+                    ? "rgba(19, 118, 79, 0.3)"
+                    : undefined,
+              }}
+            >
               {currentUser.role === "admin"
                 ? "نامحدود"
+                : quota.isExpired
+                ? "اشتراک منقضی شده"
+                : quota.daysRemaining != null
+                ? `${formatNumber(quota.daysRemaining)} روز باقی‌مانده`
                 : `${formatNumber(quota.remaining)} محصول خالی`}
             </div>
           </div>
@@ -296,7 +334,7 @@ function WalletContent() {
               <>
                 <div className="wallet-progress-track">
                   <div
-                    className={`wallet-progress-bar-fill ${usedPercentage >= 100 ? "warning" : ""}`}
+                    className={`wallet-progress-bar-fill ${usedPercentage >= 100 || quota.isExpired ? "warning" : ""}`}
                     style={{ width: `${usedPercentage}%` }}
                   />
                 </div>
@@ -313,14 +351,16 @@ function WalletContent() {
           <div className="wallet-quota-metrics-row">
             <div className="wallet-quota-mini-stat">
               <div className="wallet-quota-mini-num">{formatNumber(freeQuotaUsed)} / ۳</div>
-              <div className="wallet-quota-mini-lbl">سهمیه پایه رایگان</div>
+              <div className="wallet-quota-mini-lbl">سهمیه پایه رایگان (دائمی)</div>
             </div>
 
             <div className="wallet-quota-mini-stat">
-              <div className="wallet-quota-mini-num">
+              <div className="wallet-quota-mini-num" style={{ color: quota.isExpired ? "var(--danger)" : undefined }}>
                 {currentUser.role === "admin" ? "∞" : `+${formatNumber(extraSlots)}`}
               </div>
-              <div className="wallet-quota-mini-lbl">اسلات‌های خریداری‌شده</div>
+              <div className="wallet-quota-mini-lbl">
+                {quota.isExpired ? "اسلات منقضی شده" : "اسلات‌های ماهانه فعال"}
+              </div>
             </div>
 
             <div className="wallet-quota-mini-stat">
@@ -333,7 +373,19 @@ function WalletContent() {
 
           <div className="wallet-quota-note">
             <span aria-hidden="true">🛡️</span>
-            <span>تمام ظرفیت‌های تهیه‌شده دائمی بوده و با حذف کالا، ظرفیت بلافاصله آزاد می‌گردد.</span>
+            <span>
+              سهمیه پایه (۳ محصول) دائمی و رایگان است. اسلات‌های اضافه به صورت اشتراک ماهانه (۳۰ روزه) فعال می‌شوند.
+              {quota.slotExpiresAt && !quota.isExpired && (
+                <strong style={{ marginInlineStart: "6px", color: "var(--ok)" }}>
+                  (اعتبار فعال تا: {new Date(quota.slotExpiresAt).toLocaleDateString("fa-IR")} — {quota.daysRemaining} روز مانده)
+                </strong>
+              )}
+              {quota.isExpired && (
+                <strong style={{ marginInlineStart: "6px", color: "var(--danger)" }}>
+                  (اشتراک اسلات‌های اضافه منقضی شده است — جهت فعال‌سازی مجدد پایش کالاها، اشتراک را تمدید کنید)
+                </strong>
+              )}
+            </span>
           </div>
         </div>
       </section>
@@ -346,9 +398,9 @@ function WalletContent() {
               ⚡
             </div>
             <div className="wallet-direct-slot-text">
-              <h4>خرید تک‌اسلات پایش با کسر از موجودی کیف پول</h4>
+              <h4>شارژ ماهانه ۱ اسلات پایش با کسر از موجودی کیف پول</h4>
               <p>
-                تعرفه هر اسلات پایش دائمی: <strong>{formatNumber(slotPrice)} تومان</strong>
+                تعرفه شارژ ماهانه هر اسلات (۳۰ روزه): <strong>{formatNumber(slotPrice)} تومان</strong>
                 {canAffordSlot ? (
                   <span style={{ color: "var(--ok)", marginInlineStart: "8px" }}>
                     (موجودی شما کافی است)
@@ -372,7 +424,7 @@ function WalletContent() {
               {buyingSlot ? (
                 <span>در حال ثبت...</span>
               ) : canAffordSlot ? (
-                <span>خرید ۱ اسلات ({formatNumber(slotPrice)} تومان)</span>
+                <span>شارژ ۱ اسلات ماهانه ({formatNumber(slotPrice)} تومان)</span>
               ) : (
                 <span>موجودی ناکافی است</span>
               )}
@@ -392,15 +444,15 @@ function WalletContent() {
           <div className="wallet-section-titles">
             <h2>
               <span aria-hidden="true">🎁</span>
-              <span>بسته‌های افزایش ظرفیت پایش (پرداخت آنلاین)</span>
+              <span>بسته‌های افزایش ظرفیت پایش ماهانه (پرداخت آنلاین)</span>
             </h2>
             <p>
-              با خرید هر بسته، اسلات‌های پایش دائمی فوراً به حسابتان افزوده می‌شوند و از طریق کلیه کارت‌های عضو شتاب قابل پرداخت هستند.
+              با خرید هر بسته، اسلات‌های پایش ماهانه (۳۰ روزه) فوراً به حسابتان افزوده می‌شوند و از طریق کلیه کارت‌های عضو شتاب قابل پرداخت هستند.
             </p>
           </div>
 
           <div style={{ fontSize: "12px", color: "var(--muted)" }}>
-            هزینه پایه هر اسلات: {formatNumber(slotPrice)} تومان
+            هزینه پایه هر اسلات: {formatNumber(slotPrice)} تومان ماهانه
           </div>
         </div>
 
@@ -432,12 +484,12 @@ function WalletContent() {
                     <div className="wallet-package-top">
                       <h3 className="wallet-package-title">{pkg.title}</h3>
                       <span className="wallet-package-slots-tag">
-                        +{formatNumber(pkg.slots)} محصول
+                        +{formatNumber(pkg.slots)} محصول (ماهانه)
                       </span>
                     </div>
 
                     <p className="wallet-package-desc">
-                      {pkg.description || `افزایش ظرفیت پایش شما به میزان ${formatNumber(pkg.slots)} محصول دائمی بدون انقضا.`}
+                      {pkg.description || `افزایش ظرفیت پایش شما به میزان ${formatNumber(pkg.slots)} محصول به مدت ۳۰ روز با امکان تمدید.`}
                     </p>
                   </div>
 
@@ -445,7 +497,7 @@ function WalletContent() {
                     <div className="wallet-package-pricing-wrap">
                       <div className="wallet-package-price-row">
                         <strong>{formatNumber(pkg.price_toman)}</strong>
-                        <span>تومان</span>
+                        <span>تومان / ماهانه</span>
                       </div>
                       <div className="wallet-package-per-slot-text">
                         هر اسلات فقط: {formatNumber(pricePerSlot)} تومان
@@ -459,7 +511,7 @@ function WalletContent() {
                       </li>
                       <li className="wallet-package-feature-item">
                         <span aria-hidden="true">✓</span>
-                        <span>ظرفیت دائمی بدون نیاز به تمدید ماهانه</span>
+                        <span>اعتبار ۳۰ روزه با امکان تمدید ماهانه آسان</span>
                       </li>
                       <li className="wallet-package-feature-item">
                         <span aria-hidden="true">✓</span>
@@ -513,6 +565,17 @@ function WalletContent() {
               <span>پرداخت‌های درگاه</span>
               <span className="wallet-tab-count-badge">
                 {formatNumber(paymentTransactions.length)}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTxTab("subscriptions")}
+              className={`wallet-tab-switch-btn ${activeTxTab === "subscriptions" ? "active" : ""}`}
+            >
+              <span>دوره‌ها و اشتراک‌ها</span>
+              <span className="wallet-tab-count-badge">
+                {formatNumber((walletData?.subscriptions || []).length)}
               </span>
             </button>
           </div>
@@ -670,6 +733,73 @@ function WalletContent() {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+
+        {/* ۳. جدول دوره‌ها و اشتراک‌های فعال و قبلی */}
+        {activeTxTab === "subscriptions" && (
+          (walletData?.subscriptions || []).length === 0 ? (
+            <EmptyState text="هنوز هیچ دوره اشتراکی برای شما ثبت نشده است." />
+          ) : (
+            <div className="wallet-table-wrap">
+              <table className="wallet-table" aria-label="جدول دوره‌های اشتراک">
+                <thead>
+                  <tr>
+                    <th scope="col">عنوان دوره / بسته</th>
+                    <th scope="col">ظرفیت اسلات</th>
+                    <th scope="col">نوع شارژ</th>
+                    <th scope="col">مدت اعتبار</th>
+                    <th scope="col">تاریخ شروع</th>
+                    <th scope="col">تاریخ پایان</th>
+                    <th scope="col">وضعیت</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(walletData?.subscriptions || []).map((sub) => {
+                    const isSubActive = new Date(sub.expires_at).getTime() > nowMs;
+                    const daysLeft = Math.max(0, Math.ceil((new Date(sub.expires_at).getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+                    return (
+                      <tr key={sub.id}>
+                        <td style={{ fontWeight: 600 }}>
+                          {sub.package_title || (sub.source_type === "wallet_slot" ? "شارژ تک‌اسلات با کیف پول" : "شارژ سهمیه توسط مدیر")}
+                        </td>
+                        <td>
+                          <span className="wallet-package-slots-tag">
+                            +{formatNumber(sub.slots)} محصول
+                          </span>
+                        </td>
+                        <td style={{ color: "var(--muted)" }}>
+                          {sub.source_type === "package"
+                            ? "بسته آنلاین"
+                            : sub.source_type === "wallet_slot"
+                            ? "کیف پول"
+                            : "مدیر سیستم"}
+                        </td>
+                        <td>{formatNumber(sub.duration_days)} روز</td>
+                        <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
+                          {formatDate(sub.starts_at)}
+                        </td>
+                        <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
+                          {formatDate(sub.expires_at)}
+                        </td>
+                        <td>
+                          <span
+                            className="status-pill"
+                            style={{
+                              background: isSubActive ? "rgba(19, 118, 79, 0.1)" : "rgba(180, 59, 59, 0.1)",
+                              color: isSubActive ? "var(--ok)" : "var(--muted)",
+                              border: `1px solid ${isSubActive ? "rgba(19, 118, 79, 0.25)" : "rgba(180, 59, 59, 0.25)"}`,
+                            }}
+                          >
+                            {isSubActive ? `فعال (${daysLeft} روز مانده)` : "منقضی شده"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

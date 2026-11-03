@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { SourceRow } from "../../types/dashboard";
 import { requestJson } from "../../lib/api-client";
 import { formatNumber } from "../../lib/formatters";
@@ -45,7 +46,46 @@ export function SourcesView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "in_use" | "unused">("all");
   const [activeKebabKey, setActiveKebabKey] = useState<string | null>(null);
+  const [menuCoords, setMenuCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    openUpwards: boolean;
+  } | null>(null);
   const kebabTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const toggleKebab = useCallback(
+    (sourceKey: string) => {
+      if (activeKebabKey === sourceKey) {
+        setActiveKebabKey(null);
+        setMenuCoords(null);
+      } else {
+        const triggerEl = kebabTriggerRefs.current[sourceKey];
+        if (triggerEl) {
+          const rect = triggerEl.getBoundingClientRect();
+          const dropdownHeight = 60;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const openUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+          const menuWidth = 140;
+          let left = rect.left;
+          if (left + menuWidth > window.innerWidth - 8) {
+            left = Math.max(8, window.innerWidth - menuWidth - 8);
+          }
+          if (left < 8) {
+            left = 8;
+          }
+          setMenuCoords({
+            top: openUpwards ? undefined : rect.bottom + 4,
+            bottom: openUpwards ? window.innerHeight - rect.top + 4 : undefined,
+            left,
+            openUpwards,
+          });
+        }
+        setActiveKebabKey(sourceKey);
+      }
+    },
+    [activeKebabKey],
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -63,29 +103,46 @@ export function SourcesView() {
     loadData();
   }, [loadData, refreshTick]);
 
-  // Close kebab menu on outside click or Esc
+  // Close kebab menu on outside click, Esc, scroll, or resize
   useEffect(() => {
     if (!activeKebabKey) return;
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null;
-      if (!target?.closest(".kebab-container")) {
+      if (!target?.closest(".kebab-container") && !target?.closest(".kebab-menu-dropdown")) {
         setActiveKebabKey(null);
+        setMenuCoords(null);
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         const lastKey = activeKebabKey;
         setActiveKebabKey(null);
+        setMenuCoords(null);
         if (lastKey && kebabTriggerRefs.current[lastKey]) {
           kebabTriggerRefs.current[lastKey]?.focus();
         }
       }
     }
+    function handleScroll(event: Event) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.(".kebab-menu-dropdown")) return;
+      setActiveKebabKey(null);
+      setMenuCoords(null);
+    }
+    function handleResize() {
+      setActiveKebabKey(null);
+      setMenuCoords(null);
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, [activeKebabKey]);
 
@@ -448,18 +505,15 @@ export function SourcesView() {
                                     kebabTriggerRefs.current[source.key] = el;
                                   }}
                                   className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
-                                  onClick={() =>
-                                    setActiveKebabKey((current) =>
-                                      current === source.key ? null : source.key,
-                                    )
-                                  }
+                                  onClick={() => toggleKebab(source.key)}
                                   aria-label={`عملیات بیشتر برای ${source.key}`}
                                   aria-haspopup="menu"
                                   aria-expanded={isKebabOpen}
                                   title="عملیات بیشتر"
                                   onKeyDown={(e) => {
                                     if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-                                      setActiveKebabKey(source.key);
+                                      e.preventDefault();
+                                      toggleKebab(source.key);
                                     }
                                   }}
                                 >
@@ -476,49 +530,63 @@ export function SourcesView() {
                                   </svg>
                                 </button>
 
-                                {isKebabOpen && (
-                                  <div
-                                    className="kebab-menu-dropdown"
-                                    role="menu"
-                                    aria-orientation="vertical"
-                                    tabIndex={-1}
-                                  >
-                                    <button
-                                      type="button"
-                                      role="menuitem"
-                                      className="kebab-menu-item danger"
-                                      onClick={() => {
-                                        setActiveKebabKey(null);
-                                        handleDeleteClick(source);
+                                {isKebabOpen &&
+                                  menuCoords &&
+                                  typeof document !== "undefined" &&
+                                  createPortal(
+                                    <div
+                                      className="kebab-menu-dropdown kebab-portal-menu"
+                                      role="menu"
+                                      aria-orientation="vertical"
+                                      tabIndex={-1}
+                                      style={{
+                                        position: "fixed",
+                                        top: menuCoords.openUpwards ? "auto" : `${menuCoords.top}px`,
+                                        bottom: menuCoords.openUpwards
+                                          ? `${menuCoords.bottom}px`
+                                          : "auto",
+                                        left: `${menuCoords.left}px`,
+                                        zIndex: 9999,
                                       }}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Escape") {
-                                          setActiveKebabKey(null);
-                                          kebabTriggerRefs.current[source.key]?.focus();
-                                        }
-                                      }}
-                                      autoFocus
                                     >
-                                      <svg
-                                        width="14"
-                                        height="14"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="2"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
+                                      <button
+                                        type="button"
+                                        role="menuitem"
+                                        className="kebab-menu-item danger"
+                                        onClick={() => {
+                                          setActiveKebabKey(null);
+                                          setMenuCoords(null);
+                                          handleDeleteClick(source);
+                                        }}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Escape") {
+                                            setActiveKebabKey(null);
+                                            setMenuCoords(null);
+                                            kebabTriggerRefs.current[source.key]?.focus();
+                                          }
+                                        }}
                                       >
-                                        <polyline points="3 6 5 6 21 6" />
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                        <line x1="10" y1="11" x2="10" y2="17" />
-                                        <line x1="14" y1="11" x2="14" y2="17" />
-                                      </svg>
-                                      <span>حذف منبع</span>
-                                    </button>
-                                  </div>
-                                )}
+                                        <svg
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          aria-hidden="true"
+                                        >
+                                          <polyline points="3 6 5 6 21 6" />
+                                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                          <line x1="10" y1="11" x2="10" y2="17" />
+                                          <line x1="14" y1="11" x2="14" y2="17" />
+                                        </svg>
+                                        <span>حذف منبع</span>
+                                      </button>
+                                    </div>,
+                                    document.body,
+                                  )}
                               </div>
                             </div>
                           ) : null}

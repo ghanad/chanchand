@@ -117,7 +117,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
           </div>
 
           <div className="flex justify-between items-center text-xs pt-2 border-t border-[var(--border-subtle)]">
-            <span className="text-[var(--text-muted)]">هزینه هر اسلات محصول:</span>
+            <span className="text-[var(--text-muted)]">تعرفه شارژ ماهانه هر اسلات (۳۰ روزه):</span>
             <span className="font-bold text-xs text-[var(--foreground)]" dir="ltr">
               {formatNumber(slotPrice)} تومان
             </span>
@@ -136,7 +136,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
                   <span>در حال فعال‌سازی اسلات...</span>
                 ) : (
                   <>
-                    <span>خرید ۱ اسلات با موجودی کیف پول ({formatNumber(slotPrice)} تومان)</span>
+                    <span>شارژ ماهانه ۱ اسلات با موجودی کیف پول ({formatNumber(slotPrice)} تومان)</span>
                     <span aria-hidden="true">⚡</span>
                   </>
                 )}
@@ -151,7 +151,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
                   onClick={onClose}
                   className="btn btn-primary w-full text-xs py-2.5 font-bold flex items-center justify-center gap-2 text-center"
                 >
-                  <span>شارژ کیف پول و خرید اسلات</span>
+                  <span>شارژ کیف پول و خرید بسته</span>
                   <span aria-hidden="true">💳</span>
                 </Link>
               </div>
@@ -162,7 +162,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
         {/* لیست بسته‌های افزایش ظرفیت */}
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-muted)]">
-            <span>بسته‌های افزایش ظرفیت (پرداخت آنلاین):</span>
+            <span>بسته‌های اشتراک ماهانه افزایش ظرفیت (پرداخت آنلاین):</span>
             <Link
               href="/account/wallet"
               onClick={onClose}
@@ -195,7 +195,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
                           {pkg.title}
                         </span>
                         <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">
-                          +{formatNumber(pkg.slots)} محصول
+                          +{formatNumber(pkg.slots)} محصول (ماهانه)
                         </span>
                       </div>
                       {pkg.description && (
@@ -210,7 +210,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
                         <span className="text-xs font-bold text-[var(--primary)]">
                           {formatNumber(pkg.price_toman)}
                         </span>
-                        <span className="text-[10px] text-[var(--text-muted)] mr-1">تومان</span>
+                        <span className="text-[10px] text-[var(--text-muted)] mr-1">تومان / ماهانه</span>
                       </div>
                       <button
                         type="button"
