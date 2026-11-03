@@ -68,7 +68,6 @@ function WalletContent() {
   const [loading, setLoading] = useState(true);
 
   // Action states
-  const [purchasingPkgId, setPurchasingPkgId] = useState<number | null>(null);
   const [buyingSlot, setBuyingSlot] = useState(false);
   const [activeTxTab, setActiveTxTab] = useState<"wallet" | "payments">("wallet");
   const [copiedRefId, setCopiedRefId] = useState<string | null>(null);
@@ -170,29 +169,7 @@ function WalletContent() {
     }
   }
 
-  // Handle buying package via payment gateway
-  async function handleBuyPackage(pkg: PackageRow) {
-    if (purchasingPkgId !== null) return;
-    setPurchasingPkgId(pkg.id);
-    try {
-      const res = await requestJson<{
-        success: boolean;
-        gatewayUrl: string;
-        authority: string;
-      }>("/api/payments/request", {
-        method: "POST",
-        body: JSON.stringify({ packageId: pkg.id }),
-      });
 
-      if (res.gatewayUrl) {
-        showToast("در حال انتقال به درگاه پرداخت امن بانکی...");
-        window.location.assign(res.gatewayUrl);
-      }
-    } catch (err: any) {
-      showToast(err instanceof Error ? err.message : "خطا در ایجاد درخواست پرداخت");
-      setPurchasingPkgId(null);
-    }
-  }
 
   // Copy ref ID helper
   function handleCopyRefId(refId: string) {
@@ -436,7 +413,6 @@ function WalletContent() {
         ) : (
           <div className="wallet-packages-grid">
             {packages.map((pkg, idx) => {
-              const isBuying = purchasingPkgId === pkg.id;
               // Highlight middle package or package with slots >= 5 as featured
               const isFeatured = pkg.slots >= 5 && (packages.length <= 3 ? idx === 1 : true);
               const pricePerSlot = Math.round(pkg.price_toman / Math.max(1, pkg.slots));
@@ -493,18 +469,10 @@ function WalletContent() {
 
                     <button
                       type="button"
-                      disabled={purchasingPkgId !== null}
-                      onClick={() => handleBuyPackage(pkg)}
                       className={`btn btn-primary wallet-package-buy-btn ${isFeatured ? "" : "btn-secondary"}`}
                     >
-                      {isBuying ? (
-                        <span>در حال انتقال به درگاه...</span>
-                      ) : (
-                        <>
-                          <span>خرید و پرداخت آنلاین</span>
-                          <span aria-hidden="true">💳</span>
-                        </>
-                      )}
+                      <span>خرید و پرداخت آنلاین</span>
+                      <span aria-hidden="true">💳</span>
                     </button>
                   </div>
                 </div>
