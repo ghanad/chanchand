@@ -1,12 +1,44 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useDashboard } from "@/context/DashboardContext";
 import { requestJson } from "@/lib/api-client";
 import { formatNumber, formatDate } from "@/lib/formatters";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PackageRow, PaymentTransactionRow, WalletTransactionRow } from "@/lib/types";
+
+function PaymentCallbackBanner() {
+  const searchParams = useSearchParams();
+  const paymentStatus = searchParams.get("payment_status");
+  const callbackMessage = searchParams.get("message");
+  const callbackRefId = searchParams.get("ref_id");
+
+  if (!paymentStatus) return null;
+
+  const isSuccess = paymentStatus === "success";
+
+  return (
+    <div
+      className={`payment-alert-banner ${isSuccess ? "success" : "error"}`}
+      role="alert"
+    >
+      <span className="payment-alert-icon" aria-hidden="true">{isSuccess ? "✅" : "⚠️"}</span>
+      <div className="payment-alert-content">
+        <div className="payment-alert-title">
+          {isSuccess ? "پرداخت با موفقیت انجام شد" : "پرداخت ناموفق بود"}
+        </div>
+        {callbackMessage && <p style={{ margin: "2px 0 0 0" }}>{callbackMessage}</p>}
+        {callbackRefId && (
+          <p style={{ margin: "4px 0 0 0", fontFamily: "monospace", fontSize: "11.5px" }}>
+            کد پیگیری تراکنش: <strong>{callbackRefId}</strong>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface WalletData {
   wallet_balance: number;
@@ -86,7 +118,15 @@ function WalletContent() {
     });
   }, [loadWallet, loadPackages, loadPaymentTransactions]);
 
-  if (!currentUser) return null;
+  if (!currentUser) {
+    return (
+      <div className="wallet-view-container" dir="rtl">
+        <div style={{ padding: "48px 0", textAlign: "center", fontSize: "12.5px", color: "var(--muted)" }}>
+          در حال بارگذاری اطلاعات کیف پول...
+        </div>
+      </div>
+    );
+  }
 
   const balance = walletData?.wallet_balance ?? currentUser.wallet_balance ?? 0;
   const extraSlots = walletData?.extra_slots ?? currentUser.extra_slots ?? 0;
@@ -165,7 +205,48 @@ function WalletContent() {
   }
 
   return (
-    <div className="wallet-view-container">
+    <div className="wallet-view-container" dir="rtl">
+      {/* سربرگ اختصاصی صفحه کیف پول و سهمیه پایش */}
+      <div className="account-header-card">
+        <div className="account-header-info">
+          <div className="account-avatar-box wallet-avatar-box" aria-hidden="true">
+            💳
+          </div>
+
+          <div className="account-details">
+            <nav className="account-breadcrumbs" aria-label="مسیر راهنما">
+              <Link href="/products">محصولات</Link>
+              <span aria-hidden="true">/</span>
+              <span>کیف پول و سهمیه پایش</span>
+            </nav>
+
+            <div className="account-title-row">
+              <h1 className="account-username">
+                کیف پول و مدیریت سهمیه پایش
+              </h1>
+            </div>
+
+            <p className="account-meta-text">
+              مدیریت موجودی اعتباری، بسته‌های افزایش ظرفیت و سوابق مالی کاربر @{currentUser.username}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <Link
+            href="/products"
+            className="btn btn-secondary btn-sm"
+            title="بازگشت به صفحه محصولات"
+          >
+            <span>بازگشت به محصولات</span>
+            <span aria-hidden="true">←</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* بنر وضعیت بازگشت از درگاه پرداخت */}
+      <PaymentCallbackBanner />
+
       {/* بخش ۱: کارت دوتایی هدر (کارت اعتباری کیف پول + کارت وضعیت سهمیه) */}
       <section className="wallet-hero-grid" aria-label="کیف پول و سهمیه پایش">
         {/* ۱. کارت اعتباری دیجیتال */}

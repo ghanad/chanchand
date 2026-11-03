@@ -4574,13 +4574,36 @@ tbody tr:last-child td {
 }
 
 /* ==========================================================================
-   Wallet Specific Components
+   Account & Wallet Specific Components
    ========================================================================== */
 
+.profile-content-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 840px) {
+  .profile-content-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wallet-avatar-box {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%) !important;
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28) !important;
+  font-size: 24px !important;
+}
+
 .wallet-view-container {
+  max-width: 1040px;
+  margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 20px;
+  direction: rtl;
+  box-sizing: border-box;
 }
 
 /* Top Hero Grid */
