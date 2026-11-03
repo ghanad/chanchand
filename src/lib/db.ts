@@ -1953,17 +1953,25 @@ export function getUserById(db: Database.Database, id: number): UserRow | null {
 
 export function listUsers(db: Database.Database): SafeUser[] {
   const rows = db.prepare(`
-    SELECT id, username, email, mobile, role, must_change_password, wallet_balance, extra_slots, created_at, updated_at
-    FROM users
-    ORDER BY id ASC
-  `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number })[];
-  return rows.map((r) => ({
-    ...r,
-    mobile: r.mobile ?? null,
-    wallet_balance: r.wallet_balance ?? 0,
-    extra_slots: r.extra_slots ?? 0,
-    must_change_password: Boolean(r.must_change_password),
-  }));
+    SELECT 
+      u.id, u.username, u.email, u.mobile, u.role, u.must_change_password, u.wallet_balance, u.extra_slots, u.created_at, u.updated_at,
+      COALESCE((SELECT COUNT(*) FROM user_products up WHERE up.user_id = u.id), 0) AS used_slots
+    FROM users u
+    ORDER BY u.id ASC
+  `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number; used_slots: number })[];
+  return rows.map((r) => {
+    const extraSlots = r.extra_slots ?? 0;
+    const isAdmin = r.role === 'admin';
+    return {
+      ...r,
+      mobile: r.mobile ?? null,
+      wallet_balance: r.wallet_balance ?? 0,
+      extra_slots: extraSlots,
+      used_slots: Number(r.used_slots ?? 0),
+      total_slots: isAdmin ? 999999 : FREE_PRODUCT_LIMIT + extraSlots,
+      must_change_password: Boolean(r.must_change_password),
+    };
+  });
 }
 
 export function countUsers(db: Database.Database): number {

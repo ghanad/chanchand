@@ -141,6 +141,8 @@ export interface SafeUser {
   must_change_password: boolean;
   wallet_balance: number;
   extra_slots: number;
+  used_slots?: number;
+  total_slots?: number;
   created_at: string;
   updated_at: string;
 }

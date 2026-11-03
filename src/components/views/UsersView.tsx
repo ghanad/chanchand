@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { requestJson } from "@/lib/api-client";
 import { formatDate, formatNumber } from "@/lib/formatters";
 import { useDashboard } from "@/context/DashboardContext";
@@ -18,6 +19,8 @@ interface UserItem {
   must_change_password?: boolean;
   wallet_balance?: number;
   extra_slots?: number;
+  used_slots?: number;
+  total_slots?: number;
   created_at: string;
   updated_at: string;
 }
@@ -55,7 +58,46 @@ export function UsersView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "admin" | "viewer">("all");
   const [activeKebabKey, setActiveKebabKey] = useState<string | null>(null);
+  const [menuCoords, setMenuCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    openUpwards: boolean;
+  } | null>(null);
   const kebabTriggerRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const toggleKebab = useCallback(
+    (userId: string) => {
+      if (activeKebabKey === userId) {
+        setActiveKebabKey(null);
+        setMenuCoords(null);
+      } else {
+        const triggerEl = kebabTriggerRefs.current[userId];
+        if (triggerEl) {
+          const rect = triggerEl.getBoundingClientRect();
+          const dropdownHeight = 140;
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const openUpwards = spaceBelow < dropdownHeight && rect.top > dropdownHeight;
+          const menuWidth = 150;
+          let left = rect.left;
+          if (left + menuWidth > window.innerWidth - 8) {
+            left = Math.max(8, window.innerWidth - menuWidth - 8);
+          }
+          if (left < 8) {
+            left = 8;
+          }
+          setMenuCoords({
+            top: openUpwards ? undefined : rect.bottom + 4,
+            bottom: openUpwards ? window.innerHeight - rect.top + 4 : undefined,
+            left,
+            openUpwards,
+          });
+        }
+        setActiveKebabKey(userId);
+      }
+    },
+    [activeKebabKey],
+  );
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -73,29 +115,46 @@ export function UsersView() {
     loadUsers();
   }, [loadUsers, refreshTick]);
 
-  // Close kebab menu on outside click or Esc
+  // Close kebab menu on outside click, Esc, scroll, or resize
   useEffect(() => {
     if (!activeKebabKey) return;
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null;
-      if (!target?.closest(".kebab-container")) {
+      if (!target?.closest(".kebab-container") && !target?.closest(".kebab-menu-dropdown")) {
         setActiveKebabKey(null);
+        setMenuCoords(null);
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         const lastKey = activeKebabKey;
         setActiveKebabKey(null);
+        setMenuCoords(null);
         if (lastKey && kebabTriggerRefs.current[lastKey]) {
           kebabTriggerRefs.current[lastKey]?.focus();
         }
       }
     }
+    function handleScroll(event: Event) {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest?.(".kebab-menu-dropdown")) return;
+      setActiveKebabKey(null);
+      setMenuCoords(null);
+    }
+    function handleResize() {
+      setActiveKebabKey(null);
+      setMenuCoords(null);
+    }
+
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, true);
+    window.addEventListener("resize", handleResize);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, [activeKebabKey]);
 
@@ -421,9 +480,9 @@ export function UsersView() {
                 <tr>
                   <th scope="col">کاربر و مشخصات</th>
                   <th scope="col">نقش و سطح دسترسی</th>
-                  <th scope="col">کیف پول و سهمیه</th>
+                  <th scope="col">کیف پول</th>
                   <th scope="col">الزام تغییر رمز</th>
-                  <th scope="col">تاریخ عضویت</th>
+                  <th scope="col">مصرف اسلات‌ها</th>
                   <th scope="col" className="th-actions">عملیات</th>
                 </tr>
               </thead>
@@ -448,7 +507,10 @@ export function UsersView() {
                           </span>
                           <div className="user-names-col">
                             <div className="user-username-row">
-                              <strong className="user-username-text" title={user.username}>
+                              <strong
+                                className="user-username-text"
+                                title={`${user.username} (تاریخ عضویت: ${formatDate(user.created_at)})`}
+                              >
                                 {user.username}
                               </strong>
                               {isCurrent && (
@@ -560,12 +622,59 @@ export function UsersView() {
                         </div>
                       </td>
 
-                      {/* ۵. تاریخ عضویت */}
-                      <td className="user-col-date">
+                      {/* ۵. مصرف اسلات‌ها */}
+                      <td className="user-col-slots">
                         <div className="product-info-text">
-                          <span className="user-date-text">
-                            {formatDate(user.created_at)}
-                          </span>
+                          {isAdminUser ? (
+                            <>
+                              <strong className="user-slots-used font-semibold">
+                                {formatNumber(user.used_slots ?? 0)} محصول
+                              </strong>
+                              <span className="user-slots-detail text-xs text-[var(--muted)]">
+                                ظرفیت نامحدود
+                              </span>
+                            </>
+                          ) : (
+                            (() => {
+                              const used = user.used_slots ?? 0;
+                              const total = user.total_slots ?? (3 + (user.extra_slots ?? 0));
+                              const isFull = used >= total;
+                              const percent = Math.min(100, Math.round((used / Math.max(1, total)) * 100));
+                              return (
+                                <>
+                                  <div className="user-slots-header flex items-center gap-1">
+                                    <strong
+                                      className={`user-slots-used ${
+                                        isFull ? "text-[var(--danger)]" : "text-[var(--text)]"
+                                      }`}
+                                    >
+                                      {formatNumber(used)}
+                                    </strong>
+                                    <span className="text-xs text-[var(--muted)]">از</span>
+                                    <span className="text-xs text-[var(--text-secondary)] font-medium">
+                                      {formatNumber(total)}
+                                    </span>
+                                    <span className="text-xs text-[var(--muted)]">اسلات</span>
+                                    {isFull && (
+                                      <span className="user-slots-badge-full text-[10px] bg-[var(--danger-bg,#fee2e2)] text-[var(--danger)] px-1.5 py-0.5 rounded font-normal mr-1">
+                                        تکمیل
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div
+                                    className="user-dropdown-quota-track"
+                                    style={{ width: "84px", marginTop: "4px" }}
+                                    title={`${formatNumber(used)} از ${formatNumber(total)} اسلات استفاده‌شده (${percent}٪)`}
+                                  >
+                                    <div
+                                      className={`user-dropdown-quota-fill ${isFull ? "is-full" : ""}`}
+                                      style={{ width: `${percent}%` }}
+                                    />
+                                  </div>
+                                </>
+                              );
+                            })()
+                          )}
                         </div>
                       </td>
 
@@ -640,18 +749,15 @@ export function UsersView() {
                                 kebabTriggerRefs.current[String(user.id)] = el;
                               }}
                               className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
-                              onClick={() =>
-                                setActiveKebabKey((current) =>
-                                  current === String(user.id) ? null : String(user.id),
-                                )
-                              }
+                              onClick={() => toggleKebab(String(user.id))}
                               aria-label={`عملیات بیشتر برای ${user.username}`}
                               aria-haspopup="menu"
                               aria-expanded={isKebabOpen}
                               title="عملیات بیشتر"
                               onKeyDown={(e) => {
                                 if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-                                  setActiveKebabKey(String(user.id));
+                                  e.preventDefault();
+                                  toggleKebab(String(user.id));
                                 }
                               }}
                             >
@@ -668,113 +774,129 @@ export function UsersView() {
                               </svg>
                             </button>
 
-                            {isKebabOpen && (
-                              <div
-                                className="kebab-menu-dropdown"
-                                role="menu"
-                                aria-orientation="vertical"
-                                tabIndex={-1}
-                              >
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  className="kebab-menu-item text-[var(--primary)] font-medium"
-                                  onClick={() => {
-                                    setActiveKebabKey(null);
-                                    setWalletUser(user);
-                                    setChargeOpType("charge");
-                                    setChargeAmount("50000");
-                                    setChargeDescription("");
+                            {isKebabOpen &&
+                              menuCoords &&
+                              typeof document !== "undefined" &&
+                              createPortal(
+                                <div
+                                  className="kebab-menu-dropdown kebab-portal-menu"
+                                  role="menu"
+                                  aria-orientation="vertical"
+                                  tabIndex={-1}
+                                  style={{
+                                    position: "fixed",
+                                    top: menuCoords.openUpwards ? "auto" : `${menuCoords.top}px`,
+                                    bottom: menuCoords.openUpwards
+                                      ? `${menuCoords.bottom}px`
+                                      : "auto",
+                                    left: `${menuCoords.left}px`,
+                                    zIndex: 9999,
                                   }}
                                 >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <rect x="2" y="4" width="20" height="16" rx="2" />
-                                    <line x1="12" y1="8" x2="12" y2="16" />
-                                    <line x1="8" y1="12" x2="16" y2="12" />
-                                  </svg>
-                                  <span>شارژ کیف پول</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  className="kebab-menu-item"
-                                  onClick={() => {
-                                    setActiveKebabKey(null);
-                                    setResetUser(user);
-                                    setResetPasswordValue("");
-                                    setResetMustChangePassword(true);
-                                  }}
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                  >
-                                    <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7 8.5 5.5 7 7l-1.5-1.5L4 7a4.24 4.24 0 0 0 6 6l10-10z" />
-                                    <circle cx="7.5" cy="16.5" r="3.5" />
-                                  </svg>
-                                  <span>تغییر کلمه عبور</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  role="menuitem"
-                                  className="kebab-menu-item danger"
-                                  disabled={isCurrent || isLastAdmin}
-                                  onClick={() => {
-                                    setActiveKebabKey(null);
-                                    setUserToDelete(user);
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Escape") {
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="kebab-menu-item text-[var(--primary)] font-medium"
+                                    onClick={() => {
                                       setActiveKebabKey(null);
-                                      kebabTriggerRefs.current[String(user.id)]?.focus();
-                                    }
-                                  }}
-                                  autoFocus
-                                  title={
-                                    isCurrent
-                                      ? "امکان حذف حساب جاری وجود ندارد"
-                                      : isLastAdmin
-                                      ? "امکان حذف آخرین مدیر سیستم وجود ندارد"
-                                      : "حذف حساب کاربر"
-                                  }
-                                >
-                                  <svg
-                                    width="14"
-                                    height="14"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
+                                      setMenuCoords(null);
+                                      setWalletUser(user);
+                                      setChargeOpType("charge");
+                                      setChargeAmount("50000");
+                                      setChargeDescription("");
+                                    }}
                                   >
-                                    <polyline points="3 6 5 6 21 6" />
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                    <line x1="10" y1="11" x2="10" y2="17" />
-                                    <line x1="14" y1="11" x2="14" y2="17" />
-                                  </svg>
-                                  <span>حذف کاربر</span>
-                                </button>
-                              </div>
-                            )}
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                                      <line x1="12" y1="8" x2="12" y2="16" />
+                                      <line x1="8" y1="12" x2="16" y2="12" />
+                                    </svg>
+                                    <span>شارژ کیف پول</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="kebab-menu-item"
+                                    onClick={() => {
+                                      setActiveKebabKey(null);
+                                      setMenuCoords(null);
+                                      setResetUser(user);
+                                      setResetPasswordValue("");
+                                      setResetMustChangePassword(true);
+                                    }}
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7 8.5 5.5 7 7l-1.5-1.5L4 7a4.24 4.24 0 0 0 6 6l10-10z" />
+                                      <circle cx="7.5" cy="16.5" r="3.5" />
+                                    </svg>
+                                    <span>تغییر کلمه عبور</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    role="menuitem"
+                                    className="kebab-menu-item danger"
+                                    disabled={isCurrent || isLastAdmin}
+                                    onClick={() => {
+                                      setActiveKebabKey(null);
+                                      setMenuCoords(null);
+                                      setUserToDelete(user);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Escape") {
+                                        setActiveKebabKey(null);
+                                        setMenuCoords(null);
+                                        kebabTriggerRefs.current[String(user.id)]?.focus();
+                                      }
+                                    }}
+                                    title={
+                                      isCurrent
+                                        ? "امکان حذف حساب جاری وجود ندارد"
+                                        : isLastAdmin
+                                        ? "امکان حذف آخرین مدیر سیستم وجود ندارد"
+                                        : "حذف حساب کاربر"
+                                    }
+                                  >
+                                    <svg
+                                      width="14"
+                                      height="14"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      aria-hidden="true"
+                                    >
+                                      <polyline points="3 6 5 6 21 6" />
+                                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                      <line x1="10" y1="11" x2="10" y2="17" />
+                                      <line x1="14" y1="11" x2="14" y2="17" />
+                                    </svg>
+                                    <span>حذف کاربر</span>
+                                  </button>
+                                </div>,
+                                document.body,
+                              )}
                           </div>
                         </div>
                       </td>
