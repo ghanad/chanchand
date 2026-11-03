@@ -3,7 +3,6 @@
 import React from "react";
 import { usePathname } from "next/navigation";
 import { WorkspaceHeader } from "./WorkspaceHeader";
-import { StatusStrip } from "./StatusStrip";
 import { Toast } from "../common/Toast";
 import { useDashboard } from "../../context/DashboardContext";
 
@@ -27,7 +26,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="workspace-main">
           {children}
         </main>
-        <StatusStrip />
       </div>
       <Toast message={toast} />
     </div>

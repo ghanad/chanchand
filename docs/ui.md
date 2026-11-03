@@ -13,7 +13,6 @@ Price Getter uses Next.js 16 App Router with React 19 Server and Client Componen
   - App Shell: `src/components/layout/AppShell.tsx` (Single-column layout with top navbar)
   - Horizontal Top Navbar: `src/components/layout/WorkspaceHeader.tsx` (Compact, responsive navigation bar)
   - User Menu: `src/components/layout/UserMenu.tsx`
-  - Status Strip: `src/components/layout/StatusStrip.tsx`
   - Dashboard Context: `src/context/DashboardContext.tsx`
 - **Pages & Views**:
   - Products (Default Home): `src/app/products/page.tsx` & `src/app/admin/products/page.tsx` (`/` & `/admin` redirect here) -> `src/components/views/ProductsView.tsx`
