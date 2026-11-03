@@ -143,155 +143,352 @@ export default function AccountProfilePage() {
 
       <div className="profile-content-container">
         {/* بخش ۱: مشخصات کاربری */}
-        <div className="panel p-6 space-y-5">
+        <div className="profile-panel">
           <PanelHead title="مشخصات کاربری" meta="مدیریت آدرس ایمیل و شماره موبایل" />
 
           {profileMessage && (
             <div
-              className={`p-3 rounded-lg text-xs ${
-                profileMessage.type === "success"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-300 border border-rose-500/20"
-              }`}
+              className={`profile-alert ${profileMessage.type}`}
               role="alert"
             >
-              {profileMessage.text}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ flexShrink: 0 }}
+              >
+                {profileMessage.type === "success" ? (
+                  <>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </>
+                ) : (
+                  <>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </>
+                )}
+              </svg>
+              <span>{profileMessage.text}</span>
             </div>
           )}
 
-          <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-                نام کاربری (غیرقابل تغییر)
+          <form onSubmit={handleProfileSubmit} className="profile-form">
+            <div className="profile-field">
+              <label className="profile-label">
+                <span>نام کاربری</span>
+                <span className="profile-label-badge">غیرقابل ویرایش</span>
               </label>
               <input
                 type="text"
                 disabled
                 dir="ltr"
                 value={currentUser.username}
-                className="w-full text-xs p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)] cursor-not-allowed font-medium"
+                className="profile-input"
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-                آدرس ایمیل
+            <div className="profile-field">
+              <label className="profile-label" htmlFor="profile-email">
+                <span>آدرس ایمیل</span>
               </label>
               <input
+                id="profile-email"
                 type="email"
                 dir="ltr"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="name@example.com"
-                className="w-full text-xs p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                className="profile-input"
               />
+              <span className="profile-hint">برای دریافت اطلاعیه‌ها و بازیابی حساب</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-                شماره موبایل
+            <div className="profile-field">
+              <label className="profile-label" htmlFor="profile-mobile">
+                <span>شماره موبایل</span>
               </label>
               <input
+                id="profile-mobile"
                 type="tel"
                 dir="ltr"
                 value={mobile}
                 onChange={(e) => setMobile(e.target.value)}
                 placeholder="۰۹۱۲۳۴۵۶۷۸۹"
-                className="w-full text-xs p-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                className="profile-input"
               />
+              <span className="profile-hint">شماره همراه معتبر جهت احراز هویت</span>
             </div>
 
-            <div className="pt-2">
+            <div style={{ paddingTop: "8px" }}>
               <button
                 type="submit"
                 disabled={profileSaving}
-                className="btn btn-primary text-xs w-full py-2.5 font-bold"
+                className="btn btn-primary"
+                style={{ width: "100%" }}
               >
-                {profileSaving ? "در حال ذخیره..." : "ذخیره تغییرات مشخصات"}
+                {profileSaving ? (
+                  <>
+                    <span className="spinner-sm" aria-hidden="true" />
+                    <span>در حال ذخیره...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                      <polyline points="17 21 17 13 7 13 7 21" />
+                      <polyline points="7 3 7 8 15 8" />
+                    </svg>
+                    <span>ذخیره تغییرات مشخصات</span>
+                  </>
+                )}
               </button>
             </div>
           </form>
         </div>
 
         {/* بخش ۲: تغییر کلمه عبور */}
-        <div className="panel p-6 space-y-5">
+        <div className="profile-panel">
           <PanelHead title="تغییر کلمه عبور" meta="امنیت و کلمه عبور حساب کاربری" />
 
           {passwordMessage && (
             <div
-              className={`p-3 rounded-lg text-xs ${
-                passwordMessage.type === "success"
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300 border border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-600 dark:text-rose-300 border border-rose-500/20"
-              }`}
+              className={`profile-alert ${passwordMessage.type}`}
               role="alert"
             >
-              {passwordMessage.text}
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                style={{ flexShrink: 0 }}
+              >
+                {passwordMessage.type === "success" ? (
+                  <>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </>
+                ) : (
+                  <>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </>
+                )}
+              </svg>
+              <span>{passwordMessage.text}</span>
             </div>
           )}
 
-          <form onSubmit={handlePasswordSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-                کلمه عبور جدید
+          <form onSubmit={handlePasswordSubmit} className="profile-form">
+            <div className="profile-field">
+              <label className="profile-label" htmlFor="new-password">
+                <span>کلمه عبور جدید</span>
+                <span className="profile-label-badge">حداقل ۶ کاراکتر</span>
               </label>
-              <div className="relative">
+              <div className="profile-password-wrapper">
                 <input
+                  id="new-password"
                   type={showNewPassword ? "text" : "password"}
                   dir="ltr"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="حداقل ۶ کاراکتر"
+                  placeholder="کلمه عبور جدید را وارد کنید"
                   required
                   minLength={6}
-                  className="w-full text-xs p-2.5 pl-9 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                  className="profile-input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowNewPassword((prev) => !prev)}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
-                  title={showNewPassword ? "مخفی کردن" : "نمایش"}
+                  className="password-toggle-btn"
+                  aria-label={showNewPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+                  title={showNewPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
                 >
-                  {showNewPassword ? "👁️" : "🙈"}
+                  {showNewPassword ? (
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
                 </button>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">
-                تکرار کلمه عبور جدید
+            <div className="profile-field">
+              <label className="profile-label" htmlFor="confirm-password">
+                <span>تکرار کلمه عبور جدید</span>
               </label>
-              <div className="relative">
+              <div className="profile-password-wrapper">
                 <input
+                  id="confirm-password"
                   type={showConfirmPassword ? "text" : "password"}
                   dir="ltr"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="تکرار دقیق کلمه عبور"
+                  placeholder="تکرار کلمه عبور جدید را وارد کنید"
                   required
                   minLength={6}
-                  className="w-full text-xs p-2.5 pl-9 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                  className="profile-input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowConfirmPassword((prev) => !prev)}
-                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--foreground)]"
-                  title={showConfirmPassword ? "مخفی کردن" : "نمایش"}
+                  className="password-toggle-btn"
+                  aria-label={showConfirmPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+                  title={showConfirmPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
                 >
-                  {showConfirmPassword ? "👁️" : "🙈"}
+                  {showConfirmPassword ? (
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
                 </button>
               </div>
+              {confirmPassword.length > 0 && (
+                <span
+                  className={`profile-hint ${
+                    newPassword === confirmPassword ? "ok" : "error"
+                  }`}
+                >
+                  {newPassword === confirmPassword
+                    ? "✓ کلمه عبور و تکرار آن یکسان هستند"
+                    : "✕ تکرار کلمه عبور با کلمه عبور جدید یکسان نیست"}
+                </span>
+              )}
             </div>
 
-            <div className="pt-2">
+            <div className="profile-security-box">
+              <div className="profile-security-box-title">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>راهنمای امنیت کلمه عبور</span>
+              </div>
+              <ul>
+                <li>حداقل ۶ کاراکتر (ترجیحاً حروف، ارقام و علائم)</li>
+                <li>از کلمات عبور تکراری یا ساده استفاده نکنید</li>
+              </ul>
+            </div>
+
+            <div style={{ paddingTop: "8px" }}>
               <button
                 type="submit"
                 disabled={passwordSaving}
-                className="btn btn-secondary text-xs w-full py-2.5 font-bold"
+                className="btn btn-primary"
+                style={{ width: "100%" }}
               >
-                {passwordSaving ? "در حال به‌روزرسانی..." : "به‌روزرسانی کلمه عبور"}
+                {passwordSaving ? (
+                  <>
+                    <span className="spinner-sm" aria-hidden="true" />
+                    <span>در حال به‌روزرسانی...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                    <span>به‌روزرسانی کلمه عبور</span>
+                  </>
+                )}
               </button>
             </div>
           </form>
