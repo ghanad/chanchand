@@ -5,8 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useDashboard } from "@/context/DashboardContext";
 import { requestJson } from "@/lib/api-client";
 import { formatNumber, formatDate } from "@/lib/formatters";
-import { PanelHead } from "@/components/common/PanelHead";
-import { Metric } from "@/components/common/Metric";
 import { EmptyState } from "@/components/common/EmptyState";
 import { PackageRow, PaymentTransactionRow, WalletTransactionRow } from "@/lib/types";
 
@@ -29,7 +27,7 @@ function WalletContent() {
   const searchParams = useSearchParams();
   const { currentUser, showToast, refreshCurrentUser, triggerRefresh } = useDashboard();
 
-  const topupCardRef = useRef<HTMLDivElement>(null);
+  const packagesSectionRef = useRef<HTMLDivElement>(null);
 
   // Data states
   const [walletData, setWalletData] = useState<WalletData | null>(null);
@@ -41,12 +39,12 @@ function WalletContent() {
   const [purchasingPkgId, setPurchasingPkgId] = useState<number | null>(null);
   const [buyingSlot, setBuyingSlot] = useState(false);
   const [activeTxTab, setActiveTxTab] = useState<"wallet" | "payments">("wallet");
+  const [copiedRefId, setCopiedRefId] = useState<string | null>(null);
 
-  // Focus top-up card if query param focus=topup
+  // Focus packages section if query param focus=topup
   useEffect(() => {
-    if (searchParams.get("focus") === "topup" && topupCardRef.current) {
-      topupCardRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-      topupCardRef.current.focus();
+    if (searchParams.get("focus") === "topup" && packagesSectionRef.current) {
+      packagesSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [searchParams]);
 
@@ -110,6 +108,7 @@ function WalletContent() {
   );
 
   const canAffordSlot = balance >= slotPrice;
+  const deficit = Math.max(0, slotPrice - balance);
   const walletTransactions = walletData?.transactions || [];
 
   // Handle buying single slot from wallet balance
@@ -155,310 +154,383 @@ function WalletContent() {
     }
   }
 
+  // Copy ref ID helper
+  function handleCopyRefId(refId: string) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(refId);
+      setCopiedRefId(refId);
+      showToast("کد پیگیری کپی شد.");
+      setTimeout(() => setCopiedRefId(null), 2000);
+    }
+  }
+
   return (
-    <div className="space-y-6">
-      {/* ۱. بالای صفحه: موجودی کیف پول و فرم/کارت شارژ */}
-      <section className="product-summary-grid" aria-label="خلاصه موجودی و سهمیه">
-        <Metric
-          label="موجودی کیف پول"
-          value={`${formatNumber(balance)} تومان`}
-        />
-        <Metric
-          label="سهمیه پایه رایگان"
-          value={`${formatNumber(freeQuotaUsed)} از ۳ محصول`}
-        />
-        <Metric
-          label="اسلات‌های اضافه"
-          value={
-            currentUser.role === "admin"
-              ? "نامحدود"
-              : `${formatNumber(extraSlots)} اسلات (+${formatNumber(extraQuotaUsed)} استفاده)`
-          }
-        />
-        <Metric
-          label="کل ظرفیت باقی‌مانده"
-          value={
-            currentUser.role === "admin"
-              ? "نامحدود"
-              : `${formatNumber(quota.remaining)} محصول`
-          }
-        />
-      </section>
-
-      {/* کارت شارژ کیف پول و افزایش اعتبار */}
-      <div
-        ref={topupCardRef}
-        id="topup-card"
-        tabIndex={-1}
-        className="panel p-5 space-y-4 focus:ring-2 focus:ring-[var(--primary)] outline-none transition-shadow"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-          <div>
-            <h2 className="text-base font-bold flex items-center gap-2">
-              <span>💳</span>
-              <span>شارژ کیف پول و مدیریت اعتبار</span>
-            </h2>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              موجودی کیف پول برای خرید اسلات پایش محصول استفاده می‌شود.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 bg-[var(--surface-muted)] p-2.5 px-4 rounded-xl border border-[var(--border)]">
-            <span className="text-xs text-[var(--text-muted)] font-medium">موجودی فعلی شما:</span>
-            <span className="text-base font-black text-emerald-600 dark:text-emerald-400" dir="ltr">
-              {formatNumber(balance)} تومان
-            </span>
-          </div>
-        </div>
-
-        {/* راهنما و روش‌های شارژ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-          <div className="p-4 rounded-xl border border-sky-500/20 bg-sky-500/10 text-xs text-sky-900 dark:text-sky-200 space-y-2">
-            <div className="font-bold flex items-center gap-1.5 text-sky-800 dark:text-sky-300">
-              <span>⚡</span>
-              <span>خرید بسته‌های اعتباری و اسلات پایش</span>
+    <div className="wallet-view-container">
+      {/* بخش ۱: کارت دوتایی هدر (کارت اعتباری کیف پول + کارت وضعیت سهمیه) */}
+      <section className="wallet-hero-grid" aria-label="کیف پول و سهمیه پایش">
+        {/* ۱. کارت اعتباری دیجیتال */}
+        <div className="wallet-credit-card">
+          <div className="wallet-card-header">
+            <div className="wallet-card-brand">
+              <div className="wallet-card-chip-icon" aria-hidden="true" />
+              <span className="wallet-card-title">کیف پول اعتباری چن‌چند</span>
             </div>
-            <p className="leading-relaxed">
-              شما می‌توانید با انتخاب یکی از بسته‌های افزایش ظرفیت در بخش زیر، هزینه آن را مستقیماً از طریق درگاه امن پرداخت بانکی بپردازید تا اسلات‌ها بلافاصله به حسابتان افزوده شوند.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 text-xs text-emerald-900 dark:text-emerald-200 space-y-2">
-            <div className="font-bold flex items-center gap-1.5 text-emerald-800 dark:text-emerald-300">
-              <span>🛡️</span>
-              <span>شارژ مستقیم کیف پول</span>
-            </div>
-            <p className="leading-relaxed">
-              همچنین می‌توانید جهت شارژ کیف پول خود یا مبالغ دلخواه، با پشتیبانی مدیریت چن‌چند در ارتباط باشید تا پس از هماهنگی، کیف پول شما به صورت آنی شارژ شود.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ۲. بخش میانی: وضعیت سهمیه و گزینه‌های خرید ظرفیت اضافی */}
-      <div className="space-y-4">
-        <PanelHead
-          title="افزایش ظرفیت پایش محصول"
-          meta={`هزینه هر اسلات: ${formatNumber(slotPrice)} تومان`}
-        />
-
-        {/* نوار وضعیت مصرف سهمیه */}
-        <div className="panel p-5 space-y-3">
-          <div className="flex justify-between items-center text-xs">
-            <span className="font-semibold text-[var(--text-muted)]">میزان مصرف ظرفیت پایش:</span>
-            <span className="font-bold text-[var(--foreground)]">
-              {currentUser.role === "admin"
-                ? "کاربر مدیر — بدون محدودیت سهمیه"
-                : `${formatNumber(quota.usedCount)} از ${formatNumber(quota.totalLimit)} محصول (${formatNumber(usedPercentage)}٪)`}
+            <span className="wallet-card-user-tag" dir="ltr">
+              @{currentUser.username}
             </span>
           </div>
 
-          {currentUser.role !== "admin" && (
-            <div className="w-full bg-[var(--surface-muted)] h-2.5 rounded-full overflow-hidden border border-[var(--border)]">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  usedPercentage >= 100 ? "bg-amber-500" : "bg-[var(--primary)]"
-                }`}
-                style={{ width: `${usedPercentage}%` }}
-              />
+          <div className="wallet-card-middle">
+            <div className="wallet-card-balance-lbl">موجودی در دسترس</div>
+            <div className="wallet-card-balance-val">
+              <strong>{formatNumber(balance)}</strong>
+              <span>تومان</span>
             </div>
-          )}
-
-          <div className="text-xs text-[var(--text-muted)] space-y-1 pt-1">
-            <p>• پایش ۳ محصول اول برای تمام کاربران <strong>رایگان</strong> است.</p>
-            <p>• تمام ظرفیت‌های خریداری‌شده <strong>دائمی</strong> هستند و هرگز منقضی نمی‌شوند.</p>
-            <p>• با حذف هر محصول، ظرفیت آن آزاد شده و بلافاصله می‌توانید کالای دیگری را پایش کنید.</p>
           </div>
 
-          {/* خرید تکی اسلات از محل کیف پول */}
-          {currentUser.role !== "admin" && (
-            <div className="mt-4 pt-4 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-bold text-[var(--foreground)]">
-                  خرید ۱ اسلات دائمی از محل موجودی کیف پول
-                </div>
-                <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                  مبلغ {formatNumber(slotPrice)} تومان از موجودی فعلی شما کسر خواهد شد.
-                </div>
-              </div>
-
+          <div className="wallet-card-actions">
+            {currentUser.role !== "admin" && (
               <button
                 type="button"
                 disabled={!canAffordSlot || buyingSlot}
                 onClick={handleBuySlotFromWallet}
-                className="btn btn-primary text-xs py-2 px-4 whitespace-nowrap font-bold flex items-center justify-center gap-1.5"
+                className="wallet-card-btn-primary"
+                title={canAffordSlot ? "خرید مستقیم یک اسلات از موجودی" : `کسری موجودی: ${formatNumber(deficit)} تومان`}
               >
                 {buyingSlot ? (
-                  "در حال ثبت..."
-                ) : canAffordSlot ? (
+                  <span>در حال فعال‌سازی...</span>
+                ) : (
                   <>
-                    <span>خرید ۱ اسلات با موجودی کیف پول</span>
+                    <span>خرید ۱ اسلات با موجودی</span>
                     <span aria-hidden="true">⚡</span>
                   </>
-                ) : (
-                  `موجودی ناکافی (کسری: ${formatNumber(slotPrice - balance)} تومان)`
                 )}
               </button>
-            </div>
-          )}
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                packagesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="wallet-card-btn-secondary"
+            >
+              <span>+ افزایش اعتبار با بسته‌ها</span>
+              <span aria-hidden="true">↓</span>
+            </button>
+          </div>
         </div>
 
-        {/* لیست بسته‌های افزایش ظرفیت آنلاین */}
-        <div className="space-y-3">
-          <div className="text-xs font-bold text-[var(--text-muted)]">
-            بسته‌های ارتقای ظرفیت پایش (پرداخت مستقیم آنلاین):
+        {/* ۲. کارت تحلیلی سهمیه و پایش */}
+        <div className="wallet-quota-card">
+          <div className="wallet-quota-top">
+            <div className="wallet-quota-heading">
+              <h3>
+                <span aria-hidden="true">📊</span>
+                <span>وضعیت ظرفیت پایش محصولات</span>
+              </h3>
+              <span>
+                {currentUser.role === "admin"
+                  ? "کاربر مدیر — پایش نامحدود"
+                  : `${formatNumber(quota.usedCount)} از ${formatNumber(quota.totalLimit)} محصول فعال`}
+              </span>
+            </div>
+
+            <div className="wallet-quota-pill">
+              {currentUser.role === "admin"
+                ? "نامحدود"
+                : `${formatNumber(quota.remaining)} محصول خالی`}
+            </div>
           </div>
 
-          {loading ? (
-            <div className="p-12 text-center text-xs text-[var(--text-muted)]">
-              در حال بارگذاری بسته‌های موجود...
-            </div>
-          ) : packages.length === 0 ? (
-            <EmptyState text="در حال حاضر هیچ بسته‌ای برای خرید فعال نیست." />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {packages.map((pkg) => {
-                const isBuying = purchasingPkgId === pkg.id;
-                return (
+          <div className="wallet-progress-block">
+            {currentUser.role !== "admin" ? (
+              <>
+                <div className="wallet-progress-track">
                   <div
-                    key={pkg.id}
-                    className="panel p-5 flex flex-col justify-between hover:border-[var(--primary)] transition-all relative overflow-hidden"
-                  >
-                    <div>
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-base text-[var(--foreground)]">
-                          {pkg.title}
-                        </h3>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/20">
-                          +{formatNumber(pkg.slots)} محصول
-                        </span>
-                      </div>
+                    className={`wallet-progress-bar-fill ${usedPercentage >= 100 ? "warning" : ""}`}
+                    style={{ width: `${usedPercentage}%` }}
+                  />
+                </div>
+                <div className="wallet-progress-labels">
+                  <span>{formatNumber(usedPercentage)}٪ تکمیل شده</span>
+                  <span>سقف کل: {formatNumber(quota.totalLimit)} کالا</span>
+                </div>
+              </>
+            ) : (
+              <div style={{ height: "9px" }} />
+            )}
+          </div>
 
-                      {pkg.description && (
-                        <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                          {pkg.description}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="pt-4 border-t border-[var(--border)] space-y-3">
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-xs text-[var(--text-muted)]">مبلغ پرداختی:</span>
-                        <div>
-                          <span className="text-xl font-black text-[var(--primary)]">
-                            {formatNumber(pkg.price_toman)}
-                          </span>
-                          <span className="text-xs text-[var(--text-muted)] mr-1">تومان</span>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        disabled={purchasingPkgId !== null}
-                        onClick={() => handleBuyPackage(pkg)}
-                        className="btn btn-primary w-full text-xs py-2.5 flex items-center justify-center gap-2 font-bold"
-                      >
-                        {isBuying ? (
-                          <span>در حال انتقال به درگاه...</span>
-                        ) : (
-                          <>
-                            <span>خرید و پرداخت آنلاین</span>
-                            <span aria-hidden="true">💳</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="wallet-quota-metrics-row">
+            <div className="wallet-quota-mini-stat">
+              <div className="wallet-quota-mini-num">{formatNumber(freeQuotaUsed)} / ۳</div>
+              <div className="wallet-quota-mini-lbl">سهمیه پایه رایگان</div>
             </div>
-          )}
+
+            <div className="wallet-quota-mini-stat">
+              <div className="wallet-quota-mini-num">
+                {currentUser.role === "admin" ? "∞" : `+${formatNumber(extraSlots)}`}
+              </div>
+              <div className="wallet-quota-mini-lbl">اسلات‌های خریداری‌شده</div>
+            </div>
+
+            <div className="wallet-quota-mini-stat">
+              <div className="wallet-quota-mini-num">
+                {currentUser.role === "admin" ? "∞" : formatNumber(quota.remaining)}
+              </div>
+              <div className="wallet-quota-mini-lbl">ظرفیت باقی‌مانده</div>
+            </div>
+          </div>
+
+          <div className="wallet-quota-note">
+            <span aria-hidden="true">🛡️</span>
+            <span>تمام ظرفیت‌های تهیه‌شده دائمی بوده و با حذف کالا، ظرفیت بلافاصله آزاد می‌گردد.</span>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* ۳. بخش پایین: جدول تراکنش‌ها */}
-      <section className="panel p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
-          <PanelHead
-            title="تاریخچه تراکنش‌ها"
-            meta="گزارش تراکنش‌های کیف پول و پرداخت‌های آنلاین"
-          />
+      {/* بنر اطلاع‌رسانی خرید تکی از موجودی کیف پول */}
+      {currentUser.role !== "admin" && (
+        <div className="wallet-direct-slot-panel">
+          <div className="wallet-direct-slot-info">
+            <div className="wallet-direct-slot-icon" aria-hidden="true">
+              ⚡
+            </div>
+            <div className="wallet-direct-slot-text">
+              <h4>خرید تک‌اسلات پایش با کسر از موجودی کیف پول</h4>
+              <p>
+                تعرفه هر اسلات پایش دائمی: <strong>{formatNumber(slotPrice)} تومان</strong>
+                {canAffordSlot ? (
+                  <span style={{ color: "var(--ok)", marginInlineStart: "8px" }}>
+                    (موجودی شما کافی است)
+                  </span>
+                ) : (
+                  <span style={{ color: "var(--danger)", marginInlineStart: "8px" }}>
+                    (کسری موجودی: {formatNumber(deficit)} تومان)
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
 
-          <div className="flex gap-2">
+          <div className="wallet-direct-slot-actions">
+            <button
+              type="button"
+              disabled={!canAffordSlot || buyingSlot}
+              onClick={handleBuySlotFromWallet}
+              className="btn btn-primary btn-sm"
+            >
+              {buyingSlot ? (
+                <span>در حال ثبت...</span>
+              ) : canAffordSlot ? (
+                <span>خرید ۱ اسلات ({formatNumber(slotPrice)} تومان)</span>
+              ) : (
+                <span>موجودی ناکافی است</span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* بخش ۲: بسته‌های افزایش ظرفیت آنلاین (با درگاه بانکی) */}
+      <section
+        ref={packagesSectionRef}
+        id="packages-section"
+        className="wallet-packages-section"
+        aria-label="بسته‌های افزایش ظرفیت پایش"
+      >
+        <div className="wallet-section-header">
+          <div className="wallet-section-titles">
+            <h2>
+              <span aria-hidden="true">🎁</span>
+              <span>بسته‌های افزایش ظرفیت پایش (پرداخت آنلاین)</span>
+            </h2>
+            <p>
+              با خرید هر بسته، اسلات‌های پایش دائمی فوراً به حسابتان افزوده می‌شوند و از طریق کلیه کارت‌های عضو شتاب قابل پرداخت هستند.
+            </p>
+          </div>
+
+          <div style={{ fontSize: "12px", color: "var(--muted)" }}>
+            هزینه پایه هر اسلات: {formatNumber(slotPrice)} تومان
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: "48px 0", textAlign: "center", fontSize: "12.5px", color: "var(--muted)" }}>
+            در حال بارگذاری بسته‌های ارتقا...
+          </div>
+        ) : packages.length === 0 ? (
+          <EmptyState text="در حال حاضر بسته‌ای برای خرید فعال نیست." />
+        ) : (
+          <div className="wallet-packages-grid">
+            {packages.map((pkg, idx) => {
+              const isBuying = purchasingPkgId === pkg.id;
+              // Highlight middle package or package with slots >= 5 as featured
+              const isFeatured = pkg.slots >= 5 && (packages.length <= 3 ? idx === 1 : true);
+              const pricePerSlot = Math.round(pkg.price_toman / Math.max(1, pkg.slots));
+
+              return (
+                <div
+                  key={pkg.id}
+                  className={`wallet-package-card ${isFeatured ? "featured" : ""}`}
+                >
+                  {isFeatured && (
+                    <div className="wallet-package-popular-ribbon">
+                      پیشنهادی و پرطرفدار
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="wallet-package-top">
+                      <h3 className="wallet-package-title">{pkg.title}</h3>
+                      <span className="wallet-package-slots-tag">
+                        +{formatNumber(pkg.slots)} محصول
+                      </span>
+                    </div>
+
+                    <p className="wallet-package-desc">
+                      {pkg.description || `افزایش ظرفیت پایش شما به میزان ${formatNumber(pkg.slots)} محصول دائمی بدون انقضا.`}
+                    </p>
+                  </div>
+
+                  <div>
+                    <div className="wallet-package-pricing-wrap">
+                      <div className="wallet-package-price-row">
+                        <strong>{formatNumber(pkg.price_toman)}</strong>
+                        <span>تومان</span>
+                      </div>
+                      <div className="wallet-package-per-slot-text">
+                        هر اسلات فقط: {formatNumber(pricePerSlot)} تومان
+                      </div>
+                    </div>
+
+                    <ul className="wallet-package-features-list">
+                      <li className="wallet-package-feature-item">
+                        <span aria-hidden="true">✓</span>
+                        <span>فعال‌سازی آنی و خودکار پس از پرداخت</span>
+                      </li>
+                      <li className="wallet-package-feature-item">
+                        <span aria-hidden="true">✓</span>
+                        <span>ظرفیت دائمی بدون نیاز به تمدید ماهانه</span>
+                      </li>
+                      <li className="wallet-package-feature-item">
+                        <span aria-hidden="true">✓</span>
+                        <span>پایش منظم نرخ‌ها و آرشیو تغییرات</span>
+                      </li>
+                    </ul>
+
+                    <button
+                      type="button"
+                      disabled={purchasingPkgId !== null}
+                      onClick={() => handleBuyPackage(pkg)}
+                      className={`btn btn-primary wallet-package-buy-btn ${isFeatured ? "" : "btn-secondary"}`}
+                    >
+                      {isBuying ? (
+                        <span>در حال انتقال به درگاه...</span>
+                      ) : (
+                        <>
+                          <span>خرید و پرداخت آنلاین</span>
+                          <span aria-hidden="true">💳</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* بخش ۳: تاریخچه تراکنش‌ها */}
+      <section className="wallet-tx-panel" aria-label="تاریخچه تراکنش‌های کیف پول و پرداخت‌ها">
+        <div className="wallet-tx-panel-header">
+          <div className="wallet-section-titles">
+            <h2>
+              <span aria-hidden="true">🧾</span>
+              <span>تاریخچه و گزارش مالی</span>
+            </h2>
+            <p>مشاهده گردش حساب کیف پول و سوابق پرداخت‌های بانکی</p>
+          </div>
+
+          <div className="wallet-tab-switch-group">
             <button
               type="button"
               onClick={() => setActiveTxTab("wallet")}
-              className={`text-xs py-1.5 px-3 rounded-lg font-medium transition-colors ${
-                activeTxTab === "wallet"
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--foreground)]"
-              }`}
+              className={`wallet-tab-switch-btn ${activeTxTab === "wallet" ? "active" : ""}`}
             >
-              گردش کیف پول ({formatNumber(walletTransactions.length)})
+              <span>گردش کیف پول</span>
+              <span className="wallet-tab-count-badge">
+                {formatNumber(walletTransactions.length)}
+              </span>
             </button>
+
             <button
               type="button"
               onClick={() => setActiveTxTab("payments")}
-              className={`text-xs py-1.5 px-3 rounded-lg font-medium transition-colors ${
-                activeTxTab === "payments"
-                  ? "bg-[var(--primary)] text-white"
-                  : "bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--foreground)]"
-              }`}
+              className={`wallet-tab-switch-btn ${activeTxTab === "payments" ? "active" : ""}`}
             >
-              پرداخت‌های بانکی ({formatNumber(paymentTransactions.length)})
+              <span>پرداخت‌های درگاه</span>
+              <span className="wallet-tab-count-badge">
+                {formatNumber(paymentTransactions.length)}
+              </span>
             </button>
           </div>
         </div>
 
-        {/* جدول تراکنش‌های کیف پول */}
+        {/* ۱. جدول تراکنش‌های کیف پول */}
         {activeTxTab === "wallet" && (
           walletTransactions.length === 0 ? (
             <EmptyState text="هنوز هیچ تراکنشی در کیف پول شما ثبت نشده است." />
           ) : (
-            <div className="product-table-wrap overflow-x-auto">
-              <table className="product-compact-table" aria-label="جدول تراکنش‌های کیف پول">
+            <div className="wallet-table-wrap">
+              <table className="wallet-table" aria-label="جدول گردش کیف پول">
                 <thead>
                   <tr>
                     <th scope="col">نوع تراکنش</th>
                     <th scope="col">مبلغ</th>
                     <th scope="col">موجودی پس از تراکنش</th>
-                    <th scope="col">توضیحات</th>
-                    <th scope="col">تاریخ و ساعت</th>
+                    <th scope="col">شرح و توضیحات</th>
+                    <th scope="col">تاریخ و زمان</th>
                   </tr>
                 </thead>
                 <tbody>
                   {walletTransactions.map((tx) => {
                     const isPositive = tx.amount > 0;
                     return (
-                      <tr key={tx.id} className="product-table-row">
+                      <tr key={tx.id}>
                         <td>
                           <span
-                            className={`text-xs px-2 py-0.5 rounded font-medium ${
-                              isPositive
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
-                            }`}
+                            className="status-pill"
+                            style={{
+                              background: isPositive ? "rgba(19, 118, 79, 0.08)" : "rgba(180, 59, 59, 0.08)",
+                              color: isPositive ? "var(--ok)" : "var(--danger)",
+                              border: `1px solid ${isPositive ? "rgba(19, 118, 79, 0.2)" : "rgba(180, 59, 59, 0.2)"}`,
+                            }}
                           >
                             {tx.type === "admin_charge"
-                              ? "شارژ دستی توسط مدیر"
+                              ? "شارژ توسط مدیر"
                               : tx.type === "slot_purchase"
                               ? "خرید اسلات محصول"
                               : "تعدیل موجودی"}
                           </span>
                         </td>
-                        <td className="font-bold text-xs" dir="ltr">
-                          <span className={isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                        <td>
+                          <span className={isPositive ? "wallet-amount-positive" : "wallet-amount-negative"}>
                             {isPositive ? "+" : ""}
                             {formatNumber(tx.amount)} تومان
                           </span>
                         </td>
-                        <td className="text-xs" dir="ltr">
-                          {formatNumber(tx.balance_after)} تومان
+                        <td>
+                          <span style={{ fontFeatureSettings: "tnum", direction: "ltr", display: "inline-block" }}>
+                            {formatNumber(tx.balance_after)} تومان
+                          </span>
                         </td>
-                        <td className="text-xs text-[var(--text-muted)]">
+                        <td style={{ color: "var(--muted)" }}>
                           {tx.description || "-"}
                         </td>
-                        <td className="text-xs text-[var(--text-muted)]">
+                        <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
                           {formatDate(tx.created_at)}
                         </td>
                       </tr>
@@ -470,48 +542,67 @@ function WalletContent() {
           )
         )}
 
-        {/* جدول پرداخت‌های درگاه */}
+        {/* ۲. جدول پرداخت‌های آنلاین درگاه */}
         {activeTxTab === "payments" && (
           paymentTransactions.length === 0 ? (
-            <EmptyState text="هنوز هیچ تراکنش پرداختی ثبت نشده است." />
+            <EmptyState text="هنوز هیچ پرداخت آنلاینی در حساب شما ثبت نشده است." />
           ) : (
-            <div className="product-table-wrap overflow-x-auto">
-              <table className="product-compact-table" aria-label="جدول تراکنش‌های پرداخت">
+            <div className="wallet-table-wrap">
+              <table className="wallet-table" aria-label="جدول پرداخت‌های بانکی">
                 <thead>
                   <tr>
-                    <th scope="col">بسته / شرح</th>
-                    <th scope="col">تعداد اسلات</th>
-                    <th scope="col">مبلغ</th>
-                    <th scope="col">درگاه</th>
-                    <th scope="col">وضعیت</th>
-                    <th scope="col">کد پیگیری</th>
-                    <th scope="col">تاریخ</th>
+                    <th scope="col">عنوان بسته</th>
+                    <th scope="col">اسلات‌های دریافتی</th>
+                    <th scope="col">مبلغ پرداختی</th>
+                    <th scope="col">درگاه بانکی</th>
+                    <th scope="col">وضعیت تراکنش</th>
+                    <th scope="col">کد پیگیری شتاب</th>
+                    <th scope="col">تاریخ پرداخت</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paymentTransactions.map((tx) => (
-                    <tr key={tx.id} className="product-table-row">
-                      <td className="font-semibold text-xs text-[var(--foreground)]">
+                    <tr key={tx.id}>
+                      <td style={{ fontWeight: 600 }}>
                         {tx.package_title}
                       </td>
-                      <td className="text-xs font-medium">
-                        +{formatNumber(tx.slots)}
+                      <td>
+                        <span className="wallet-package-slots-tag">
+                          +{formatNumber(tx.slots)}
+                        </span>
                       </td>
-                      <td className="text-xs font-bold" dir="ltr">
-                        {formatNumber(tx.amount_toman)} تومان
+                      <td>
+                        <strong style={{ fontFeatureSettings: "tnum", direction: "ltr", display: "inline-block" }}>
+                          {formatNumber(tx.amount_toman)} تومان
+                        </strong>
                       </td>
-                      <td className="text-xs text-[var(--text-muted)]">
+                      <td style={{ color: "var(--muted)" }}>
                         {tx.gateway === "zarinpal" ? "زرین‌پال" : tx.gateway === "mock" ? "آزمایشی" : tx.gateway}
                       </td>
                       <td>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded font-semibold ${
-                            tx.status === "paid"
-                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                              : tx.status === "pending"
-                              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20"
-                              : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/20"
-                          }`}
+                          className="status-pill"
+                          style={{
+                            background:
+                              tx.status === "paid"
+                                ? "rgba(19, 118, 79, 0.1)"
+                                : tx.status === "pending"
+                                ? "rgba(217, 119, 6, 0.1)"
+                                : "rgba(180, 59, 59, 0.1)",
+                            color:
+                              tx.status === "paid"
+                                ? "var(--ok)"
+                                : tx.status === "pending"
+                                ? "var(--warn)"
+                                : "var(--danger)",
+                            border: `1px solid ${
+                              tx.status === "paid"
+                                ? "rgba(19, 118, 79, 0.25)"
+                                : tx.status === "pending"
+                                ? "rgba(217, 119, 6, 0.25)"
+                                : "rgba(180, 59, 59, 0.25)"
+                            }`,
+                          }}
                         >
                           {tx.status === "paid"
                             ? "پرداخت موفق"
@@ -520,10 +611,22 @@ function WalletContent() {
                             : "ناموفق / لغو شده"}
                         </span>
                       </td>
-                      <td className="text-xs font-mono text-[var(--text-muted)]" dir="ltr">
-                        {tx.ref_id || "-"}
+                      <td>
+                        {tx.ref_id ? (
+                          <button
+                            type="button"
+                            onClick={() => handleCopyRefId(tx.ref_id!)}
+                            className="wallet-ref-code"
+                            title="کلیک برای کپی کد پیگیری"
+                            style={{ cursor: "pointer", border: "1px dashed var(--line)" }}
+                          >
+                            {tx.ref_id} {copiedRefId === tx.ref_id ? "✓" : ""}
+                          </button>
+                        ) : (
+                          <span style={{ color: "var(--muted)" }}>-</span>
+                        )}
                       </td>
-                      <td className="text-xs text-[var(--text-muted)]">
+                      <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
                         {formatDate(tx.paid_at || tx.created_at)}
                       </td>
                     </tr>
@@ -540,7 +643,13 @@ function WalletContent() {
 
 export default function AccountWalletPage() {
   return (
-    <Suspense fallback={<div className="p-12 text-center text-xs text-[var(--text-muted)]">در حال بارگذاری اطلاعات کیف پول...</div>}>
+    <Suspense
+      fallback={
+        <div style={{ padding: "48px 0", textAlign: "center", fontSize: "12.5px", color: "var(--muted)" }}>
+          در حال بارگذاری اطلاعات کیف پول...
+        </div>
+      }
+    >
       <WalletContent />
     </Suspense>
   );
