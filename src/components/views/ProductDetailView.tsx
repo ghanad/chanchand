@@ -278,8 +278,11 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     return { minToman: minT, maxToman: maxT, minUsd: minU, maxUsd: maxU };
   }, [history]);
 
+  const isPublicProduct = Boolean(product?.is_public);
+  const activeMetric: HistoryMetric = isPublicProduct ? "toman" : chartMetric;
+
   const metricConfig = useMemo(() => {
-    return chartMetric === "usd"
+    return activeMetric === "usd"
       ? {
           key: "price_usd" as const,
           label: "دلار",
@@ -292,7 +295,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           suffix: "تومان",
           empty: "هنوز داده‌ای برای نمودار ثبت نشده است.",
         };
-  }, [chartMetric]);
+  }, [activeMetric]);
 
   const chartRows = useMemo(() => {
     return history.flatMap((row) => {
@@ -318,7 +321,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
   // Reset zoom if chart metric, history limit or product changes
   useEffect(() => {
     setZoomRange(null);
-  }, [chartMetric, historyLimit, productKey]);
+  }, [activeMetric, historyLimit, productKey]);
 
   const visibleRows = useMemo(() => {
     if (!zoomRange) return chartRows;
@@ -633,7 +636,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
               : "ثبت نشده"
           }
           hint={
-            latestSnapshot?.price_usd
+            !isPublicProduct && latestSnapshot?.price_usd
               ? `معادل ${formatNumber(latestSnapshot.price_usd)} دلار`
               : latestSnapshot?.seller
               ? `فروشنده: ${latestSnapshot.seller}`
@@ -643,12 +646,12 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
         <Metric
           label="کمترین قیمت تاریخی"
           value={minToman !== null ? `${formatNumber(minToman)} تومان` : "-"}
-          hint={minUsd !== null ? `معادل ${formatNumber(minUsd)} دلار` : undefined}
+          hint={!isPublicProduct && minUsd !== null ? `معادل ${formatNumber(minUsd)} دلار` : undefined}
         />
         <Metric
           label="بیشترین قیمت تاریخی"
           value={maxToman !== null ? `${formatNumber(maxToman)} تومان` : "-"}
-          hint={maxUsd !== null ? `معادل ${formatNumber(maxUsd)} دلار` : undefined}
+          hint={!isPublicProduct && maxUsd !== null ? `معادل ${formatNumber(maxUsd)} دلار` : undefined}
         />
         <Metric
           label="تعداد کل مشاهدات"
@@ -693,22 +696,24 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
                 </button>
               )}
 
-              <div className="metric-toggle" aria-label="واحد نمایش نمودار">
-                <button
-                  type="button"
-                  className={chartMetric === "toman" ? "active" : ""}
-                  onClick={() => setChartMetric("toman")}
-                >
-                  تومان
-                </button>
-                <button
-                  type="button"
-                  className={chartMetric === "usd" ? "active" : ""}
-                  onClick={() => setChartMetric("usd")}
-                >
-                  دلار
-                </button>
-              </div>
+              {!isPublicProduct && (
+                <div className="metric-toggle" aria-label="واحد نمایش نمودار">
+                  <button
+                    type="button"
+                    className={activeMetric === "toman" ? "active" : ""}
+                    onClick={() => setChartMetric("toman")}
+                  >
+                    تومان
+                  </button>
+                  <button
+                    type="button"
+                    className={activeMetric === "usd" ? "active" : ""}
+                    onClick={() => setChartMetric("usd")}
+                  >
+                    دلار
+                  </button>
+                </div>
+              )}
 
               <select
                 className="compact-select"
