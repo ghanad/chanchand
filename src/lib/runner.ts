@@ -7,6 +7,9 @@ import {
   recordPrice,
   recordError,
   hasSuccessfulPriceToday,
+  hasSuccessfulPriceThisHour,
+  getTimezoneHour,
+  getPublicProductKeys,
   isMarketSource,
   getManagedTargets,
   getSourcesMap,
@@ -115,6 +118,10 @@ export class PriceRunner {
 
     const sources = config?.sources || getSourcesMap(db);
     const fetchedObservations = new Map<string, PriceObservation>();
+    const publicKeys = getPublicProductKeys(db);
+    const now = new Date();
+    const currentHour = getTimezoneHour(now);
+    const isPublicCollectionHour = currentHour >= 8 && currentHour <= 23;
 
     try {
       for (const target of activeTargets) {
@@ -125,10 +132,30 @@ export class PriceRunner {
         }
 
         const isMarket = isMarketSource(target.source_key, source.adapter) || target.product_key === USD_PRODUCT_KEY;
+        const isPublic = publicKeys.has(target.product_key);
 
-        if (!options?.force && !isMarket && hasSuccessfulPriceToday(db, target.product_key, undefined, target.url, target.source_key)) {
-          console.log(`[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`);
-          continue;
+        if (!options?.force && !isMarket) {
+          if (isPublic) {
+            if (!isPublicCollectionHour) {
+              console.log(
+                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (08:00 - 23:00)`
+              );
+              continue;
+            }
+            if (hasSuccessfulPriceThisHour(db, target.product_key, now, target.url, target.source_key)) {
+              console.log(
+                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, already collected this hour`
+              );
+              continue;
+            }
+          } else {
+            if (hasSuccessfulPriceToday(db, target.product_key, now, target.url, target.source_key)) {
+              console.log(
+                `[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`
+              );
+              continue;
+            }
+          }
         }
 
         const dedupKey = getTargetDeduplicationKey(target.source_key, target.url, target.adapter_settings);

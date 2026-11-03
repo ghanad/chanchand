@@ -234,6 +234,9 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
 
   it('staggers collection across 24 hours using LRU batching and keeps market targets in every batch', async () => {
     const db = getDatabase();
+    // Mark the product from beforeEach as private for this 24-hour staggering test
+    db.prepare('UPDATE managed_products SET is_public = 0').run();
+
     // Add market source & product
     addManagedSource(db, {
       key: 'servix_market',
@@ -251,14 +254,14 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
       adapter_settings: {},
     });
 
-    // Add 12 regular products (total 13 regular products including the one from beforeEach)
+    // Add 12 regular private products (total 13 regular products including the one from beforeEach)
     for (let i = 2; i <= 13; i++) {
       addManagedProduct(db, {
         title: `Product ${i}`,
         url: `https://example.com/item/${i}`,
         source_key: 'test_mock_source',
         user_id: 1,
-        is_public: true,
+        is_public: false,
         adapter_settings: { selector: '.price' },
       });
     }
@@ -307,5 +310,33 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
     const json3 = await res3.json();
     expect(json3.force).toBe(true);
     expect(json3.target_count).toBe(14); // 13 regular + 1 market
+  });
+
+  it('runs public products on every trigger within active window without being throttled by 24h batch size', async () => {
+    const db = getDatabase();
+    // Public product from beforeEach is already is_public = true.
+    // Add another public product
+    addManagedProduct(db, {
+      title: 'Public Product 2',
+      url: 'https://example.com/item/pub2',
+      source_key: 'test_mock_source',
+      user_id: 1,
+      is_public: true,
+      adapter_settings: { selector: '.price' },
+    });
+    db.close();
+
+    const req = new NextRequest('https://example.com/api/trigger-run', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${TEST_API_KEY}`,
+      },
+    });
+    const res = await triggerRunPost(req);
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.ok).toBe(true);
+    expect(json.total_public_targets).toBe(2);
+    expect(typeof json.is_public_collection_hour).toBe('boolean');
   });
 });

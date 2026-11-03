@@ -1367,11 +1367,126 @@ export function isMarketSource(sourceKey?: string, adapter?: string): boolean {
   return lower.includes('market') || lower.includes('servix') || lower.includes('brsapi');
 }
 
+export function getAppTimezone(): string {
+  return process.env.APP_TIMEZONE || process.env.TZ || 'Asia/Tehran';
+}
+
+export function getTimezoneHour(date: Date = new Date(), timeZone: string = getAppTimezone()): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+    const hourPart = parts.find((p) => p.type === 'hour');
+    return hourPart ? parseInt(hourPart.value, 10) : date.getHours();
+  } catch {
+    return date.getHours();
+  }
+}
+
+export function getHourBounds(
+  date: Date = new Date(),
+  timeZone: string = getAppTimezone()
+): { startOfHour: string; endOfHour: string; hour: number } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const p: Record<string, number> = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') p[part.type] = parseInt(part.value, 10);
+    }
+
+    const minute = p.minute ?? date.getMinutes();
+    const second = p.second ?? date.getSeconds();
+    const ms = date.getMilliseconds();
+    const msIntoHour = (minute * 60 + second) * 1000 + ms;
+    const startOfHour = new Date(date.getTime() - msIntoHour);
+    const endOfHour = new Date(startOfHour.getTime() + 60 * 60 * 1000 - 1);
+
+    return {
+      hour: p.hour ?? date.getHours(),
+      startOfHour: startOfHour.toISOString(),
+      endOfHour: endOfHour.toISOString(),
+    };
+  } catch {
+    const start = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), 0, 0, 0);
+    const end = new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), 59, 59, 999);
+    return {
+      hour: date.getHours(),
+      startOfHour: start.toISOString(),
+      endOfHour: end.toISOString(),
+    };
+  }
+}
+
+export function getDayBounds(
+  date: Date = new Date(),
+  timeZone: string = getAppTimezone()
+): { startOfDay: string; endOfDay: string } {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hourCycle: 'h23',
+    }).formatToParts(date);
+
+    const p: Record<string, number> = {};
+    for (const part of parts) {
+      if (part.type !== 'literal') p[part.type] = parseInt(part.value, 10);
+    }
+
+    const hour = p.hour ?? date.getHours();
+    const minute = p.minute ?? date.getMinutes();
+    const second = p.second ?? date.getSeconds();
+    const ms = date.getMilliseconds();
+    const msIntoDay = ((hour * 60 + minute) * 60 + second) * 1000 + ms;
+    const startOfDay = new Date(date.getTime() - msIntoDay);
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+    return {
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+    };
+  } catch {
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0).toISOString();
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999).toISOString();
+    return { startOfDay, endOfDay };
+  }
+}
+
+export function getPublicProductKeys(db: Database.Database): Set<string> {
+  const keys = db.prepare('SELECT key FROM managed_products WHERE is_public = 1').pluck().all() as string[];
+  return new Set(keys);
+}
+
+export function isPublicProduct(db: Database.Database, productKey: string): boolean {
+  const row = db.prepare('SELECT is_public FROM managed_products WHERE key = ?').get(productKey) as
+    | { is_public?: number }
+    | undefined;
+  return Boolean(row && row.is_public === 1);
+}
+
 export interface ScheduledBatchOptions {
   limit?: number;
   force?: boolean;
   spread?: boolean;
   runsPerDay?: number;
+  now?: Date;
 }
 
 export interface ScheduledBatchResult {
@@ -1382,6 +1497,11 @@ export interface ScheduledBatchResult {
   totalNonMarketTargets: number;
   totalEligibleNonMarket: number;
   remainingToday: number;
+  totalPublicTargets?: number;
+  eligiblePublicTargets?: number;
+  totalPrivateTargets?: number;
+  eligiblePrivateTargets?: number;
+  isPublicCollectionHour?: boolean;
 }
 
 export function getScheduledBatchTargets(
@@ -1389,18 +1509,25 @@ export function getScheduledBatchTargets(
   allActiveTargets: TargetConfig[],
   options: ScheduledBatchOptions = {}
 ): ScheduledBatchResult {
-  const { limit, force = false, spread = true, runsPerDay = 24 } = options;
+  const { limit, force = false, spread = true, runsPerDay = 24, now = new Date() } = options;
 
   const marketTargets: TargetConfig[] = [];
-  const nonMarketTargets: TargetConfig[] = [];
+  const publicTargets: TargetConfig[] = [];
+  const privateTargets: TargetConfig[] = [];
+
+  const publicKeys = getPublicProductKeys(db);
 
   for (const t of allActiveTargets) {
     if (isMarketSource(t.source_key) || t.product_key === USD_PRODUCT_KEY) {
       marketTargets.push(t);
+    } else if (publicKeys.has(t.product_key)) {
+      publicTargets.push(t);
     } else {
-      nonMarketTargets.push(t);
+      privateTargets.push(t);
     }
   }
+
+  const nonMarketTargets = [...publicTargets, ...privateTargets];
 
   if (force || !spread) {
     return {
@@ -1411,49 +1538,56 @@ export function getScheduledBatchTargets(
       totalNonMarketTargets: nonMarketTargets.length,
       totalEligibleNonMarket: nonMarketTargets.length,
       remainingToday: 0,
+      totalPublicTargets: publicTargets.length,
+      eligiblePublicTargets: publicTargets.length,
+      totalPrivateTargets: privateTargets.length,
+      eligiblePrivateTargets: privateTargets.length,
+      isPublicCollectionHour: true,
     };
   }
 
-  const eligibleNonMarket = nonMarketTargets.filter(
-    (t) => !hasSuccessfulPriceToday(db, t.product_key, undefined, t.url, t.source_key)
+  // 1. Hourly check for public targets: active between 08:00 and 23:00 in configured timezone
+  const currentHour = getTimezoneHour(now);
+  const isPublicCollectionHour = currentHour >= 8 && currentHour <= 23;
+
+  let eligiblePublic: TargetConfig[] = [];
+  if (isPublicCollectionHour) {
+    eligiblePublic = publicTargets.filter(
+      (t) => !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key)
+    );
+  }
+
+  // 2. Daily check for private targets: collected once a day across 24h
+  const eligiblePrivate = privateTargets.filter(
+    (t) => !hasSuccessfulPriceToday(db, t.product_key, now, t.url, t.source_key)
   );
 
-  if (eligibleNonMarket.length === 0) {
-    return {
-      targets: marketTargets,
-      batchSize: 0,
-      totalManagedTargets: allActiveTargets.length,
-      totalMarketTargets: marketTargets.length,
-      totalNonMarketTargets: nonMarketTargets.length,
-      totalEligibleNonMarket: 0,
-      remainingToday: 0,
-    };
+  // If there are eligible private targets, prioritize LRU based on last attempt timestamp
+  if (eligiblePrivate.length > 0) {
+    const attempts = db.prepare(`
+      SELECT product_key, url, MAX(observed_at) as last_time
+      FROM (
+        SELECT product_key, url, observed_at FROM price_snapshots
+        UNION ALL
+        SELECT product_key, url, observed_at FROM fetch_errors
+      )
+      GROUP BY product_key, url
+    `).all() as { product_key: string; url: string; last_time: string }[];
+
+    const lastAttemptMap = new Map<string, string>();
+    for (const row of attempts) {
+      lastAttemptMap.set(`${row.product_key}:::${row.url}`, row.last_time);
+    }
+
+    eligiblePrivate.sort((a, b) => {
+      const timeA = lastAttemptMap.get(`${a.product_key}:::${a.url}`) || '';
+      const timeB = lastAttemptMap.get(`${b.product_key}:::${b.url}`) || '';
+      if (!timeA && !timeB) return 0;
+      if (!timeA) return -1; // null/unattempted first
+      if (!timeB) return 1;
+      return timeA.localeCompare(timeB); // oldest first
+    });
   }
-
-  // Find last attempt timestamp for eligible targets to prioritize LRU
-  const attempts = db.prepare(`
-    SELECT product_key, url, MAX(observed_at) as last_time
-    FROM (
-      SELECT product_key, url, observed_at FROM price_snapshots
-      UNION ALL
-      SELECT product_key, url, observed_at FROM fetch_errors
-    )
-    GROUP BY product_key, url
-  `).all() as { product_key: string; url: string; last_time: string }[];
-
-  const lastAttemptMap = new Map<string, string>();
-  for (const row of attempts) {
-    lastAttemptMap.set(`${row.product_key}:::${row.url}`, row.last_time);
-  }
-
-  eligibleNonMarket.sort((a, b) => {
-    const timeA = lastAttemptMap.get(`${a.product_key}:::${a.url}`) || '';
-    const timeB = lastAttemptMap.get(`${b.product_key}:::${b.url}`) || '';
-    if (!timeA && !timeB) return 0;
-    if (!timeA) return -1; // null/unattempted first
-    if (!timeB) return 1;
-    return timeA.localeCompare(timeB); // oldest first
-  });
 
   let effectiveBatchSize: number;
   if (typeof limit === 'number' && limit > 0) {
@@ -1462,20 +1596,25 @@ export function getScheduledBatchTargets(
     effectiveBatchSize = parseInt(process.env.PRICE_GETTER_BATCH_SIZE, 10);
   } else {
     const rpd = process.env.CRON_RUNS_PER_DAY ? parseInt(process.env.CRON_RUNS_PER_DAY, 10) : runsPerDay;
-    effectiveBatchSize = Math.max(1, Math.ceil(nonMarketTargets.length / Math.max(1, rpd)));
+    effectiveBatchSize = Math.max(1, Math.ceil(privateTargets.length / Math.max(1, rpd)));
   }
 
-  const selectedNonMarket = eligibleNonMarket.slice(0, effectiveBatchSize);
-  const remainingToday = Math.max(0, eligibleNonMarket.length - selectedNonMarket.length);
+  const selectedPrivate = eligiblePrivate.slice(0, effectiveBatchSize);
+  const remainingToday = Math.max(0, eligiblePrivate.length - selectedPrivate.length);
 
   return {
-    targets: [...marketTargets, ...selectedNonMarket],
+    targets: [...marketTargets, ...eligiblePublic, ...selectedPrivate],
     batchSize: effectiveBatchSize,
     totalManagedTargets: allActiveTargets.length,
     totalMarketTargets: marketTargets.length,
     totalNonMarketTargets: nonMarketTargets.length,
-    totalEligibleNonMarket: eligibleNonMarket.length,
+    totalEligibleNonMarket: eligiblePublic.length + eligiblePrivate.length,
     remainingToday,
+    totalPublicTargets: publicTargets.length,
+    eligiblePublicTargets: eligiblePublic.length,
+    totalPrivateTargets: privateTargets.length,
+    eligiblePrivateTargets: eligiblePrivate.length,
+    isPublicCollectionHour,
   };
 }
 
@@ -1486,10 +1625,7 @@ export function hasSuccessfulPriceToday(
   url?: string,
   sourceKey?: string
 ): boolean {
-  // Start of day in local time, converted to ISO / UTC
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).toISOString();
-  const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999).toISOString();
-
+  const { startOfDay, endOfDay } = getDayBounds(now);
   const isMarket = isMarketSource(sourceKey);
 
   let row;
@@ -1511,6 +1647,40 @@ export function hasSuccessfulPriceToday(
         AND observed_at <= ?
       LIMIT 1
     `).get(productKey, startOfDay, endOfDay);
+  }
+
+  return !!row;
+}
+
+export function hasSuccessfulPriceThisHour(
+  db: Database.Database,
+  productKey: string,
+  now = new Date(),
+  url?: string,
+  sourceKey?: string
+): boolean {
+  const { startOfHour, endOfHour } = getHourBounds(now);
+  const isMarket = isMarketSource(sourceKey);
+
+  let row;
+  if (url && !isMarket) {
+    row = db.prepare(`
+      SELECT id FROM price_snapshots
+      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%'))
+        AND price_irr IS NOT NULL
+        AND observed_at >= ?
+        AND observed_at <= ?
+      LIMIT 1
+    `).get(productKey, url, startOfHour, endOfHour);
+  } else {
+    row = db.prepare(`
+      SELECT id FROM price_snapshots
+      WHERE product_key = ?
+        AND price_irr IS NOT NULL
+        AND observed_at >= ?
+        AND observed_at <= ?
+      LIMIT 1
+    `).get(productKey, startOfHour, endOfHour);
   }
 
   return !!row;

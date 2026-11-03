@@ -147,7 +147,7 @@ export function CronRunsView() {
 
   const totalPages = Math.ceil(filteredRuns.length / pageSize) || 1;
 
-  const cronSampleCommand = `0 4 * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer <TRIGGER_API_KEY>" >> /var/log/price-getter-cron.log 2>&1`;
+  const cronSampleCommand = `0 * * * * curl -s -X POST http://localhost:8000/api/trigger-run -H "Authorization: Bearer <TRIGGER_API_KEY>" >> /var/log/price-getter-cron.log 2>&1`;
   const curlSampleCommand = `curl -s -X POST http://localhost:8000/api/trigger-run \\
   -H "Authorization: Bearer <TRIGGER_API_KEY>" \\
   -H "Content-Type: application/json" \\
@@ -253,7 +253,7 @@ export function CronRunsView() {
             <div style={{ display: "grid", gap: "10px", margin: "10px 0" }}>
               <div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <strong style={{ fontSize: "12px" }}>دستور پیشنهادی برای Crontab (روزی یک‌بار رأس ساعت ۴ صبح):</strong>
+                  <strong style={{ fontSize: "12px" }}>دستور پیشنهادی برای Crontab (اجرای ساعتی — جمع‌آوری محصولات عمومی بین ۸ تا ۲۳ و محصولات اختصاصی روزانه):</strong>
                   <button
                     type="button"
                     className="secondary-button"
