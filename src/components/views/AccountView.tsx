@@ -219,12 +219,6 @@ export function AccountView() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link href="/products" className="btn btn-secondary text-xs flex items-center gap-1.5">
-            <span>بازگشت به محصولات</span>
-            <span aria-hidden="true">←</span>
-          </Link>
-        </div>
       </div>
 
       {/* بنر نتیجه بازگشت از درگاه پرداخت */}

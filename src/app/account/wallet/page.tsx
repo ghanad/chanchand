@@ -232,16 +232,6 @@ function WalletContent() {
           </div>
         </div>
 
-        <div>
-          <Link
-            href="/products"
-            className="btn btn-secondary btn-sm"
-            title="بازگشت به صفحه محصولات"
-          >
-            <span>بازگشت به محصولات</span>
-            <span aria-hidden="true">←</span>
-          </Link>
-        </div>
       </div>
 
       {/* بنر وضعیت بازگشت از درگاه پرداخت */}

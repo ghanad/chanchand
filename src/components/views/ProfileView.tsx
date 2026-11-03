@@ -110,13 +110,6 @@ export function ProfileView() {
             </svg>
             <span>تغییر کلمه عبور</span>
           </Link>
-          <Link
-            href="/products"
-            className="btn btn-secondary text-xs flex items-center gap-1.5"
-          >
-            <span>بازگشت به محصولات</span>
-            <span>←</span>
-          </Link>
         </div>
       </div>
 
