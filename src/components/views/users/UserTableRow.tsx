@@ -1,7 +1,8 @@
 import React from "react";
-import { createPortal } from "react-dom";
 import { formatDate, formatNumber } from "@/lib/formatters";
 import { UserItem, MenuCoords } from "./types";
+import { UserSlotsCell } from "./UserSlotsCell";
+import { UserKebabMenu } from "./UserKebabMenu";
 
 interface UserTableRowProps {
   user: UserItem;
@@ -98,147 +99,106 @@ export function UserTableRow({
             }
             disabled={isBusy || isLastAdmin}
             className={`status-toggle-btn ${isAdminUser ? "is-active" : ""} ${
-              busyAction === `role:${user.id}` ? "is-loading" : ""
+              isBusy ? "is-loading" : ""
             }`}
             onClick={onToggleRole}
             title={
               isLastAdmin
-                ? "حداقل یک کاربر مدیر باید در سیستم فعال باشد"
+                ? "امکان تغییر نقش آخرین مدیر سیستم وجود ندارد"
                 : isAdminUser
-                ? "کلیک برای تبدیل به بیننده"
-                : "کلیک برای ارتقا به مدیر"
+                ? "مدیر کل (کلیک برای تبدیل به بیننده عادی)"
+                : "بیننده (کلیک برای ارتقا به مدیر سیستم)"
             }
           >
             <span className="status-toggle-thumb">
-              {busyAction === `role:${user.id}` && (
+              {isBusy && (
                 <span className="status-toggle-spinner" aria-hidden="true" />
               )}
             </span>
           </button>
-          <span className={`role-pill ${user.role}`}>
-            {user.role === "admin" ? "مدیر کل" : "بیننده"}
+          <span
+            className={`adapter-badge role-badge ${isAdminUser ? "admin" : "viewer"}`}
+          >
+            {isAdminUser ? "مدیر کل" : "بیننده"}
           </span>
         </div>
       </td>
 
-      {/* ۳. کیف پول و اسلات */}
-      <td className="user-col-wallet">
-        <div className="product-info-text">
-          <span className="wallet-balance-val">
-            {formatNumber(user.wallet_balance ?? 0)} تومان
-          </span>
-          <span className="wallet-slots-sub">
-            {isAdminUser ? (
-              "ظرفیت نامحدود"
-            ) : (
-              <>
-                <span>{formatNumber(user.extra_slots ?? 0)} اسلات ماهانه ({formatNumber(3 + (user.extra_slots ?? 0))} کل)</span>
-                {user.slot_expires_at && (
-                  new Date(user.slot_expires_at).getTime() <= nowMs ? (
-                    <span style={{ color: "var(--danger)", display: "block", fontSize: "11px" }}>
-                      (منقضی شده)
-                    </span>
-                  ) : (
-                    <span style={{ color: "var(--ok)", display: "block", fontSize: "11px" }}>
-                      ({Math.max(1, Math.ceil((new Date(user.slot_expires_at).getTime() - nowMs) / (1000 * 60 * 60 * 24)))} روز مانده)
-                    </span>
-                  )
-                )}
-              </>
-            )}
-          </span>
-        </div>
-      </td>
-
-      {/* ۴. الزام تغییر رمز */}
-      <td className="user-col-forcepass">
+      {/* ۳. وضعیت الزام کلمه عبور */}
+      <td className="user-col-status">
         <div className="status-toggle-wrapper">
           <button
             type="button"
             role="switch"
-            aria-checked={Boolean(user.must_change_password)}
-            aria-label={`تغییر الزام تغییر کلمه عبور برای ${user.username}`}
+            aria-checked={user.must_change_password}
+            aria-label={
+              user.must_change_password
+                ? `غیرفعال کردن الزام تغییر رمز برای ${user.username}`
+                : `فعال کردن الزام تغییر رمز برای ${user.username}`
+            }
             disabled={isBusy}
             className={`status-toggle-btn ${
-              user.must_change_password ? "is-active warning" : ""
-            } ${busyAction === `forcepass:${user.id}` ? "is-loading" : ""}`}
+              user.must_change_password ? "is-active" : "is-inactive"
+            } ${isBusy ? "is-loading" : ""}`}
             onClick={onToggleMustChangePassword}
             title={
               user.must_change_password
-                ? "الزام تغییر کلمه عبور فعال است (کلیک برای غیرفعال‌سازی)"
-                : "الزام تغییر کلمه عبور غیرفعال است (کلیک برای فعال‌سازی)"
+                ? "کاربر در ورود بعدی باید کلمه عبور را تغییر دهد (کلیک برای لغو الزام)"
+                : "کلمه عبور معتبر است (کلیک برای الزام کاربر به تغییر رمز در ورود بعدی)"
             }
           >
             <span className="status-toggle-thumb">
-              {busyAction === `forcepass:${user.id}` && (
+              {isBusy && (
                 <span className="status-toggle-spinner" aria-hidden="true" />
               )}
             </span>
           </button>
           <span
             className={`status-toggle-label ${
-              user.must_change_password ? "warning-label" : ""
+              user.must_change_password ? "active" : ""
             }`}
           >
-            {user.must_change_password ? "اجباری" : "اختیاری"}
+            {user.must_change_password ? "تغییر اجباری" : "عادی"}
           </span>
         </div>
       </td>
 
-      {/* ۵. مصرف اسلات‌ها */}
-      <td className="user-col-slots">
+      {/* ۴. کیف پول و اشتراک */}
+      <td className="user-col-wallet">
         <div className="product-info-text">
-          {isAdminUser ? (
-            <>
-              <strong className="user-slots-used font-semibold">
-                {formatNumber(user.used_slots ?? 0)} محصول
-              </strong>
-              <span className="user-slots-detail text-xs text-[var(--muted)]">
-                ظرفیت نامحدود
-              </span>
-            </>
-          ) : (
-            (() => {
-              const used = user.used_slots ?? 0;
-              const total = user.total_slots ?? (3 + (user.extra_slots ?? 0));
-              const isFull = used >= total;
-              const percent = Math.min(100, Math.round((used / Math.max(1, total)) * 100));
-              return (
-                <>
-                  <div className="user-slots-header flex items-center gap-1">
-                    <strong
-                      className={`user-slots-used ${
-                        isFull ? "text-[var(--danger)]" : "text-[var(--text)]"
-                      }`}
-                    >
-                      {formatNumber(used)}
-                    </strong>
-                    <span className="text-xs text-[var(--muted)]">از</span>
-                    <span className="text-xs text-[var(--text-secondary)] font-medium">
-                      {formatNumber(total)}
-                    </span>
-                    <span className="text-xs text-[var(--muted)]">اسلات</span>
-                    {isFull && (
-                      <span className="user-slots-badge-full text-[10px] bg-[var(--danger-bg,#fee2e2)] text-[var(--danger)] px-1.5 py-0.5 rounded font-normal mr-1">
-                        تکمیل
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className="user-dropdown-quota-track"
-                    style={{ width: "84px", marginTop: "4px" }}
-                    title={`${formatNumber(used)} از ${formatNumber(total)} اسلات استفاده‌شده (${percent}٪)`}
+          <div className="user-wallet-balance-row">
+            <strong className="user-wallet-balance-value">
+              {formatNumber(user.wallet_balance ?? 0)}
+            </strong>
+            <span className="user-wallet-balance-unit text-xs text-[var(--muted)]">
+              تومان
+            </span>
+          </div>
+          <div className="user-subscription-info text-xs">
+            {user.slot_expires_at ? (
+              (() => {
+                const expiresMs = new Date(user.slot_expires_at).getTime();
+                const diffDays = Math.ceil((expiresMs - nowMs) / (1000 * 60 * 60 * 24));
+                const isExpired = diffDays <= 0;
+                return (
+                  <span
+                    className={`user-sub-badge ${isExpired ? "text-[var(--danger)] font-medium" : "text-[var(--muted)]"}`}
+                    title={`انقضا: ${formatDate(user.slot_expires_at)}`}
                   >
-                    <div
-                      className={`user-dropdown-quota-fill ${isFull ? "is-full" : ""}`}
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </>
-              );
-            })()
-          )}
+                    {isExpired ? "منقضی‌شده" : `${formatNumber(diffDays)} روز باقی‌مانده`}
+                  </span>
+                );
+              })()
+            ) : (
+              <span className="user-sub-badge text-[var(--muted)]">پایه (بدون انقضا)</span>
+            )}
+          </div>
         </div>
+      </td>
+
+      {/* ۵. اسلات‌ها و ظرفیت پایش */}
+      <td className="user-col-slots">
+        <UserSlotsCell user={user} isAdminUser={isAdminUser} />
       </td>
 
       {/* ۶. عملیات: شارژ کیف پول، تغییر رمز و منوی کباب */}
@@ -296,145 +256,19 @@ export function UserTableRow({
           </button>
 
           {/* منوی کباب */}
-          <div className="kebab-container">
-            <button
-              type="button"
-              ref={kebabTriggerRef}
-              className={`action-icon-button kebab-trigger ${isKebabOpen ? "open" : ""}`}
-              onClick={onToggleKebab}
-              aria-label={`عملیات بیشتر برای ${user.username}`}
-              aria-haspopup="menu"
-              aria-expanded={isKebabOpen}
-              title="عملیات بیشتر"
-              onKeyDown={(e) => {
-                if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onToggleKebab();
-                }
-              }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <circle cx="12" cy="12" r="2" />
-                <circle cx="19" cy="12" r="2" />
-                <circle cx="5" cy="12" r="2" />
-              </svg>
-            </button>
-
-            {isKebabOpen &&
-              menuCoords &&
-              typeof document !== "undefined" &&
-              createPortal(
-                <div
-                  className="kebab-menu-dropdown kebab-portal-menu"
-                  role="menu"
-                  aria-orientation="vertical"
-                  tabIndex={-1}
-                  style={{
-                    position: "fixed",
-                    top: menuCoords.openUpwards ? "auto" : `${menuCoords.top}px`,
-                    bottom: menuCoords.openUpwards
-                      ? `${menuCoords.bottom}px`
-                      : "auto",
-                    left: `${menuCoords.left}px`,
-                    zIndex: 9999,
-                  }}
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="kebab-menu-item text-[var(--primary)] font-medium"
-                    onClick={() => {
-                      onCloseKebab();
-                      onOpenChargeWallet();
-                    }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <rect x="2" y="4" width="20" height="16" rx="2" />
-                      <line x1="12" y1="8" x2="12" y2="16" />
-                      <line x1="8" y1="12" x2="16" y2="12" />
-                    </svg>
-                    <span>شارژ کیف پول</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="kebab-menu-item"
-                    onClick={() => {
-                      onCloseKebab();
-                      onOpenResetPassword();
-                    }}
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7 8.5 5.5 7 7l-1.5-1.5L4 7a4.24 4.24 0 0 0 6 6l10-10z" />
-                      <circle cx="7.5" cy="16.5" r="3.5" />
-                    </svg>
-                    <span>تغییر کلمه عبور</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="kebab-menu-item danger"
-                    disabled={isCurrent || isLastAdmin}
-                    onClick={() => {
-                      onCloseKebab();
-                      onOpenDelete();
-                    }}
-                    title={
-                      isCurrent
-                        ? "امکان حذف حساب جاری وجود ندارد"
-                        : isLastAdmin
-                        ? "امکان حذف آخرین مدیر سیستم وجود ندارد"
-                        : "حذف حساب کاربر"
-                    }
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      <line x1="10" y1="11" x2="10" y2="17" />
-                      <line x1="14" y1="11" x2="14" y2="17" />
-                    </svg>
-                    <span>حذف کاربر</span>
-                  </button>
-                </div>,
-                document.body,
-              )}
-          </div>
+          <UserKebabMenu
+            user={user}
+            isCurrent={isCurrent}
+            isLastAdmin={isLastAdmin}
+            isKebabOpen={isKebabOpen}
+            menuCoords={menuCoords}
+            kebabTriggerRef={kebabTriggerRef}
+            onToggleKebab={onToggleKebab}
+            onCloseKebab={onCloseKebab}
+            onOpenChargeWallet={onOpenChargeWallet}
+            onOpenResetPassword={onOpenResetPassword}
+            onOpenDelete={onOpenDelete}
+          />
         </div>
       </td>
     </tr>
