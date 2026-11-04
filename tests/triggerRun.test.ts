@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -22,6 +22,15 @@ describe('POST /api/trigger-run (OS Cron & Scheduler API)', () => {
   let prevDbEnv: string | undefined;
   let prevApiKeyEnv: string | undefined;
   const TEST_API_KEY = 'secret-test-cron-token-12345';
+
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-04T10:00:00.000Z'));
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
+  });
 
   beforeEach(() => {
     prevDbEnv = process.env.PRICE_GETTER_DB_URL;

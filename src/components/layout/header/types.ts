@@ -18,7 +18,6 @@ export const mainNavItems: MainNavItem[] = [
 
 export const adminNavItems: AdminNavItem[] = [
   { id: "admin-products", label: "مدیریت محصولات", href: "/admin/products" },
-  { id: "admin-runs", label: "اجرا و خطا", href: "/admin/runs" },
   { id: "admin-cron-runs", label: "وضعیت کرون و API", href: "/admin/cron-runs" },
   { id: "admin-sources", label: "منابع قیمت‌گیری", href: "/admin/sources" },
   { id: "admin-users", label: "مدیریت کاربران", href: "/admin/users" },
@@ -44,18 +43,14 @@ export function isAdminItemActive(pathname: string, id: string): boolean {
       pathname === "/admin/manage-products"
     );
   }
-  if (id === "admin-runs") {
-    return (
-      pathname === "/runs" ||
-      pathname === "/admin/runs" ||
-      pathname.startsWith("/runs/") ||
-      pathname.startsWith("/admin/runs/")
-    );
-  }
   if (id === "admin-cron-runs") {
     return (
       pathname === "/admin/cron-runs" ||
-      pathname.startsWith("/admin/cron-runs/")
+      pathname.startsWith("/admin/cron-runs/") ||
+      pathname === "/admin/runs" ||
+      pathname.startsWith("/admin/runs/") ||
+      pathname === "/runs" ||
+      pathname.startsWith("/runs/")
     );
   }
   if (id === "admin-sources") {

@@ -92,9 +92,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL('/admin', req.url));
   }
 
-  // If authenticated admin visits /runs, redirect to /admin/runs
-  if ((pathname === '/runs' || pathname.startsWith('/runs/')) && session.role === 'admin') {
-    return NextResponse.redirect(new URL('/admin/runs', req.url));
+  // If authenticated admin visits /runs or /admin/runs, redirect to /admin/cron-runs
+  if (
+    ((pathname === '/runs' || pathname.startsWith('/runs/')) ||
+     (pathname === '/admin/runs' || pathname.startsWith('/admin/runs/'))) &&
+    session.role === 'admin'
+  ) {
+    return NextResponse.redirect(new URL('/admin/cron-runs', req.url));
   }
 
   // Role check: /admin/*, /api/admin/*, or /runs require 'admin' role

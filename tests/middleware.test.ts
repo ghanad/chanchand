@@ -157,13 +157,20 @@ describe('Next.js RBAC & Edge Middleware', () => {
     expect(res.headers.get('location')).toMatch(/\/$/);
   });
 
-  it('redirects admin from /runs to /admin/runs', async () => {
+  it('redirects admin from /runs or /admin/runs to /admin/cron-runs', async () => {
     const adminToken = await signAuthToken({ id: 1, username: 'admin', role: 'admin' });
-    const req = new NextRequest('https://example.com/runs', {
+    const reqRuns = new NextRequest('https://example.com/runs', {
       headers: { cookie: `${AUTH_COOKIE_NAME}=${adminToken}` },
     });
-    const res = await middleware(req);
-    expect(res.status).toBe(307);
-    expect(res.headers.get('location')).toContain('/admin/runs');
+    const resRuns = await middleware(reqRuns);
+    expect(resRuns.status).toBe(307);
+    expect(resRuns.headers.get('location')).toContain('/admin/cron-runs');
+
+    const reqAdminRuns = new NextRequest('https://example.com/admin/runs', {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${adminToken}` },
+    });
+    const resAdminRuns = await middleware(reqAdminRuns);
+    expect(resAdminRuns.status).toBe(307);
+    expect(resAdminRuns.headers.get('location')).toContain('/admin/cron-runs');
   });
 });

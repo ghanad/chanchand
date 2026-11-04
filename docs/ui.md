@@ -17,7 +17,7 @@ Price Getter uses Next.js 16 App Router with React 19 Server and Client Componen
 - **Pages & Views**:
   - Products (Default Home): `src/app/products/page.tsx` & `src/app/admin/products/page.tsx` (`/` & `/admin` redirect here) -> `src/components/views/ProductsView.tsx`
   - Product Details: `src/app/products/[key]/page.tsx` & `src/app/admin/products/[key]/page.tsx` -> `src/components/views/ProductDetailView.tsx` (includes full history snapshots)
-  - Runs & Errors: `src/app/runs/page.tsx` & `src/app/admin/runs/page.tsx` -> `src/components/views/RunsView.tsx`
+  - Cron Runs & Execution Status: `src/app/admin/cron-runs/page.tsx` -> `src/components/views/CronRunsView.tsx` (all runs, details, snapshots, and errors)
   - Sources (Admin only): `src/app/sources/page.tsx` & `src/app/admin/sources/page.tsx` -> `src/components/views/SourcesView.tsx`
   - Users (Admin only): `src/app/admin/users/page.tsx` -> `src/components/views/UsersView.tsx`
   - Login: `src/app/login/page.tsx`
