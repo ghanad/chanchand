@@ -1,0 +1,280 @@
+import React, { useState } from "react";
+import { requestJson } from "@/lib/api-client";
+import { PanelHead } from "@/components/common/PanelHead";
+
+interface ChangePasswordCardProps {
+  showToast: (msg: string) => void;
+}
+
+export function ChangePasswordCard({ showToast }: ChangePasswordCardProps) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  async function handlePasswordSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPasswordMessage(null);
+
+    if (newPassword.length < 6) {
+      setPasswordMessage({ type: "error", text: "کلمه عبور باید حداقل ۶ کاراکتر باشد." });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({ type: "error", text: "کلمه عبور جدید و تکرار آن یکسان نیستند." });
+      return;
+    }
+
+    setPasswordSaving(true);
+    try {
+      const res = await requestJson<{ success: boolean; message: string }>("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({ newPassword }),
+      });
+      setPasswordMessage({ type: "success", text: res.message || "کلمه عبور با موفقیت به‌روزرسانی شد." });
+      setNewPassword("");
+      setConfirmPassword("");
+      showToast("کلمه عبور تغییر یافت.");
+    } catch (err: any) {
+      setPasswordMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "خطا در تغییر کلمه عبور",
+      });
+    } finally {
+      setPasswordSaving(false);
+    }
+  }
+
+  return (
+    <div className="profile-panel">
+      <PanelHead title="تغییر کلمه عبور" meta="امنیت و کلمه عبور حساب کاربری" />
+
+      {passwordMessage && (
+        <div
+          className={`profile-alert ${passwordMessage.type}`}
+          role="alert"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ flexShrink: 0 }}
+          >
+            {passwordMessage.type === "success" ? (
+              <>
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </>
+            )}
+          </svg>
+          <span>{passwordMessage.text}</span>
+        </div>
+      )}
+
+      <form onSubmit={handlePasswordSubmit} className="profile-form">
+        <div className="profile-field">
+          <label className="profile-label" htmlFor="new-password">
+            <span>کلمه عبور جدید</span>
+            <span className="profile-label-badge">حداقل ۶ کاراکتر</span>
+          </label>
+          <div className="profile-password-wrapper">
+            <input
+              id="new-password"
+              type={showNewPassword ? "text" : "password"}
+              dir="ltr"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="کلمه عبور جدید را وارد کنید"
+              required
+              minLength={6}
+              className="profile-input"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowNewPassword((prev) => !prev)}
+              className="password-toggle-btn"
+              aria-label={showNewPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+              title={showNewPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+            >
+              {showNewPassword ? (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="profile-field">
+          <label className="profile-label" htmlFor="confirm-password">
+            <span>تکرار کلمه عبور جدید</span>
+          </label>
+          <div className="profile-password-wrapper">
+            <input
+              id="confirm-password"
+              type={showConfirmPassword ? "text" : "password"}
+              dir="ltr"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="تکرار کلمه عبور جدید را وارد کنید"
+              required
+              minLength={6}
+              className="profile-input"
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              tabIndex={-1}
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              className="password-toggle-btn"
+              aria-label={showConfirmPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+              title={showConfirmPassword ? "مخفی کردن کلمه عبور" : "نمایش کلمه عبور"}
+            >
+              {showConfirmPassword ? (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              ) : (
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              )}
+            </button>
+          </div>
+          {confirmPassword.length > 0 && (
+            <span
+              className={`profile-hint ${
+                newPassword === confirmPassword ? "ok" : "error"
+              }`}
+            >
+              {newPassword === confirmPassword
+                ? "✓ کلمه عبور و تکرار آن یکسان هستند"
+                : "✕ تکرار کلمه عبور با کلمه عبور جدید یکسان نیست"}
+            </span>
+          )}
+        </div>
+
+        <div className="profile-security-box">
+          <div className="profile-security-box-title">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+            <span>راهنمای امنیت کلمه عبور</span>
+          </div>
+          <ul>
+            <li>حداقل ۶ کاراکتر (ترجیحاً حروف، ارقام و علائم)</li>
+            <li>از کلمات عبور تکراری یا ساده استفاده نکنید</li>
+          </ul>
+        </div>
+
+        <div style={{ paddingTop: "8px" }}>
+          <button
+            type="submit"
+            disabled={passwordSaving}
+            className="btn btn-primary"
+            style={{ width: "100%" }}
+          >
+            {passwordSaving ? (
+              <>
+                <span className="spinner-sm" aria-hidden="true" />
+                <span>در حال به‌روزرسانی...</span>
+              </>
+            ) : (
+              <>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                <span>به‌روزرسانی کلمه عبور</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
