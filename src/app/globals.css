@@ -3,14 +3,34 @@
    Modular stylesheet architecture for high token efficiency & maintainability.
    ========================================================================== */
 
+/* 1. Core Variables & Base Components */
 @import "./styles/variables.css";
+@import "./styles/base-components.css";
+
+/* 2. Top Header & Navigation */
 @import "./styles/header.css";
-@import "./styles/auth.css";
 @import "./styles/user-menu.css";
-@import "./styles/modals.css";
-@import "./styles/sources.css";
-@import "./styles/products.css";
-@import "./styles/users.css";
+
+/* 3. Authentication & Account / Wallet */
+@import "./styles/auth.css";
+@import "./styles/wallet/layout.css";
+@import "./styles/wallet/profile.css";
+@import "./styles/wallet/card.css";
+@import "./styles/wallet/quota.css";
+@import "./styles/wallet/packages.css";
+@import "./styles/wallet/transactions.css";
+
+/* 4. Products Management & Detail */
+@import "./styles/products/toolbar.css";
+@import "./styles/products/table.css";
+@import "./styles/products/catalog.css";
+@import "./styles/products/mobile.css";
 @import "./styles/product-detail.css";
+
+/* 5. Sources & Users */
+@import "./styles/sources.css";
+@import "./styles/users.css";
+
+/* 6. Modals & Pagination */
+@import "./styles/modals.css";
 @import "./styles/pagination.css";
-@import "./styles/wallet.css";

@@ -1,0 +1,204 @@
+/* Top Hero Grid */
+.wallet-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+@media (max-width: 840px) {
+  .wallet-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Digital Wallet Credit Card */
+.wallet-credit-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #132225 0%, #193135 60%, #102629 100%);
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  color: #ffffff;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: 0 12px 36px rgba(10, 20, 22, 0.35);
+  min-height: 240px;
+  transition: all 0.25s ease;
+}
+
+.wallet-credit-card::before {
+  content: "";
+  position: absolute;
+  top: -80px;
+  right: -80px;
+  width: 220px;
+  height: 220px;
+  background: radial-gradient(circle, rgba(45, 212, 191, 0.16) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.wallet-credit-card::after {
+  content: "";
+  position: absolute;
+  bottom: -60px;
+  left: -60px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.wallet-card-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wallet-card-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wallet-card-chip-icon {
+  width: 32px;
+  height: 24px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #e6c875 0%, #b8973d 100%);
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wallet-card-chip-icon::after {
+  content: "";
+  width: 24px;
+  height: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.wallet-card-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #eff7f5;
+  letter-spacing: -0.2px;
+}
+
+.wallet-card-user-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #5eead4;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.25);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-family: inherit;
+}
+
+.wallet-card-middle {
+  position: relative;
+  z-index: 1;
+  margin: 20px 0;
+}
+
+.wallet-card-balance-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8da4a2;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.wallet-card-balance-val {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.wallet-card-balance-val strong {
+  font-size: 34px;
+  font-weight: 800;
+  color: #ffffff;
+  font-feature-settings: "tnum";
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.wallet-card-balance-val span {
+  font-size: 14px;
+  font-weight: 600;
+  color: #5eead4;
+}
+
+.wallet-card-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wallet-card-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: #ffffff !important;
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 14px rgba(15, 118, 110, 0.35);
+}
+
+.wallet-card-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0d6e66 0%, #0c857b 100%);
+  box-shadow: 0 6px 18px rgba(15, 118, 110, 0.5);
+  transform: translateY(-1px);
+}
+
+.wallet-card-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.wallet-card-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eff7f5 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.wallet-card-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #ffffff !important;
+}
