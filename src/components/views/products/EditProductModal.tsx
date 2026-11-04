@@ -1,0 +1,108 @@
+import React from "react";
+import { Modal } from "../../common/Modal";
+import { SourceRow } from "../../../types/dashboard";
+import { ProductFormState } from "./types";
+
+interface EditProductModalProps {
+  isOpen: boolean;
+  productKey: string | null;
+  onClose: () => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  editForm: ProductFormState;
+  setEditForm: React.Dispatch<React.SetStateAction<ProductFormState>>;
+  sources: SourceRow[];
+  isAdmin: boolean;
+  isBusy: boolean;
+}
+
+export function EditProductModal({
+  isOpen,
+  productKey,
+  onClose,
+  onSubmit,
+  editForm,
+  setEditForm,
+  sources,
+  isAdmin,
+  isBusy,
+}: EditProductModalProps) {
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title={`ویرایش محصول: ${editForm.title || productKey || ""}`}
+    >
+      <form className="modal-form" onSubmit={onSubmit}>
+        <label>
+          عنوان محصول
+          <input
+            value={editForm.title}
+            onChange={(event) =>
+              setEditForm((current) => ({ ...current, title: event.target.value }))
+            }
+            autoComplete="off"
+            required
+            autoFocus
+          />
+        </label>
+        <label>
+          منبع قیمت‌گیری
+          <select
+            value={editForm.source_key}
+            onChange={(event) =>
+              setEditForm((current) => ({ ...current, source_key: event.target.value }))
+            }
+          >
+            {sources.map((source) => (
+              <option key={source.key} value={source.key}>
+                {source.key} ({source.adapter})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          آدرس اینترنتی (URL)
+          <input
+            value={editForm.url}
+            onChange={(event) =>
+              setEditForm((current) => ({ ...current, url: event.target.value }))
+            }
+            type="url"
+            dir="ltr"
+            placeholder="https://..."
+            required
+          />
+        </label>
+        {isAdmin ? (
+          <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+            <input
+              type="checkbox"
+              checked={editForm.is_public}
+              onChange={(event) =>
+                setEditForm((current) => ({ ...current, is_public: event.target.checked }))
+              }
+            />
+            <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
+          </label>
+        ) : null}
+        <div className="modal-form-actions">
+          <button
+            className="secondary-button"
+            type="button"
+            onClick={onClose}
+            disabled={isBusy}
+          >
+            انصراف
+          </button>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={isBusy}
+          >
+            {isBusy ? "در حال ذخیره..." : "ذخیره تغییرات"}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
