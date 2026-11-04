@@ -123,8 +123,9 @@ export function UserKebabMenu({
                 strokeLinejoin="round"
                 aria-hidden="true"
               >
-                <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7 8.5 5.5 7 7l-1.5-1.5L4 7a4.24 4.24 0 0 0 6 6l10-10z" />
-                <circle cx="7.5" cy="16.5" r="3.5" />
+                <circle cx="7.5" cy="15.5" r="5.5" />
+                <path d="m21 2-9.6 9.6" />
+                <path d="m15.5 7.5 3 3L22 7l-3-3" />
               </svg>
               <span>تغییر کلمه عبور</span>
             </button>

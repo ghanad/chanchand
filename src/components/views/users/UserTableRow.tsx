@@ -201,60 +201,9 @@ export function UserTableRow({
         <UserSlotsCell user={user} isAdminUser={isAdminUser} />
       </td>
 
-      {/* ۶. عملیات: شارژ کیف پول، تغییر رمز و منوی کباب */}
+      {/* ۶. عملیات: منوی کباب */}
       <td className="user-col-actions">
         <div className="product-actions-cell">
-          {/* دکمه شارژ سریع کیف پول */}
-          <button
-            type="button"
-            className="action-icon-button"
-            onClick={onOpenChargeWallet}
-            disabled={isBusy}
-            aria-label={`شارژ کیف پول ${user.username}`}
-            title="شارژ کیف پول"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="2" y="4" width="20" height="16" rx="2" />
-              <line x1="12" y1="8" x2="12" y2="16" />
-              <line x1="8" y1="12" x2="16" y2="12" />
-            </svg>
-          </button>
-
-          {/* دکمه تغییر کلمه عبور */}
-          <button
-            type="button"
-            className="action-icon-button"
-            onClick={onOpenResetPassword}
-            disabled={isBusy}
-            aria-label={`تغییر کلمه عبور ${user.username}`}
-            title="تغییر کلمه عبور"
-          >
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M21 2l-2 2m-1.5 1.5L16 7l-1.5-1.5L13 7l-1.5-1.5L10 7 8.5 5.5 7 7l-1.5-1.5L4 7a4.24 4.24 0 0 0 6 6l10-10z" />
-              <circle cx="7.5" cy="16.5" r="3.5" />
-            </svg>
-          </button>
-
           {/* منوی کباب */}
           <UserKebabMenu
             user={user}
