@@ -86,6 +86,8 @@ export function getManagedProducts(
                COALESCE(up.custom_title, mp.title) AS title,
                mp.user_id,
                mp.is_public,
+               mp.active_start_hour,
+               mp.active_end_hour,
                mp.created_at,
                mp.updated_at,
                u.username AS owner_username,
@@ -132,6 +134,8 @@ export function addManagedProduct(
     key?: string;
     user_id?: number | null;
     is_public?: boolean | number;
+    active_start_hour?: number | null;
+    active_end_hour?: number | null;
     adapter_settings?: Record<string, any> | string;
   }
 ): { product_key: string; reused?: boolean } {
@@ -142,6 +146,14 @@ export function addManagedProduct(
   const sourceKey = options.source_key?.trim() || 'digikala_api';
   const userId = options.user_id ?? null;
   const isPublic = options.is_public ? 1 : 0;
+  const startHour =
+    options.active_start_hour !== undefined && options.active_start_hour !== null
+      ? Math.max(0, Math.min(23, Number(options.active_start_hour)))
+      : 8;
+  const endHour =
+    options.active_end_hour !== undefined && options.active_end_hour !== null
+      ? Math.max(0, Math.min(23, Number(options.active_end_hour)))
+      : 23;
   const now = new Date().toISOString();
 
   // Deduplication check: does a target with this URL and symbol already exist?
@@ -205,7 +217,7 @@ export function addManagedProduct(
   }
 
   const insertProd = db.prepare(
-    'INSERT INTO managed_products (key, title, user_id, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    'INSERT INTO managed_products (key, title, user_id, is_public, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insertTgt = db.prepare(
     'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)'
@@ -215,7 +227,7 @@ export function addManagedProduct(
   );
 
   const txn = db.transaction(() => {
-    insertProd.run(productKey, cleanTitle, userId, isPublic, now, now);
+    insertProd.run(productKey, cleanTitle, userId, isPublic, startHour, endHour, now, now);
     insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, now, now);
     if (userId != null) {
       insertUserProd.run(userId, productKey, cleanTitle, now);
@@ -234,6 +246,8 @@ export function updateManagedProduct(
     url: string;
     source_key?: string | null;
     is_public?: boolean | number;
+    active_start_hour?: number | null;
+    active_end_hour?: number | null;
   },
   requestingUser?: { id: number; role: string }
 ): { product_key: string } {
@@ -266,6 +280,16 @@ export function updateManagedProduct(
         : 0
       : prod.is_public ?? 0;
 
+  const nextStartHour =
+    requestingUser?.role === 'admin' && options.active_start_hour !== undefined && options.active_start_hour !== null
+      ? Math.max(0, Math.min(23, Number(options.active_start_hour)))
+      : (prod.active_start_hour ?? 8);
+
+  const nextEndHour =
+    requestingUser?.role === 'admin' && options.active_end_hour !== undefined && options.active_end_hour !== null
+      ? Math.max(0, Math.min(23, Number(options.active_end_hour)))
+      : (prod.active_end_hour ?? 23);
+
   const existingTarget = db
     .prepare('SELECT * FROM managed_targets WHERE product_key = ? LIMIT 1')
     .get(productKey) as ManagedTargetRow | undefined;
@@ -288,9 +312,11 @@ export function updateManagedProduct(
   }
 
   const txn = db.transaction(() => {
-    db.prepare('UPDATE managed_products SET title = ?, is_public = ?, updated_at = ? WHERE key = ?').run(
+    db.prepare('UPDATE managed_products SET title = ?, is_public = ?, active_start_hour = ?, active_end_hour = ?, updated_at = ? WHERE key = ?').run(
       cleanTitle,
       nextIsPublic,
+      nextStartHour,
+      nextEndHour,
       now,
       productKey
     );

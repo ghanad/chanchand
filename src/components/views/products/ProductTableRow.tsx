@@ -61,7 +61,7 @@ export function ProductTableRow({
             {showPublicIndicator && product.is_public ? (
               <span
                 className="public-market-indicator"
-                title="کالای بازار عمومی (مشترک بین تمام کاربران)"
+                title={`کالای بازار عمومی (ساعت جمع‌آوری: ${String(product.active_start_hour ?? 8).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00)`}
                 aria-label="کالای بازار عمومی"
                 onClick={(e) => e.stopPropagation()}
               >

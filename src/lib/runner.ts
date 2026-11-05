@@ -10,6 +10,8 @@ import {
   hasSuccessfulPriceThisHour,
   getTimezoneHour,
   getPublicProductKeys,
+  getPublicProductScheduleMap,
+  isHourInWindow,
   isMarketSource,
   getManagedTargets,
   getSourcesMap,
@@ -119,9 +121,9 @@ export class PriceRunner {
     const sources = config?.sources || getSourcesMap(db);
     const fetchedObservations = new Map<string, PriceObservation>();
     const publicKeys = getPublicProductKeys(db);
+    const publicScheduleMap = getPublicProductScheduleMap(db);
     const now = new Date();
     const currentHour = getTimezoneHour(now);
-    const isPublicCollectionHour = currentHour >= 8 && currentHour <= 23;
 
     try {
       for (const target of activeTargets) {
@@ -136,9 +138,10 @@ export class PriceRunner {
 
         if (!options?.force && !isMarket) {
           if (isPublic) {
-            if (!isPublicCollectionHour) {
+            const sched = publicScheduleMap.get(target.product_key) ?? { startHour: 8, endHour: 23 };
+            if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
               console.log(
-                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (08:00 - 23:00)`
+                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (${sched.startHour}:00 - ${sched.endHour}:00)`
               );
               continue;
             }

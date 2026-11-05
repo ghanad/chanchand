@@ -61,8 +61,12 @@ export function ProductDetailHeader({
                 {product.key}
               </span>
               {product.is_public ? (
-                <span className="adapter-badge brsapi_market" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
-                  عمومی / بازار
+                <span
+                  className="adapter-badge brsapi_market"
+                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                  title={`ساعات جمع‌آوری: ${String(product.active_start_hour ?? 8).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`}
+                >
+                  عمومی ({String(product.active_start_hour ?? 8).padStart(2, "0")}:00 - {String(product.active_end_hour ?? 23).padStart(2, "0")}:00)
                 </span>
               ) : null}
               {isAdmin && product.owner_username ? (

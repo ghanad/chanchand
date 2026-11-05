@@ -84,6 +84,8 @@ export function productsPayload(
     user_id?: number | null;
     owner_username?: string | null;
     is_public?: number | boolean;
+    active_start_hour?: number | null;
+    active_end_hour?: number | null;
     is_tracked_by_user?: boolean;
   }> = [],
   managedTargets?: Array<{
@@ -109,6 +111,8 @@ export function productsPayload(
       user_id: dbProduct.user_id ?? null,
       owner_username: dbProduct.owner_username ?? null,
       is_public: isPublic,
+      active_start_hour: dbProduct.active_start_hour ?? 8,
+      active_end_hour: dbProduct.active_end_hour ?? 23,
       can_edit: canEdit,
       configured: true,
       target_count: 0,
@@ -126,6 +130,8 @@ export function productsPayload(
         user_id: null,
         owner_username: null,
         is_public: true,
+        active_start_hour: 8,
+        active_end_hour: 23,
         can_edit: currentUser?.role === 'admin',
         configured: true,
         target_count: 0,

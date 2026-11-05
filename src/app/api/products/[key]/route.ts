@@ -36,6 +36,8 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
         url: body.url,
         source_key: body.source_key,
         is_public: auth.user.role === 'admin' && body.is_public !== undefined ? Boolean(body.is_public) : undefined,
+        active_start_hour: auth.user.role === 'admin' && body.active_start_hour !== undefined ? Number(body.active_start_hour) : undefined,
+        active_end_hour: auth.user.role === 'admin' && body.active_end_hour !== undefined ? Number(body.active_end_hour) : undefined,
       },
       auth.user
     );

@@ -13,6 +13,8 @@ export interface ProductFormState {
   url: string;
   source_key: string;
   is_public: boolean;
+  active_start_hour: number;
+  active_end_hour: number;
 }
 
 export interface ProductTableRowProps {

@@ -112,6 +112,35 @@ export function getDayBounds(
   }
 }
 
+export function isHourInWindow(currentHour: number, startHour: number = 8, endHour: number = 23): boolean {
+  if (startHour <= endHour) {
+    return currentHour >= startHour && currentHour <= endHour;
+  }
+  // Overnight window: e.g. 22:00 to 06:00
+  return currentHour >= startHour || currentHour <= endHour;
+}
+
+export function getPublicProductScheduleMap(
+  db: Database.Database
+): Map<string, { startHour: number; endHour: number }> {
+  const rows = db
+    .prepare('SELECT key, active_start_hour, active_end_hour FROM managed_products WHERE is_public = 1')
+    .all() as Array<{
+    key: string;
+    active_start_hour?: number | null;
+    active_end_hour?: number | null;
+  }>;
+
+  const map = new Map<string, { startHour: number; endHour: number }>();
+  for (const r of rows) {
+    map.set(r.key, {
+      startHour: r.active_start_hour ?? 8,
+      endHour: r.active_end_hour ?? 23,
+    });
+  }
+  return map;
+}
+
 export function getPublicProductKeys(db: Database.Database): Set<string> {
   const keys = db.prepare('SELECT key FROM managed_products WHERE is_public = 1').pluck().all() as string[];
   return new Set(keys);
@@ -233,16 +262,25 @@ export function getScheduledBatchTargets(
     };
   }
 
-  // 1. Hourly check for public targets: active between 08:00 and 23:00 in configured timezone
+  // 1. Hourly check for public targets: each public product has its configured active hour window
   const currentHour = getTimezoneHour(now);
-  const isPublicCollectionHour = currentHour >= 8 && currentHour <= 23;
+  const publicScheduleMap = getPublicProductScheduleMap(db);
 
-  let eligiblePublic: TargetConfig[] = [];
-  if (isPublicCollectionHour) {
-    eligiblePublic = publicTargets.filter(
-      (t) => !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key)
-    );
-  }
+  const isPublicCollectionHour =
+    publicTargets.length > 0
+      ? publicTargets.some((t) => {
+          const sched = publicScheduleMap.get(t.product_key) ?? { startHour: 8, endHour: 23 };
+          return isHourInWindow(currentHour, sched.startHour, sched.endHour);
+        })
+      : currentHour >= 8 && currentHour <= 23;
+
+  const eligiblePublic: TargetConfig[] = publicTargets.filter((t) => {
+    const sched = publicScheduleMap.get(t.product_key) ?? { startHour: 8, endHour: 23 };
+    if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
+      return false;
+    }
+    return !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key);
+  });
 
   // 2. Daily check for private targets: collected once a day across 24h
   const eligiblePrivate = privateTargets.filter(

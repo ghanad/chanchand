@@ -50,6 +50,8 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     url: "",
     source_key: "",
     is_public: false,
+    active_start_hour: 8,
+    active_end_hour: 23,
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -71,6 +73,8 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           url: matched.primary_target?.url || "",
           source_key: matched.primary_target?.source_key || "",
           is_public: Boolean(matched.is_public),
+          active_start_hour: matched.active_start_hour ?? 8,
+          active_end_hour: matched.active_end_hour ?? 23,
         });
       } else {
         setProduct(null);
@@ -214,6 +218,8 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
+            active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
+            active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),
         },
       );

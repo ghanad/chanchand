@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
     }
 
     const isPublic = auth.user.role === 'admin' ? Boolean(body.is_public) : false;
+    const startHour = auth.user.role === 'admin' && body.active_start_hour !== undefined ? Number(body.active_start_hour) : undefined;
+    const endHour = auth.user.role === 'admin' && body.active_end_hour !== undefined ? Number(body.active_end_hour) : undefined;
 
     const db = getDatabase();
     const result = addManagedProduct(db, {
@@ -62,6 +64,8 @@ export async function POST(req: NextRequest) {
       source_key: body.source_key,
       user_id: auth.user.id,
       is_public: isPublic,
+      active_start_hour: startHour,
+      active_end_hour: endHour,
       adapter_settings: body.adapter_settings,
     });
 

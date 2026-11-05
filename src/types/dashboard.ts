@@ -24,6 +24,8 @@ export interface ProductRow {
   user_id?: number | null;
   owner_username?: string | null;
   is_public?: boolean;
+  active_start_hour?: number;
+  active_end_hour?: number;
   can_edit?: boolean;
   configured: boolean;
   target_count: number;

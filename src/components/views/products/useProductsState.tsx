@@ -26,9 +26,23 @@ export function useProductsState() {
   const [productToDelete, setProductToDelete] = useState<ProductRow | null>(null);
 
   // Forms state
-  const [form, setForm] = useState<ProductFormState>({ title: "", url: "", source_key: "", is_public: false });
+  const [form, setForm] = useState<ProductFormState>({
+    title: "",
+    url: "",
+    source_key: "",
+    is_public: false,
+    active_start_hour: 8,
+    active_end_hour: 23,
+  });
   const [editProductKey, setEditProductKey] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<ProductFormState>({ title: "", url: "", source_key: "", is_public: false });
+  const [editForm, setEditForm] = useState<ProductFormState>({
+    title: "",
+    url: "",
+    source_key: "",
+    is_public: false,
+    active_start_hour: 8,
+    active_end_hour: 23,
+  });
 
   // Filtering & search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -239,10 +253,19 @@ export function useProductsState() {
           url: form.url.trim(),
           source_key: form.source_key || null,
           is_public: isAdmin ? form.is_public : false,
+          active_start_hour: isAdmin ? form.active_start_hour : undefined,
+          active_end_hour: isAdmin ? form.active_end_hour : undefined,
         }),
       });
       showToast(`محصول ${result.product_key} اضافه شد.`);
-      setForm((current) => ({ title: "", url: "", source_key: current.source_key, is_public: false }));
+      setForm((current) => ({
+        title: "",
+        url: "",
+        source_key: current.source_key,
+        is_public: false,
+        active_start_hour: 8,
+        active_end_hour: 23,
+      }));
       setShowAddProductModal(false);
       triggerRefresh();
     } catch (error: any) {
@@ -266,12 +289,21 @@ export function useProductsState() {
       url: product.primary_target.url,
       source_key: product.primary_target.source_key,
       is_public: Boolean(product.is_public),
+      active_start_hour: product.active_start_hour ?? 8,
+      active_end_hour: product.active_end_hour ?? 23,
     });
   }
 
   function cancelEditProduct() {
     setEditProductKey(null);
-    setEditForm({ title: "", url: "", source_key: "", is_public: false });
+    setEditForm({
+      title: "",
+      url: "",
+      source_key: "",
+      is_public: false,
+      active_start_hour: 8,
+      active_end_hour: 23,
+    });
   }
 
   async function updateProduct(event: React.FormEvent<HTMLFormElement>) {
@@ -288,6 +320,8 @@ export function useProductsState() {
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
+            active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
+            active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),
         },
       );

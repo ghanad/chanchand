@@ -18,6 +18,9 @@ import {
   hasSuccessfulPriceToday,
   isPublicProduct,
   getPublicProductKeys,
+  getPublicProductScheduleMap,
+  isHourInWindow,
+  updateManagedProduct,
 } from '../src/lib/db';
 import { TargetConfig } from '../src/lib/types';
 import { PriceRunner } from '../src/lib/runner';
@@ -308,6 +311,102 @@ describe('Hourly Public Product Scheduler (8 AM - 23 PM)', () => {
       // This confirms it does NOT skip early
       const summary3 = await runner.executeRun(null, runId3, targets, { force: true });
       expect(summary3.target_count).toBe(1);
+
+      db.close();
+    });
+
+    it('respects custom active hours per public product configured by admin', () => {
+      expect(isHourInWindow(10, 8, 23)).toBe(true);
+      expect(isHourInWindow(7, 8, 23)).toBe(false);
+      expect(isHourInWindow(23, 8, 23)).toBe(true);
+      expect(isHourInWindow(0, 8, 23)).toBe(false);
+
+      // Overnight window: 22 to 4
+      expect(isHourInWindow(23, 22, 4)).toBe(true);
+      expect(isHourInWindow(2, 22, 4)).toBe(true);
+      expect(isHourInWindow(5, 22, 4)).toBe(false);
+
+      const db = getDatabase();
+      const admin = createUser(db, { username: 'hour_admin', role: 'admin', password_hash: 'dummy' });
+      addManagedSource(db, { key: 'src_test', adapter: 'generic_html', currency: 'IRR', price_multiplier: 1 });
+
+      // Product 1: Custom window: 14 to 22 (2 PM to 10 PM)
+      addManagedProduct(db, {
+        key: 'pub_custom_hours',
+        title: 'Custom Hours Product',
+        url: 'https://example.com/custom',
+        source_key: 'src_test',
+        is_public: true,
+        active_start_hour: 14,
+        active_end_hour: 22,
+        user_id: admin.id,
+      });
+
+      // Product 2: Default window: 8 to 23
+      addManagedProduct(db, {
+        key: 'pub_default_hours',
+        title: 'Default Hours Product',
+        url: 'https://example.com/default',
+        source_key: 'src_test',
+        is_public: true,
+        user_id: admin.id,
+      });
+
+      const scheduleMap = getPublicProductScheduleMap(db);
+      expect(scheduleMap.get('pub_custom_hours')).toEqual({ startHour: 14, endHour: 22 });
+      expect(scheduleMap.get('pub_default_hours')).toEqual({ startHour: 8, endHour: 23 });
+
+      const targets: TargetConfig[] = [
+        { product_key: 'pub_custom_hours', source_key: 'src_test', url: 'https://example.com/custom', enabled: true },
+        { product_key: 'pub_default_hours', source_key: 'src_test', url: 'https://example.com/default', enabled: true },
+      ];
+
+      // At 10:00 AM Tehran time (06:30 UTC):
+      // Only pub_default_hours should be eligible! pub_custom_hours only starts at 14:00
+      const at10am = new Date('2026-11-03T06:30:00.000Z');
+      const batch10am = getScheduledBatchTargets(db, targets, { now: at10am });
+      const keys10am = batch10am.targets.map((t) => t.product_key);
+      expect(keys10am).toContain('pub_default_hours');
+      expect(keys10am).not.toContain('pub_custom_hours');
+      expect(batch10am.eligiblePublicTargets).toBe(1);
+
+      // At 15:00 PM Tehran time (11:30 UTC):
+      // Both should be eligible!
+      const at15pm = new Date('2026-11-03T11:30:00.000Z');
+      const batch15pm = getScheduledBatchTargets(db, targets, { now: at15pm });
+      const keys15pm = batch15pm.targets.map((t) => t.product_key);
+      expect(keys15pm).toContain('pub_default_hours');
+      expect(keys15pm).toContain('pub_custom_hours');
+      expect(batch15pm.eligiblePublicTargets).toBe(2);
+
+      // At 23:00 PM Tehran time (19:30 UTC):
+      // pub_custom_hours ended after 22:59, pub_default_hours is active until 23:59
+      const at2300 = new Date('2026-11-03T19:30:00.000Z');
+      const batch2300 = getScheduledBatchTargets(db, targets, { now: at2300 });
+      const keys2300 = batch2300.targets.map((t) => t.product_key);
+      expect(keys2300).toContain('pub_default_hours');
+      expect(keys2300).not.toContain('pub_custom_hours');
+
+      // Admin updates custom product hours to start earlier (from 9 to 22)
+      updateManagedProduct(
+        db,
+        'pub_custom_hours',
+        {
+          title: 'Custom Hours Product Updated',
+          url: 'https://example.com/custom',
+          source_key: 'src_test',
+          is_public: true,
+          active_start_hour: 9,
+          active_end_hour: 22,
+        },
+        admin
+      );
+
+      // Now at 10:00 AM, pub_custom_hours IS eligible!
+      const batch10amUpdated = getScheduledBatchTargets(db, targets, { now: at10am });
+      const keys10amUpdated = batch10amUpdated.targets.map((t) => t.product_key);
+      expect(keys10amUpdated).toContain('pub_custom_hours');
+      expect(keys10amUpdated).toContain('pub_default_hours');
 
       db.close();
     });

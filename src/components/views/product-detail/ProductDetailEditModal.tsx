@@ -1,6 +1,7 @@
 import React from "react";
 import { SourceRow } from "@/types/dashboard";
 import { Modal } from "@/components/common/Modal";
+import { ProductActiveHoursField } from "@/components/views/products/ProductActiveHoursField";
 import { ProductDetailEditForm } from "./types";
 
 interface ProductDetailEditModalProps {
@@ -66,14 +67,24 @@ export function ProductDetailEditModal({
           />
         </label>
         {isAdmin ? (
-          <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
-            <input
-              type="checkbox"
-              checked={form.is_public}
-              onChange={(e) => setForm((c) => ({ ...c, is_public: e.target.checked }))}
-            />
-            <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
-          </label>
+          <>
+            <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+              <input
+                type="checkbox"
+                checked={form.is_public}
+                onChange={(e) => setForm((c) => ({ ...c, is_public: e.target.checked }))}
+              />
+              <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
+            </label>
+            {form.is_public ? (
+              <ProductActiveHoursField
+                startHour={form.active_start_hour}
+                endHour={form.active_end_hour}
+                onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
+                onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
+              />
+            ) : null}
+          </>
         ) : null}
         <div className="modal-form-actions">
           <button
