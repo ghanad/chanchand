@@ -315,6 +315,7 @@ export function ProductTableRow({
                 onRefresh={onRefresh}
                 onDelete={onDelete}
                 onCopyUrl={onCopyUrl}
+                onEdit={onEdit}
               />
             </>
           ) : (
