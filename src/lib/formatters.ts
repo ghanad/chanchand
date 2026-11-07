@@ -3,8 +3,13 @@ import { Availability, RunStatus, PriceRow } from "../types/dashboard";
 export const numberFormatter = new Intl.NumberFormat("fa-IR");
 
 export const dateFormatter = new Intl.DateTimeFormat("fa-IR", {
-  dateStyle: "short",
-  timeStyle: "short",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  hour12: false,
 });
 
 export function formatNumber(value: number | null | undefined): string {

@@ -36,6 +36,17 @@ describe('formatters module', () => {
       expect(result.length).toBeGreaterThan(3);
     });
 
+    it('formats time in 24-hour format without ambiguous 12-hour values', () => {
+      // 20:30 UTC -> will have evening hours in any timezone
+      const eveningDate = new Date('2026-10-23T20:30:00.000Z');
+      const formatted = formatDate(eveningDate.toISOString());
+      // Should not contain AM/PM suffixes
+      expect(formatted).not.toContain('AM');
+      expect(formatted).not.toContain('PM');
+      expect(formatted).not.toContain('قبل‌ازظهر');
+      expect(formatted).not.toContain('بعدازظهر');
+    });
+
     it('returns raw string if not parsable as valid date', () => {
       expect(formatDate('not-a-valid-date')).toBe('not-a-valid-date');
     });
