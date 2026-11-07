@@ -72,6 +72,16 @@
   color: var(--text);
 }
 
+.toolbar-controls-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mobile-sort-container {
+  display: none;
+}
+
 .status-filter-pills {
   display: flex;
   align-items: center;

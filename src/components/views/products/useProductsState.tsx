@@ -236,6 +236,11 @@ export function useProductsState() {
     }
   }
 
+  function handleDirectSort(field: SortField | null, direction: SortDirection = "asc") {
+    setSortField(field);
+    setSortDirection(direction);
+  }
+
   const handleOpenAddModal = () => {
     if (!isAdmin && currentUser?.quota && !currentUser.quota.canAdd) {
       setShowBuySlotModal(true);
@@ -478,6 +483,7 @@ export function useProductsState() {
     sortField,
     sortDirection,
     handleSort,
+    handleDirectSort,
     renderSortIndicator,
     showAddProductModal,
     setShowAddProductModal,

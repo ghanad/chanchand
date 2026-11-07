@@ -34,6 +34,7 @@ export function ProductsView() {
     sortField,
     sortDirection,
     handleSort,
+    handleDirectSort,
     renderSortIndicator,
     showAddProductModal,
     setShowAddProductModal,
@@ -82,6 +83,7 @@ export function ProductsView() {
 
           {currentUser && currentUser.role !== "admin" && currentUser.quota?.isExpired && (
             <div
+              className="quota-expired-banner"
               style={{
                 margin: "12px 16px",
                 padding: "12px 16px",
@@ -120,6 +122,9 @@ export function ProductsView() {
             allCount={configuredProductCount}
             personalCount={personalProducts.length}
             publicCount={publicProducts.length}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortChange={handleDirectSort}
           />
 
           {/* Compact Product Table */}

@@ -1,5 +1,168 @@
-/* Responsive table: cards on screens below 768px */
+/* ==========================================================================
+   Mobile Responsive Redesign for Products List (< 768px)
+   ========================================================================== */
+
 @media (max-width: 768px) {
+  /* Page & Panel Container Adjustments */
+  .products-page {
+    gap: 12px;
+  }
+
+  .panel.product-list-panel {
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .product-list-panel .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: nowrap;
+  }
+
+  .product-list-panel .panel-head-titles {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .product-list-panel .panel-head h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .product-list-panel .panel-head-titles span {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  .product-list-panel .panel-head-action button {
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Quota Warning Banner on Mobile */
+  .quota-expired-banner {
+    margin: 10px 0 !important;
+    padding: 10px 12px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 10px !important;
+  }
+
+  .quota-expired-banner .btn {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Responsive Toolbar & Search */
+  .product-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .product-search-wrapper {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .product-search-input {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 36px 0 34px;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  .product-search-clear {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+    left: 8px;
+  }
+
+  .toolbar-controls-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .status-filter-pills {
+    width: 100%;
+    display: flex;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 10px;
+  }
+
+  .status-filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-pill-btn {
+    flex: 1 1 0;
+    min-height: 34px;
+    padding: 0 8px;
+    font-size: 12px;
+    white-space: nowrap;
+    text-align: center;
+    border-radius: 8px;
+  }
+
+  /* Mobile Sort Selector Dropdown */
+  .mobile-sort-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 2px 10px;
+    width: 100%;
+  }
+
+  .mobile-sort-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  .mobile-sort-select {
+    width: 100%;
+    min-height: 34px;
+    border: none;
+    background: transparent;
+    padding: 0 4px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    cursor: pointer;
+    outline: none;
+  }
+
+  /* Table Reset for Card View */
   .product-table-wrap,
   .product-table-wrapper {
     border: none;
@@ -17,104 +180,342 @@
     width: 100%;
   }
 
-  .product-compact-table tbody tr.product-table-row {
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    grid-template-areas:
-      "title status actions"
-      "source price price"
-      "date url url";
-    row-gap: 10px;
-    column-gap: 8px;
-    align-items: center;
-    height: auto;
-    min-height: auto;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 10px;
-  }
-
   .product-compact-table td {
     padding: 0;
     border: none;
   }
 
+  /* Table Group Header Section Rows */
   .product-compact-table tbody tr.table-group-header-row {
     display: block;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    margin-top: 14px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+    margin-top: 16px;
     border: 1px solid var(--line);
+    background: var(--surface-soft);
   }
 
   .product-compact-table tbody tr.table-group-header-row:first-child {
     margin-top: 0;
   }
 
-  .col-title {
-    grid-area: title;
+  .product-compact-table tbody tr.table-group-header-row td.table-group-header-cell {
+    display: block;
+    padding: 9px 12px;
+    border: none;
   }
 
-  .product-row-title,
-  .product-row-slug {
+  .table-group-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .table-group-title {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .table-group-badge {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* Modern Product Card */
+  .product-compact-table tbody tr.product-table-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "title actions"
+      "price status"
+      "source url"
+      "date url";
+    row-gap: 8px;
+    column-gap: 10px;
+    align-items: center;
+    height: auto;
+    min-height: auto;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 14px 12px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 2px 6px rgba(0, 0, 0, 0.02);
+    position: relative;
+    overflow: visible;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+  }
+
+  .product-compact-table tbody tr.product-table-row.is-active {
+    border-right: 3.5px solid var(--accent);
+  }
+
+  .product-compact-table tbody tr.product-table-row.is-inactive {
+    border-right: 3.5px solid #cbd5e1;
+    background: #fafcfb;
+  }
+
+  /* Admin Grid Layout (with owner badge under title) */
+  .product-compact-table tbody tr.product-table-row.is-admin-row {
+    grid-template-areas:
+      "title actions"
+      "owner actions"
+      "price status"
+      "source url"
+      "date url";
+  }
+
+  /* Card Header: Title & Actions */
+  .col-title {
+    grid-area: title;
+    min-width: 0;
+  }
+
+  .col-title .product-title-cell {
+    gap: 3px;
+  }
+
+  .col-title .product-title-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .col-title .product-row-title-link {
+    min-width: 0;
+  }
+
+  .col-title .product-row-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.45;
     max-width: 100%;
   }
 
-  .col-status {
-    grid-area: status;
-    justify-self: end;
+  .col-title .product-row-slug {
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.85;
+    max-width: 100%;
+  }
+
+  .public-market-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(15, 118, 110, 0.08);
+    border: 1px solid rgba(15, 118, 110, 0.22);
+    border-radius: 6px;
+    padding: 1px 5px;
+    font-size: 10px;
+    color: var(--accent);
+    opacity: 1;
+  }
+
+  .public-indicator-text {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .col-owner {
+    grid-area: owner;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 1px 0;
   }
 
   .col-actions {
     grid-area: actions;
     justify-self: end;
+    align-self: start;
+    padding-top: 1px;
   }
 
+  .col-actions .product-actions-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .col-actions .action-icon-button {
+    width: 34px;
+    height: 34px;
+    min-height: 34px;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    border-color: var(--line);
+  }
+
+  .product-table-row:not(.can-edit) .col-actions .muted-text {
+    display: none;
+  }
+
+  /* Card Body: Price & Status */
+  .col-price {
+    grid-area: price;
+    justify-self: start;
+    align-self: center;
+    padding: 3px 0;
+    min-width: 0;
+  }
+
+  .col-price .price-cell-stacked {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+
+  .col-price .product-price-value {
+    font-size: 16.5px;
+    font-weight: 700;
+    color: var(--accent-strong);
+    font-feature-settings: "tnum";
+    letter-spacing: -0.2px;
+  }
+
+  .col-price .product-price-unit {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+
+  .col-price .price-empty-state {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .col-status {
+    grid-area: status;
+    justify-self: end;
+    align-self: center;
+    padding: 3px 0;
+  }
+
+  .col-status .status-toggle-wrapper {
+    gap: 6px;
+  }
+
+  .col-status .status-toggle-label {
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  /* Card Footer: Metadata (Source, Date) & Links (URL) */
   .col-source {
     grid-area: source;
     border-top: 1px solid var(--line);
-    padding-top: 10px;
+    padding-top: 9px;
+    margin-top: 3px;
+    justify-self: start;
+    align-self: center;
   }
 
-  .col-price {
-    grid-area: price;
-    border-top: 1px solid var(--line);
-    padding-top: 10px;
-    justify-self: end;
+  .col-source .source-badges-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
 
   .col-date {
     grid-area: date;
-    padding-top: 2px;
+    padding-top: 1px;
+    justify-self: start;
+    align-self: center;
+  }
+
+  .col-date .product-date-text {
+    font-size: 11px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .col-date .product-date-empty {
+    font-size: 11px;
+    color: var(--muted);
+    opacity: 0.7;
   }
 
   .col-url {
     grid-area: url;
-    padding-top: 2px;
+    border-top: 1px solid var(--line);
+    padding-top: 9px;
+    margin-top: 3px;
     justify-self: end;
+    align-self: center;
   }
 
-  .product-url-wrapper {
-    max-width: 100%;
+  .col-url .url-action-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  .product-table-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .col-url .action-icon-button {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    border-color: var(--line);
   }
 
-  .product-search-wrapper {
-    max-width: 100%;
+  .col-url .public-link-badge {
+    font-size: 11px;
+    padding: 3px 7px;
   }
 
-  .status-filter-pills {
-    width: 100%;
+  /* Touch Interaction Feedback */
+  .product-compact-table tbody tr.clickable-row:active {
+    transform: scale(0.995);
   }
 
-  .filter-pill-btn {
-    flex: 1;
-    text-align: center;
+  /* Kebab Dropdown on Mobile */
+  .kebab-menu-dropdown {
+    min-width: 160px;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.18), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  }
+
+  .kebab-menu-item {
+    min-height: 36px;
+    font-size: 12.5px;
+  }
+
+  /* Empty State */
+  .empty-filter-container {
+    padding: 32px 14px;
+  }
+}
+
+/* Extra Tweaks for Small Mobile Screens (< 480px) */
+@media (max-width: 480px) {
+  .panel.product-list-panel {
+    padding: 10px;
+  }
+
+  .product-compact-table tbody tr.product-table-row {
+    padding: 12px 12px 10px;
+    margin-bottom: 9px;
+  }
+
+  .col-title .product-row-title {
+    font-size: 13px;
+  }
+
+  .col-price .product-price-value {
+    font-size: 15.5px;
   }
 }

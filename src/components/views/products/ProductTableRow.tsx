@@ -33,7 +33,7 @@ export function ProductTableRow({
 
   return (
     <tr
-      className={`product-table-row clickable-row ${isActive ? "is-active" : "is-inactive"}`}
+      className={`product-table-row clickable-row ${isActive ? "is-active" : "is-inactive"} ${isAdmin ? "is-admin-row" : ""} ${canEdit ? "can-edit" : ""}`}
       tabIndex={0}
       role="link"
       aria-label={`مشاهده جزئیات ${product.title}`}
@@ -80,6 +80,7 @@ export function ProductTableRow({
                   <line x1="2" y1="12" x2="22" y2="12" />
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                 </svg>
+                <span className="public-indicator-text">عمومی</span>
               </span>
             ) : null}
           </div>
@@ -248,11 +249,26 @@ export function ProductTableRow({
       <td className="col-date">
         <div className="product-info-text">
           {product.latestSnapshot?.observed_at ? (
-            <span className="muted-text" title={product.latestSnapshot.observed_at}>
-              {formatDate(product.latestSnapshot.observed_at)}
+            <span className="muted-text product-date-text" title={product.latestSnapshot.observed_at}>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="date-clock-icon"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span>{formatDate(product.latestSnapshot.observed_at)}</span>
             </span>
           ) : (
-            <span className="muted-text">-</span>
+            <span className="muted-text product-date-empty">-</span>
           )}
         </div>
       </td>
