@@ -263,6 +263,9 @@ export function useProductsState() {
           show_usd_chart: isAdmin && form.is_public ? form.show_usd_chart : false,
           active_start_hour: isAdmin ? form.active_start_hour : undefined,
           active_end_hour: isAdmin ? form.active_end_hour : undefined,
+          adapter_settings:
+            form.adapter_settings ||
+            (form.source_key === "iranjib" ? { item_name: form.title.trim() } : undefined),
         }),
       });
       showToast(`محصول ${result.product_key} اضافه شد.`);
@@ -274,6 +277,7 @@ export function useProductsState() {
         show_usd_chart: false,
         active_start_hour: 8,
         active_end_hour: 23,
+        adapter_settings: undefined,
       }));
       setShowAddProductModal(false);
       triggerRefresh();

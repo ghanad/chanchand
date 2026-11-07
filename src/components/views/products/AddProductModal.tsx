@@ -119,6 +119,11 @@ export function AddProductModal({
       title: found.name,
       url: iranjibUrl,
       source_key: "iranjib",
+      adapter_settings: {
+        item_name: found.name,
+        ...(found.company ? { company: found.company } : {}),
+        ...(found.id ? { item_id: found.id } : {}),
+      },
     }));
   };
 
@@ -129,6 +134,12 @@ export function AddProductModal({
         ...current,
         source_key: "iranjib",
         url: iranjibUrl,
+      }));
+    } else {
+      setSelectedCar(null);
+      setForm((current) => ({
+        ...current,
+        adapter_settings: undefined,
       }));
     }
   };

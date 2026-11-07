@@ -99,17 +99,29 @@ export function getTargetDeduplicationKey(
     try {
       const parsed = typeof adapterSettings === 'string' ? JSON.parse(adapterSettings) : adapterSettings;
       if (parsed && typeof parsed === 'object') {
-        symbol = String(parsed.symbol || parsed.name || parsed.code || parsed.asset || '').trim();
+        symbol = String(
+          parsed.symbol ||
+          parsed.name ||
+          parsed.item_name ||
+          parsed.item_id ||
+          parsed.id ||
+          parsed.code ||
+          parsed.asset ||
+          parsed.car_name ||
+          parsed.model ||
+          ''
+        ).trim();
       }
     } catch {}
   }
 
-  const isMarket =
+  const isMultiItemSource =
     sourceKey.includes('market') ||
     sourceKey.includes('servix') ||
-    sourceKey.includes('brsapi');
+    sourceKey.includes('brsapi') ||
+    sourceKey.includes('iranjib');
 
-  if (isMarket || symbol) {
+  if (isMultiItemSource || symbol) {
     return `${sourceKey}::${norm}::${symbol}`;
   }
 

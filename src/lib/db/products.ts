@@ -48,12 +48,17 @@ export function findManagedTargetByUrl(
   if (!norm) return undefined;
 
   const targetKey = getTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings);
-  const isMarket =
-    (sourceKey && (sourceKey.includes('market') || sourceKey.includes('servix') || sourceKey.includes('brsapi'))) ||
+  const isMultiItem =
+    (sourceKey &&
+      (sourceKey.includes('market') ||
+        sourceKey.includes('servix') ||
+        sourceKey.includes('brsapi') ||
+        sourceKey.includes('iranjib'))) ||
     targetKey.includes('::');
 
-  // If it's a market endpoint without an explicit symbol, we cannot safely match by URL alone
-  if (isMarket && !adapterSettings && !targetKey.split('::')[2]) {
+  // If it's a multi-item endpoint without an explicit symbol, we cannot safely match by URL alone
+  const symbolPart = targetKey.includes('::') ? targetKey.split('::')[2] : '';
+  if (isMultiItem && !symbolPart) {
     return undefined;
   }
 
@@ -179,8 +184,24 @@ export function addManagedProduct(
     }
   }
 
-  // Deduplication check: does a target with this URL and symbol already exist?
-  const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, options.adapter_settings);
+  let adapterSettingsObj: Record<string, any> = {};
+  if (options.adapter_settings) {
+    try {
+      adapterSettingsObj =
+        typeof options.adapter_settings === 'string'
+          ? JSON.parse(options.adapter_settings)
+          : { ...options.adapter_settings };
+    } catch {
+      adapterSettingsObj = {};
+    }
+  }
+  if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
+    adapterSettingsObj.item_name = cleanTitle;
+  }
+  const adapterSettingsStr = JSON.stringify(adapterSettingsObj);
+
+  // Deduplication check: does a target with this URL and symbol/item_name already exist?
+  const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, adapterSettingsObj);
   if (existingTarget) {
     const existingProd = db
       .prepare('SELECT * FROM managed_products WHERE key = ?')
@@ -230,22 +251,6 @@ export function addManagedProduct(
   } else if (existing.has(productKey)) {
     throw new Error(`product key already exists: ${productKey}`);
   }
-
-  let adapterSettingsObj: Record<string, any> = {};
-  if (options.adapter_settings) {
-    try {
-      adapterSettingsObj =
-        typeof options.adapter_settings === 'string'
-          ? JSON.parse(options.adapter_settings)
-          : { ...options.adapter_settings };
-    } catch {
-      adapterSettingsObj = {};
-    }
-  }
-  if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
-    adapterSettingsObj.item_name = cleanTitle;
-  }
-  const adapterSettingsStr = JSON.stringify(adapterSettingsObj);
 
   const insertProd = db.prepare(
     'INSERT INTO managed_products (key, title, user_id, is_public, show_usd_chart, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'

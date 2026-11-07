@@ -205,6 +205,57 @@ describe('Product & Target Deduplication (Shared Catalog & User Watchlist)', () 
       db.close();
     });
 
+    it('allows a user to add multiple different cars sharing the same Iranjib URL without replacement', () => {
+      const db = getDatabase();
+      const iranjibUrl = 'https://www.iranjib.ir/showgroup/45/%D9%82%DB%8C%D9%85%D8%AA-%D8%AE%D9%88%D8%AF%D8%B1%D9%88-%D8%AA%D9%88%D9%84%DB%8C%D8%AF-%D8%AF%D8%A7%D8%AE%D9%84/';
+
+      // User 1 adds first car (Peugeot 207)
+      const car1 = addManagedProduct(db, {
+        title: 'پژو ۲۰۷ دستی',
+        url: iranjibUrl,
+        source_key: 'iranjib',
+        user_id: user1Id,
+      });
+      expect(car1.reused).toBe(false);
+      expect(car1.product_key).toBeDefined();
+
+      // User 1 adds second car (Dena Plus) sharing the exact same Iranjib URL
+      const car2 = addManagedProduct(db, {
+        title: 'دنا پلاس توربو',
+        url: iranjibUrl,
+        source_key: 'iranjib',
+        user_id: user1Id,
+      });
+      expect(car2.reused).toBe(false);
+      expect(car2.product_key).toBeDefined();
+      expect(car2.product_key).not.toBe(car1.product_key);
+
+      // Verify that User 1 has both products in their watchlist
+      const user1Products = getManagedProducts(db, { userId: user1Id });
+      expect(user1Products.length).toBe(2);
+      const titles = user1Products.map((p) => p.title);
+      expect(titles).toContain('پژو ۲۰۷ دستی');
+      expect(titles).toContain('دنا پلاس توربو');
+
+      // Another user (User 2) adds the same Peugeot 207 -> should be reused
+      const car1User2 = addManagedProduct(db, {
+        title: 'پژو ۲۰۷ دستی',
+        url: iranjibUrl,
+        source_key: 'iranjib',
+        user_id: user2Id,
+      });
+      expect(car1User2.reused).toBe(true);
+      expect(car1User2.product_key).toBe(car1.product_key);
+
+      // Verify targets have correct distinct item_name in adapter_settings
+      const target1 = db.prepare('SELECT * FROM managed_targets WHERE product_key = ?').get(car1.product_key) as any;
+      const target2 = db.prepare('SELECT * FROM managed_targets WHERE product_key = ?').get(car2.product_key) as any;
+      expect(JSON.parse(target1.adapter_settings).item_name).toBe('پژو ۲۰۷ دستی');
+      expect(JSON.parse(target2.adapter_settings).item_name).toBe('دنا پلاس توربو');
+
+      db.close();
+    });
+
     it('collects price snapshot only ONCE and shares history between tracking users', async () => {
       let fetchCount = 0;
       vi.spyOn(adaptersModule, 'getAdapter').mockReturnValue({

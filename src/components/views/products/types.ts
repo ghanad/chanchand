@@ -16,6 +16,7 @@ export interface ProductFormState {
   show_usd_chart: boolean;
   active_start_hour: number;
   active_end_hour: number;
+  adapter_settings?: Record<string, any>;
 }
 
 export interface ProductTableRowProps {

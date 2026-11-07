@@ -4,10 +4,21 @@ import { USD_PRODUCT_KEY } from '../serializers';
 import { FREE_PRODUCT_LIMIT } from './connection';
 
 export function isMarketSource(sourceKey?: string, adapter?: string): boolean {
-  if (adapter === 'brsapi_market' || adapter === 'servix_market') return true;
+  if (
+    adapter === 'brsapi_market' ||
+    adapter === 'servix_market' ||
+    adapter === 'iranjib' ||
+    adapter === 'iranjib_car'
+  )
+    return true;
   if (!sourceKey) return false;
   const lower = sourceKey.toLowerCase();
-  return lower.includes('market') || lower.includes('servix') || lower.includes('brsapi');
+  return (
+    lower.includes('market') ||
+    lower.includes('servix') ||
+    lower.includes('brsapi') ||
+    lower.includes('iranjib')
+  );
 }
 
 export function getAppTimezone(): string {
@@ -357,7 +368,7 @@ export function hasSuccessfulPriceToday(
   if (url && !isMarket) {
     row = db.prepare(`
       SELECT id FROM price_snapshots
-      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%'))
+      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%' AND source_key NOT LIKE '%iranjib%'))
         AND price_irr IS NOT NULL
         AND observed_at >= ?
         AND observed_at <= ?
@@ -391,7 +402,7 @@ export function hasSuccessfulPriceThisHour(
   if (url && !isMarket) {
     row = db.prepare(`
       SELECT id FROM price_snapshots
-      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%'))
+      WHERE (product_key = ? OR (url = ? AND source_key NOT LIKE '%market%' AND source_key NOT LIKE '%servix%' AND source_key NOT LIKE '%brsapi%' AND source_key NOT LIKE '%iranjib%'))
         AND price_irr IS NOT NULL
         AND observed_at >= ?
         AND observed_at <= ?
