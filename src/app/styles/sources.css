@@ -97,6 +97,12 @@
   border-color: #bbf7d0;
 }
 
+.adapter-badge.iranjib {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
 .adapter-badge.default {
   background: var(--surface-soft);
   color: var(--muted);

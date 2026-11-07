@@ -10,6 +10,8 @@ Read this when adding or changing a price source.
 - Digikala API: `src/lib/adapters/digikalaApi.ts`
 - Digikala Web (HTML/SSR): `src/lib/adapters/digikalaWeb.ts`
 - BRSAPI gold and currency markets: `src/lib/adapters/brsapiMarket.ts`
+- Servix gold and currency markets: `src/lib/adapters/servixMarket.ts`
+- Iranjib car and market tables: `src/lib/adapters/iranjib.ts`
 - Adapter tests: `tests/adapters.test.ts`
 
 ## Contracts

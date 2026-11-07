@@ -21,6 +21,7 @@ export function getMonogram(key: string): string {
   if (key.startsWith("digikala")) return "DK";
   if (key.startsWith("brsapi")) return "BR";
   if (key.startsWith("generic")) return "GH";
+  if (key.startsWith("iranjib")) return "IJ";
   return key.slice(0, 2).toUpperCase();
 }
 
@@ -28,6 +29,7 @@ export function getBadgeClass(adapter: string): string {
   if (adapter.includes("digikala")) return "digikala_api";
   if (adapter.includes("brsapi")) return "brsapi_market";
   if (adapter.includes("generic")) return "generic_html";
+  if (adapter.includes("iranjib")) return "iranjib";
   return "default";
 }
 

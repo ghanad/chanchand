@@ -48,6 +48,7 @@ export function EditSourceModal({
               <option value="digikala_web">digikala_web (خزش وب دیجی‌کالا)</option>
               <option value="servix_market">servix_market (وب‌سرویس طلا، سکه و ارز Servix)</option>
               <option value="brsapi_market">brsapi_market (وب‌سرویس طلا و ارز)</option>
+              <option value="iranjib">iranjib (قیمت خودرو و بازار ایران‌جیب)</option>
               <option value="generic_html">generic_html (خزش عمومی HTML)</option>
             </select>
           </label>

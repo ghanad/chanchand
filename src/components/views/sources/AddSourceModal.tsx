@@ -49,8 +49,8 @@ export function AddSourceModal({
                 setForm((c) => ({
                   ...c,
                   adapter: val,
-                  currency: val === "brsapi_market" ? "TOMAN" : c.currency,
-                  price_multiplier: val === "brsapi_market" ? 10 : c.price_multiplier,
+                  currency: val === "brsapi_market" || val === "iranjib" ? "TOMAN" : c.currency,
+                  price_multiplier: val === "brsapi_market" || val === "iranjib" ? 10 : c.price_multiplier,
                 }));
               }}
             >
@@ -58,6 +58,7 @@ export function AddSourceModal({
               <option value="digikala_web">digikala_web (خزش وب دیجی‌کالا)</option>
               <option value="servix_market">servix_market (وب‌سرویس طلا، سکه و ارز Servix)</option>
               <option value="brsapi_market">brsapi_market (وب‌سرویس طلا و ارز)</option>
+              <option value="iranjib">iranjib (قیمت خودرو و بازار ایران‌جیب)</option>
               <option value="generic_html">generic_html (خزش عمومی HTML)</option>
             </select>
             <span className="form-hint">موتور دریافت قیمت (در صورت نیاز به آداپتور اختصاصی جدید، به راهنمای پایین صفحه مراجعه کنید)</span>

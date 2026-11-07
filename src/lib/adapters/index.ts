@@ -4,6 +4,7 @@ import { DigikalaWebAdapter } from './digikalaWeb';
 import { BrsapiMarketAdapter } from './brsapiMarket';
 import { ServixMarketAdapter } from './servixMarket';
 import { GenericHtmlAdapter } from './genericHtml';
+import { IranjibAdapter } from './iranjib';
 
 export * from './types';
 export * from './digikalaApi';
@@ -11,6 +12,7 @@ export * from './digikalaWeb';
 export * from './brsapiMarket';
 export * from './servixMarket';
 export * from './genericHtml';
+export * from './iranjib';
 
 const adapters: Record<string, () => PriceAdapter> = {
   generic_html: () => new GenericHtmlAdapter(),
@@ -19,6 +21,8 @@ const adapters: Record<string, () => PriceAdapter> = {
   digikala_web: () => new DigikalaWebAdapter(),
   brsapi_market: () => new BrsapiMarketAdapter(),
   servix_market: () => new ServixMarketAdapter(),
+  iranjib: () => new IranjibAdapter(),
+  iranjib_car: () => new IranjibAdapter(),
 };
 
 export function getAdapter(name: string): PriceAdapter {

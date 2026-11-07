@@ -630,6 +630,18 @@ export function seedDefaultSourcesIfEmpty(db: Database.Database): void {
           cache_ttl_seconds: 30,
         },
       },
+      {
+        key: 'iranjib',
+        adapter: 'iranjib',
+        timeout_seconds: 15,
+        rate_limit_seconds: 2,
+        currency: 'TOMAN',
+        price_multiplier: 10,
+        headers: {},
+        settings: {
+          cache_ttl_seconds: 60,
+        },
+      },
     ];
 
     const txn = db.transaction(() => {
