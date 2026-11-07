@@ -528,11 +528,6 @@ export function seedManagedProductsIfEmpty(db: Database.Database, initialConfig?
 
 export function seedDefaultSourcesIfEmpty(db: Database.Database): void {
   try {
-    const countRow = db.prepare('SELECT count(*) as cnt FROM managed_sources').get() as { cnt: number } | undefined;
-    if (countRow && countRow.cnt > 0) {
-      return;
-    }
-
     const now = new Date().toISOString();
     const insert = db.prepare(`
       INSERT OR IGNORE INTO managed_sources (
@@ -540,42 +535,46 @@ export function seedDefaultSourcesIfEmpty(db: Database.Database): void {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    // Check if we can seed from previous sources table
-    const pastSources = db.prepare('SELECT DISTINCT key, adapter, config_json FROM sources').all() as any[];
-    if (pastSources.length > 0) {
-      const txn = db.transaction(() => {
-        for (const s of pastSources) {
-          let timeout = 15;
-          let rateLimit = 2;
-          let currency = 'IRR';
-          let multiplier = 1;
-          let headers = {};
-          let settings = {};
-          try {
-            const conf = JSON.parse(s.config_json);
-            if (conf.timeout_seconds) timeout = conf.timeout_seconds;
-            if (conf.rate_limit_seconds) rateLimit = conf.rate_limit_seconds;
-            if (conf.currency) currency = conf.currency;
-            if (conf.price_multiplier) multiplier = conf.price_multiplier;
-            if (conf.headers) headers = conf.headers;
-            if (conf.settings) settings = conf.settings;
-          } catch {}
-          insert.run(
-            s.key,
-            s.adapter,
-            timeout,
-            rateLimit,
-            currency,
-            multiplier,
-            JSON.stringify(headers),
-            JSON.stringify(settings),
-            now,
-            now
-          );
-        }
-      });
-      txn();
-      return;
+    const countRow = db.prepare('SELECT count(*) as cnt FROM managed_sources').get() as { cnt: number } | undefined;
+    const isBrandNew = !countRow || countRow.cnt === 0;
+
+    // Check if we can seed from previous sources table if brand new
+    if (isBrandNew) {
+      const pastSources = db.prepare('SELECT DISTINCT key, adapter, config_json FROM sources').all() as any[];
+      if (pastSources.length > 0) {
+        const txn = db.transaction(() => {
+          for (const s of pastSources) {
+            let timeout = 15;
+            let rateLimit = 2;
+            let currency = 'IRR';
+            let multiplier = 1;
+            let headers = {};
+            let settings = {};
+            try {
+              const conf = JSON.parse(s.config_json);
+              if (conf.timeout_seconds) timeout = conf.timeout_seconds;
+              if (conf.rate_limit_seconds) rateLimit = conf.rate_limit_seconds;
+              if (conf.currency) currency = conf.currency;
+              if (conf.price_multiplier) multiplier = conf.price_multiplier;
+              if (conf.headers) headers = conf.headers;
+              if (conf.settings) settings = conf.settings;
+            } catch {}
+            insert.run(
+              s.key,
+              s.adapter,
+              timeout,
+              rateLimit,
+              currency,
+              multiplier,
+              JSON.stringify(headers),
+              JSON.stringify(settings),
+              now,
+              now
+            );
+          }
+        });
+        txn();
+      }
     }
 
     // Default built-in sources

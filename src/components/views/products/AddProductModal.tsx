@@ -42,8 +42,6 @@ export function AddProductModal({
   isAdmin,
   isBusy,
 }: AddProductModalProps) {
-  const hasIranjibSource = useMemo(() => sources.some((s) => s.key === "iranjib"), [sources]);
-
   const [mode, setMode] = useState<"general" | "car">("general");
   const [carItems, setCarItems] = useState<IranjibItemData[]>([]);
   const [carCompanies, setCarCompanies] = useState<string[]>([]);
@@ -137,26 +135,24 @@ export function AddProductModal({
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="افزودن محصول جدید">
-      {hasIranjibSource && (
-        <div className="product-type-tabs">
-          <button
-            type="button"
-            className={`product-type-tab ${mode === "general" ? "active" : ""}`}
-            onClick={() => handleSwitchMode("general")}
-          >
-            <span>🛒</span>
-            <span>کالای عمومی (دیجی‌کالا و سایر)</span>
-          </button>
-          <button
-            type="button"
-            className={`product-type-tab ${mode === "car" ? "active" : ""}`}
-            onClick={() => handleSwitchMode("car")}
-          >
-            <span>🚗</span>
-            <span>خودرو داخلی (ایران‌جیب)</span>
-          </button>
-        </div>
-      )}
+      <div className="product-type-tabs">
+        <button
+          type="button"
+          className={`product-type-tab ${mode === "general" ? "active" : ""}`}
+          onClick={() => handleSwitchMode("general")}
+        >
+          <span>🛒</span>
+          <span>کالای عمومی (دیجی‌کالا و سایر)</span>
+        </button>
+        <button
+          type="button"
+          className={`product-type-tab ${mode === "car" ? "active" : ""}`}
+          onClick={() => handleSwitchMode("car")}
+        >
+          <span>🚗</span>
+          <span>خودرو داخلی (ایران‌جیب)</span>
+        </button>
+      </div>
 
       <form className="modal-form" onSubmit={onSubmit}>
         {mode === "car" ? (

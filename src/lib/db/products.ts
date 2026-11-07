@@ -168,6 +168,17 @@ export function addManagedProduct(
       : 23;
   const now = new Date().toISOString();
 
+  if (sourceKey === 'iranjib') {
+    const srcRow = db.prepare('SELECT 1 FROM managed_sources WHERE key = ? LIMIT 1').get('iranjib');
+    if (!srcRow) {
+      db.prepare(`
+        INSERT OR IGNORE INTO managed_sources (
+          key, adapter, timeout_seconds, rate_limit_seconds, currency, price_multiplier, headers, settings, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run('iranjib', 'iranjib', 15, 2, 'TOMAN', 10, '{}', JSON.stringify({ cache_ttl_seconds: 60 }), now, now);
+    }
+  }
+
   // Deduplication check: does a target with this URL and symbol already exist?
   const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, options.adapter_settings);
   if (existingTarget) {
