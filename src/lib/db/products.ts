@@ -145,7 +145,16 @@ export function addManagedProduct(
   if (!cleanTitle) throw new Error('title cannot be empty');
   const cleanUrl = options.url.trim();
   if (!cleanUrl) throw new Error('url cannot be empty');
-  const sourceKey = options.source_key?.trim() || 'digikala_api';
+
+  let sourceKey = options.source_key?.trim();
+  if (cleanUrl.includes('iranjib.ir')) {
+    if (!sourceKey || sourceKey === 'brsapi_market' || sourceKey === 'digikala_api') {
+      sourceKey = 'iranjib';
+    }
+  } else if (!sourceKey) {
+    sourceKey = cleanUrl.includes('digikala.com') ? 'digikala_api' : 'digikala_api';
+  }
+
   const userId = options.user_id ?? null;
   const isPublic = options.is_public ? 1 : 0;
   const showUsdChart = options.show_usd_chart ? 1 : 0;
@@ -211,13 +220,21 @@ export function addManagedProduct(
     throw new Error(`product key already exists: ${productKey}`);
   }
 
-  let adapterSettingsStr = '{}';
+  let adapterSettingsObj: Record<string, any> = {};
   if (options.adapter_settings) {
-    adapterSettingsStr =
-      typeof options.adapter_settings === 'string'
-        ? options.adapter_settings
-        : JSON.stringify(options.adapter_settings);
+    try {
+      adapterSettingsObj =
+        typeof options.adapter_settings === 'string'
+          ? JSON.parse(options.adapter_settings)
+          : { ...options.adapter_settings };
+    } catch {
+      adapterSettingsObj = {};
+    }
   }
+  if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
+    adapterSettingsObj.item_name = cleanTitle;
+  }
+  const adapterSettingsStr = JSON.stringify(adapterSettingsObj);
 
   const insertProd = db.prepare(
     'INSERT INTO managed_products (key, title, user_id, is_public, show_usd_chart, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -259,7 +276,15 @@ export function updateManagedProduct(
   if (!cleanTitle) throw new Error('title cannot be empty');
   const cleanUrl = options.url.trim();
   if (!cleanUrl) throw new Error('url cannot be empty');
-  const sourceKey = options.source_key?.trim() || 'digikala_api';
+
+  let sourceKey = options.source_key?.trim();
+  if (cleanUrl.includes('iranjib.ir')) {
+    if (!sourceKey || sourceKey === 'brsapi_market' || sourceKey === 'digikala_api') {
+      sourceKey = 'iranjib';
+    }
+  } else if (!sourceKey) {
+    sourceKey = cleanUrl.includes('digikala.com') ? 'digikala_api' : 'digikala_api';
+  }
 
   const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
   if (!prod) throw new Error(`unknown product: ${productKey}`);
@@ -341,16 +366,27 @@ export function updateManagedProduct(
       );
     }
     if (existingTarget) {
-      db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, updated_at = ? WHERE id = ?').run(
+      let adapterSettingsObj: Record<string, any> = {};
+      try {
+        adapterSettingsObj = JSON.parse(existingTarget.adapter_settings || '{}');
+      } catch {
+        adapterSettingsObj = {};
+      }
+      if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
+        adapterSettingsObj.item_name = cleanTitle;
+      }
+      db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, adapter_settings = ?, updated_at = ? WHERE id = ?').run(
         sourceKey,
         cleanUrl,
+        JSON.stringify(adapterSettingsObj),
         now,
         existingTarget.id
       );
     } else {
+      const adapterSettings = sourceKey === 'iranjib' ? JSON.stringify({ item_name: cleanTitle }) : '{}';
       db.prepare(
         'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)'
-      ).run(productKey, sourceKey, cleanUrl, '{}', now, now);
+      ).run(productKey, sourceKey, cleanUrl, adapterSettings, now, now);
     }
   });
   txn();

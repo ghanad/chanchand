@@ -65,9 +65,18 @@ export function EditProductModal({
           آدرس اینترنتی (URL)
           <input
             value={editForm.url}
-            onChange={(event) =>
-              setEditForm((current) => ({ ...current, url: event.target.value }))
-            }
+            onChange={(event) => {
+              const val = event.target.value;
+              setEditForm((current) => {
+                let nextSource = current.source_key;
+                if (val.includes("iranjib.ir") && sources.some((s) => s.key === "iranjib")) {
+                  nextSource = "iranjib";
+                } else if (val.includes("digikala.com") && sources.some((s) => s.key === "digikala_api")) {
+                  nextSource = "digikala_api";
+                }
+                return { ...current, url: val, source_key: nextSource };
+              });
+            }}
             type="url"
             dir="ltr"
             placeholder="https://..."

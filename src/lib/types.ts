@@ -22,6 +22,7 @@ export interface ProductConfig {
 
 export interface TargetConfig {
   product_key: string;
+  product_title?: string;
   source_key: string;
   url: string;
   enabled: boolean;

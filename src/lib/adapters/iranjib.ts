@@ -109,7 +109,7 @@ export class IranjibAdapter implements PriceAdapter {
     const requestedCompany = this.clean(settings.company);
 
     let requestedName = this.clean(
-      settings.item_name || settings.name || settings.model || settings.car_name
+      settings.item_name || settings.name || settings.model || settings.car_name || target.product_title
     );
 
     // Fallback: extract from URL hash or query param if not set in settings

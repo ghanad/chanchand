@@ -90,7 +90,12 @@ export class PriceRunner {
 
     let candidateTargets = targets;
     if (!candidateTargets) {
-      const managedTargets = getManagedTargets(db);
+      const managedTargets = db.prepare(`
+        SELECT mt.*, mp.title AS product_title
+        FROM managed_targets mt
+        LEFT JOIN managed_products mp ON mp.key = mt.product_key
+        ORDER BY mt.id ASC
+      `).all() as any[];
       if (managedTargets.length > 0) {
         candidateTargets = managedTargets.map((t) => {
           let adapterSettings: Record<string, any> = {};
@@ -99,6 +104,7 @@ export class PriceRunner {
           } catch {}
           return {
             product_key: t.product_key,
+            product_title: t.product_title || undefined,
             source_key: t.source_key,
             url: t.url,
             enabled: Boolean(t.enabled),
