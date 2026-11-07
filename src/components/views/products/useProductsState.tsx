@@ -31,6 +31,7 @@ export function useProductsState() {
     url: "",
     source_key: "",
     is_public: false,
+    show_usd_chart: false,
     active_start_hour: 8,
     active_end_hour: 23,
   });
@@ -40,6 +41,7 @@ export function useProductsState() {
     url: "",
     source_key: "",
     is_public: false,
+    show_usd_chart: false,
     active_start_hour: 8,
     active_end_hour: 23,
   });
@@ -253,6 +255,7 @@ export function useProductsState() {
           url: form.url.trim(),
           source_key: form.source_key || null,
           is_public: isAdmin ? form.is_public : false,
+          show_usd_chart: isAdmin && form.is_public ? form.show_usd_chart : false,
           active_start_hour: isAdmin ? form.active_start_hour : undefined,
           active_end_hour: isAdmin ? form.active_end_hour : undefined,
         }),
@@ -263,6 +266,7 @@ export function useProductsState() {
         url: "",
         source_key: current.source_key,
         is_public: false,
+        show_usd_chart: false,
         active_start_hour: 8,
         active_end_hour: 23,
       }));
@@ -289,6 +293,7 @@ export function useProductsState() {
       url: product.primary_target.url,
       source_key: product.primary_target.source_key,
       is_public: Boolean(product.is_public),
+      show_usd_chart: Boolean(product.show_usd_chart),
       active_start_hour: product.active_start_hour ?? 8,
       active_end_hour: product.active_end_hour ?? 23,
     });
@@ -301,6 +306,7 @@ export function useProductsState() {
       url: "",
       source_key: "",
       is_public: false,
+      show_usd_chart: false,
       active_start_hour: 8,
       active_end_hour: 23,
     });
@@ -320,6 +326,7 @@ export function useProductsState() {
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
+            show_usd_chart: isAdmin ? (editForm.is_public ? editForm.show_usd_chart : false) : undefined,
             active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
             active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),

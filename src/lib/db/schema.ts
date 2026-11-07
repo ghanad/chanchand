@@ -56,6 +56,7 @@ export function initDatabase(db: Database.Database): void {
       title TEXT NOT NULL,
       user_id INTEGER REFERENCES users(id),
       is_public INTEGER NOT NULL DEFAULT 0,
+      show_usd_chart INTEGER NOT NULL DEFAULT 0,
       active_start_hour INTEGER NOT NULL DEFAULT 8,
       active_end_hour INTEGER NOT NULL DEFAULT 23,
       created_at DATETIME NOT NULL,
@@ -310,6 +311,9 @@ export function initDatabase(db: Database.Database): void {
       }
       if (!prodColumns.some((col) => col.name === 'is_public')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN is_public INTEGER NOT NULL DEFAULT 0').run();
+      }
+      if (!prodColumns.some((col) => col.name === 'show_usd_chart')) {
+        db.prepare('ALTER TABLE managed_products ADD COLUMN show_usd_chart INTEGER NOT NULL DEFAULT 0').run();
       }
       if (!prodColumns.some((col) => col.name === 'active_start_hour')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN active_start_hour INTEGER NOT NULL DEFAULT 8').run();

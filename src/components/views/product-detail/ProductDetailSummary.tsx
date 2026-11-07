@@ -5,7 +5,8 @@ import { Metric } from "@/components/common/Metric";
 
 interface ProductDetailSummaryProps {
   latestSnapshot: PriceRow | null;
-  isPublicProduct: boolean;
+  isPublicProduct?: boolean;
+  showUsd?: boolean;
   minToman: number | null;
   maxToman: number | null;
   minUsd: number | null;
@@ -15,13 +16,16 @@ interface ProductDetailSummaryProps {
 
 export function ProductDetailSummary({
   latestSnapshot,
-  isPublicProduct,
+  isPublicProduct = false,
+  showUsd,
   minToman,
   maxToman,
   minUsd,
   maxUsd,
   historyLength,
 }: ProductDetailSummaryProps) {
+  const canShowUsd = showUsd !== undefined ? showUsd : !isPublicProduct;
+
   return (
     <section className="product-summary-grid" aria-label="شاخص‌های کلیدی محصول">
       <Metric
@@ -32,7 +36,7 @@ export function ProductDetailSummary({
             : "ثبت نشده"
         }
         hint={
-          !isPublicProduct && latestSnapshot?.price_usd
+          canShowUsd && latestSnapshot?.price_usd
             ? `معادل ${formatNumber(latestSnapshot.price_usd)} دلار`
             : latestSnapshot?.seller
             ? `فروشنده: ${latestSnapshot.seller}`
@@ -42,12 +46,12 @@ export function ProductDetailSummary({
       <Metric
         label="کمترین قیمت تاریخی"
         value={minToman !== null ? `${formatNumber(minToman)} تومان` : "-"}
-        hint={!isPublicProduct && minUsd !== null ? `معادل ${formatNumber(minUsd)} دلار` : undefined}
+        hint={canShowUsd && minUsd !== null ? `معادل ${formatNumber(minUsd)} دلار` : undefined}
       />
       <Metric
         label="بیشترین قیمت تاریخی"
         value={maxToman !== null ? `${formatNumber(maxToman)} تومان` : "-"}
-        hint={!isPublicProduct && maxUsd !== null ? `معادل ${formatNumber(maxUsd)} دلار` : undefined}
+        hint={canShowUsd && maxUsd !== null ? `معادل ${formatNumber(maxUsd)} دلار` : undefined}
       />
       <Metric
         label="تعداد کل مشاهدات"

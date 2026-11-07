@@ -39,6 +39,7 @@ export interface ManagedProductRow {
   title: string;
   user_id?: number | null;
   is_public?: number;
+  show_usd_chart?: number;
   active_start_hour?: number | null;
   active_end_hour?: number | null;
   owner_username?: string | null;

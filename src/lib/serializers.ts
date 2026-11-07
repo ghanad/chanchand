@@ -84,6 +84,7 @@ export function productsPayload(
     user_id?: number | null;
     owner_username?: string | null;
     is_public?: number | boolean;
+    show_usd_chart?: number | boolean;
     active_start_hour?: number | null;
     active_end_hour?: number | null;
     is_tracked_by_user?: boolean;
@@ -111,6 +112,7 @@ export function productsPayload(
       user_id: dbProduct.user_id ?? null,
       owner_username: dbProduct.owner_username ?? null,
       is_public: isPublic,
+      show_usd_chart: Boolean(dbProduct.show_usd_chart),
       active_start_hour: dbProduct.active_start_hour ?? 8,
       active_end_hour: dbProduct.active_end_hour ?? 23,
       can_edit: canEdit,
@@ -130,6 +132,7 @@ export function productsPayload(
         user_id: null,
         owner_username: null,
         is_public: true,
+        show_usd_chart: false,
         active_start_hour: 8,
         active_end_hour: 23,
         can_edit: currentUser?.role === 'admin',

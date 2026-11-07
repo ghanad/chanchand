@@ -17,7 +17,8 @@ import { ChartRow } from "./types";
 
 interface ProductDetailChartProps {
   chartRows: ChartRow[];
-  isPublicProduct: boolean;
+  isPublicProduct?: boolean;
+  showUsdToggle?: boolean;
   activeMetric: HistoryMetric;
   setChartMetric: (metric: HistoryMetric) => void;
   historyLimit: string;
@@ -32,7 +33,8 @@ interface ProductDetailChartProps {
 
 export function ProductDetailChart({
   chartRows,
-  isPublicProduct,
+  isPublicProduct = false,
+  showUsdToggle,
   activeMetric,
   setChartMetric,
   historyLimit,
@@ -40,6 +42,7 @@ export function ProductDetailChart({
   metricConfig,
   productKey,
 }: ProductDetailChartProps) {
+  const canToggleUsd = showUsdToggle !== undefined ? showUsdToggle : !isPublicProduct;
   // Zoom & selection state
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
@@ -188,7 +191,7 @@ export function ProductDetailChart({
               </button>
             )}
 
-            {!isPublicProduct && (
+            {canToggleUsd && (
               <div className="metric-toggle" aria-label="واحد نمایش نمودار">
                 <button
                   type="button"

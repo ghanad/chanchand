@@ -347,5 +347,89 @@ describe('Multi-user Product Ownership and Public Market Items', () => {
       const json = await resHistory.json();
       expect(json.error).toContain('دسترسی غیرمجاز');
     });
+
+    it('allows admin to set and update show_usd_chart for public products, but ignores it for non-admin', async () => {
+      // 1. Admin creates public product with show_usd_chart = true
+      const reqAdminPost = new NextRequest('https://example.com/api/products', {
+        method: 'POST',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${adminCookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'طلای آبشده نقدی',
+          url: 'https://example.com/gold-melted',
+          is_public: true,
+          show_usd_chart: true,
+        }),
+      });
+      const resAdminPost = await postProduct(reqAdminPost);
+      expect(resAdminPost.status).toBe(200);
+      const { product_key: goldKey } = await resAdminPost.json();
+
+      // Check DB
+      const db = getDatabase();
+      const goldProd = db.prepare('SELECT is_public, show_usd_chart FROM managed_products WHERE key = ?').get(goldKey) as any;
+      expect(goldProd.is_public).toBe(1);
+      expect(goldProd.show_usd_chart).toBe(1);
+      db.close();
+
+      // Check GET /api/products
+      const reqGet = new NextRequest('https://example.com/api/products', {
+        headers: { cookie: `${AUTH_COOKIE_NAME}=${adminCookie}` },
+      });
+      const resGet = await getProducts(reqGet);
+      const jsonGet = await resGet.json();
+      const foundGold = jsonGet.products.find((p: any) => p.key === goldKey);
+      expect(foundGold.is_public).toBe(true);
+      expect(foundGold.show_usd_chart).toBe(true);
+
+      // 2. Admin updates show_usd_chart to false
+      const reqAdminPut = new NextRequest(`https://example.com/api/products/${goldKey}`, {
+        method: 'PUT',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${adminCookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'طلای آبشده نقدی',
+          url: 'https://example.com/gold-melted',
+          is_public: true,
+          show_usd_chart: false,
+        }),
+      });
+      const resAdminPut = await putProduct(reqAdminPut, { params: Promise.resolve({ key: goldKey }) });
+      expect(resAdminPut.status).toBe(200);
+
+      // Verify DB updated
+      const db2 = getDatabase();
+      const goldProdUpdated = db2.prepare('SELECT is_public, show_usd_chart FROM managed_products WHERE key = ?').get(goldKey) as any;
+      expect(goldProdUpdated.show_usd_chart).toBe(0);
+      db2.close();
+
+      // 3. Non-admin attempts to create a product with show_usd_chart = true
+      const reqUserPost = new NextRequest('https://example.com/api/products', {
+        method: 'POST',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${user1Cookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'کالای کاربر عادی',
+          url: 'https://example.com/regular-item',
+          is_public: true, // viewer attempts to make it public
+          show_usd_chart: true, // viewer attempts to enable usd chart
+        }),
+      });
+      const resUserPost = await postProduct(reqUserPost);
+      expect(resUserPost.status).toBe(200);
+      const { product_key: userItemKey } = await resUserPost.json();
+
+      const db3 = getDatabase();
+      const userProd = db3.prepare('SELECT is_public, show_usd_chart FROM managed_products WHERE key = ?').get(userItemKey) as any;
+      expect(userProd.is_public).toBe(0);
+      expect(userProd.show_usd_chart).toBe(0);
+      db3.close();
+    });
   });
 });

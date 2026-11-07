@@ -77,12 +77,22 @@ export function ProductDetailEditModal({
               <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
             </label>
             {form.is_public ? (
-              <ProductActiveHoursField
-                startHour={form.active_start_hour}
-                endHour={form.active_end_hour}
-                onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
-                onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
-              />
+              <>
+                <ProductActiveHoursField
+                  startHour={form.active_start_hour}
+                  endHour={form.active_end_hour}
+                  onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
+                  onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
+                />
+                <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.show_usd_chart}
+                    onChange={(e) => setForm((c) => ({ ...c, show_usd_chart: e.target.checked }))}
+                  />
+                  <span>نمایش نمودار دلاری برای این کالا</span>
+                </label>
+              </>
             ) : null}
           </>
         ) : null}

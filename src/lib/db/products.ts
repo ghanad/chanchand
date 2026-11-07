@@ -86,6 +86,7 @@ export function getManagedProducts(
                COALESCE(up.custom_title, mp.title) AS title,
                mp.user_id,
                mp.is_public,
+               mp.show_usd_chart,
                mp.active_start_hour,
                mp.active_end_hour,
                mp.created_at,
@@ -134,6 +135,7 @@ export function addManagedProduct(
     key?: string;
     user_id?: number | null;
     is_public?: boolean | number;
+    show_usd_chart?: boolean | number;
     active_start_hour?: number | null;
     active_end_hour?: number | null;
     adapter_settings?: Record<string, any> | string;
@@ -146,6 +148,7 @@ export function addManagedProduct(
   const sourceKey = options.source_key?.trim() || 'digikala_api';
   const userId = options.user_id ?? null;
   const isPublic = options.is_public ? 1 : 0;
+  const showUsdChart = options.show_usd_chart ? 1 : 0;
   const startHour =
     options.active_start_hour !== undefined && options.active_start_hour !== null
       ? Math.max(0, Math.min(23, Number(options.active_start_hour)))
@@ -217,7 +220,7 @@ export function addManagedProduct(
   }
 
   const insertProd = db.prepare(
-    'INSERT INTO managed_products (key, title, user_id, is_public, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO managed_products (key, title, user_id, is_public, show_usd_chart, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insertTgt = db.prepare(
     'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)'
@@ -227,7 +230,7 @@ export function addManagedProduct(
   );
 
   const txn = db.transaction(() => {
-    insertProd.run(productKey, cleanTitle, userId, isPublic, startHour, endHour, now, now);
+    insertProd.run(productKey, cleanTitle, userId, isPublic, showUsdChart, startHour, endHour, now, now);
     insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, now, now);
     if (userId != null) {
       insertUserProd.run(userId, productKey, cleanTitle, now);
@@ -246,6 +249,7 @@ export function updateManagedProduct(
     url: string;
     source_key?: string | null;
     is_public?: boolean | number;
+    show_usd_chart?: boolean | number;
     active_start_hour?: number | null;
     active_end_hour?: number | null;
   },
@@ -280,6 +284,13 @@ export function updateManagedProduct(
         : 0
       : prod.is_public ?? 0;
 
+  const nextShowUsdChart =
+    requestingUser?.role === 'admin' && options.show_usd_chart !== undefined
+      ? options.show_usd_chart
+        ? 1
+        : 0
+      : (prod.show_usd_chart ?? 0);
+
   const nextStartHour =
     requestingUser?.role === 'admin' && options.active_start_hour !== undefined && options.active_start_hour !== null
       ? Math.max(0, Math.min(23, Number(options.active_start_hour)))
@@ -308,13 +319,15 @@ export function updateManagedProduct(
       source_key: sourceKey,
       user_id: requestingUser.id,
       is_public: false,
+      show_usd_chart: false,
     });
   }
 
   const txn = db.transaction(() => {
-    db.prepare('UPDATE managed_products SET title = ?, is_public = ?, active_start_hour = ?, active_end_hour = ?, updated_at = ? WHERE key = ?').run(
+    db.prepare('UPDATE managed_products SET title = ?, is_public = ?, show_usd_chart = ?, active_start_hour = ?, active_end_hour = ?, updated_at = ? WHERE key = ?').run(
       cleanTitle,
       nextIsPublic,
+      nextShowUsdChart,
       nextStartHour,
       nextEndHour,
       now,

@@ -50,6 +50,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     url: "",
     source_key: "",
     is_public: false,
+    show_usd_chart: false,
     active_start_hour: 8,
     active_end_hour: 23,
   });
@@ -73,6 +74,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           url: matched.primary_target?.url || "",
           source_key: matched.primary_target?.source_key || "",
           is_public: Boolean(matched.is_public),
+          show_usd_chart: Boolean(matched.show_usd_chart),
           active_start_hour: matched.active_start_hour ?? 8,
           active_end_hour: matched.active_end_hour ?? 23,
         });
@@ -218,6 +220,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
             url: editForm.url.trim(),
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
+            show_usd_chart: isAdmin ? (editForm.is_public ? editForm.show_usd_chart : false) : undefined,
             active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
             active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),
@@ -279,7 +282,8 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
   }, [history]);
 
   const isPublicProduct = Boolean(product?.is_public);
-  const activeMetric: HistoryMetric = isPublicProduct ? "toman" : chartMetric;
+  const showUsd = !isPublicProduct || Boolean(product?.show_usd_chart);
+  const activeMetric: HistoryMetric = showUsd ? chartMetric : "toman";
 
   const metricConfig = useMemo(() => {
     return activeMetric === "usd"
@@ -358,6 +362,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
       <ProductDetailSummary
         latestSnapshot={latestSnapshot}
         isPublicProduct={isPublicProduct}
+        showUsd={showUsd}
         minToman={minToman}
         maxToman={maxToman}
         minUsd={minUsd}
@@ -368,6 +373,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
       <ProductDetailChart
         chartRows={chartRows}
         isPublicProduct={isPublicProduct}
+        showUsdToggle={showUsd}
         activeMetric={activeMetric}
         setChartMetric={setChartMetric}
         historyLimit={historyLimit}
