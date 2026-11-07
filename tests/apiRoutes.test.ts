@@ -9,6 +9,7 @@ import { GET as getHealth } from '../src/app/api/health/route';
 import { GET as getMe } from '../src/app/api/auth/me/route';
 import { POST as postLogin } from '../src/app/api/auth/login/route';
 import { GET as getProducts } from '../src/app/api/products/route';
+import { GET as getIranjibItems } from '../src/app/api/sources/iranjib/items/route';
 
 describe('Next.js API Route Handlers Integration', () => {
   let tempDbPath: string;
@@ -164,6 +165,30 @@ describe('Next.js API Route Handlers Integration', () => {
       expect(json.sources).toBeDefined();
       expect(Array.isArray(json.products)).toBe(true);
       expect(json.products.some((p: any) => p.title === 'گوشی آیفون ۱۵')).toBe(true);
+    });
+  });
+
+  describe('GET /api/sources/iranjib/items', () => {
+    it('returns 401 if unauthenticated', async () => {
+      const req = new NextRequest('https://example.com/api/sources/iranjib/items');
+      const res = await getIranjibItems(req);
+      expect(res.status).toBe(401);
+    });
+
+    it('returns car catalog and companies for authenticated user', async () => {
+      const token = await signAuthToken({ id: 1, username: 'testuser', role: 'admin' });
+      const req = new NextRequest('https://example.com/api/sources/iranjib/items', {
+        headers: { Cookie: `${AUTH_COOKIE_NAME}=${token}` },
+      });
+      const res = await getIranjibItems(req);
+      expect(res.status).toBe(200);
+
+      const json = await res.json();
+      expect(json.ok).toBe(true);
+      expect(Array.isArray(json.items)).toBe(true);
+      expect(json.items.length).toBeGreaterThan(0);
+      expect(Array.isArray(json.companies)).toBe(true);
+      expect(json.companies).toContain('ایران خودرو');
     });
   });
 });
