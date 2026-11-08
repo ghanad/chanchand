@@ -51,7 +51,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     source_key: "",
     is_public: false,
     show_usd_chart: false,
-    active_start_hour: 8,
+    active_start_hour: 0,
     active_end_hour: 23,
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -75,7 +75,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           source_key: matched.primary_target?.source_key || "",
           is_public: Boolean(matched.is_public),
           show_usd_chart: Boolean(matched.show_usd_chart),
-          active_start_hour: matched.active_start_hour ?? 8,
+          active_start_hour: matched.active_start_hour ?? 0,
           active_end_hour: matched.active_end_hour ?? 23,
         });
       } else {
@@ -179,16 +179,21 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
 
   // Run Now handler for this specific product
   const handleRunNow = async () => {
-    if (isRunningNow || !product) return;
+    if (isRunningNow || !product || (!isAdmin && product.can_refresh === false)) return;
     setIsRunningNow(true);
     try {
       const res = await requestJson<{
         run_id: number;
         success_count?: number;
         error_count?: number;
+        can_refresh?: boolean;
       }>(`/api/products/${encodeURIComponent(product.key)}/refresh`, {
         method: "POST",
       });
+
+      if (!isAdmin) {
+        setProduct((prev) => (prev ? { ...prev, can_refresh: false } : null));
+      }
 
       if (res.error_count && res.error_count > 0 && res.success_count === 0) {
         showToast("استعلام قیمت با خطا مواجه شد. لطفاً اتصال اینترنت یا آدرس هدف را بررسی کنید.");
@@ -200,6 +205,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
       triggerRefresh();
     } catch (error) {
       showToast(error instanceof Error ? error.message : "خطا در استعلام قیمت محصول");
+      await loadProductAndSources();
     } finally {
       setIsRunningNow(false);
     }

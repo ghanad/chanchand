@@ -1,9 +1,10 @@
 import React, { useMemo } from "react";
 import { CronRunDetail } from "@/types/dashboard";
-import { formatNumber, formatDate, statusText, formatDuration } from "@/lib/formatters";
+import { formatNumber, statusText, formatDuration } from "@/lib/formatters";
 import { Modal } from "@/components/common/Modal";
 import { StatusPill } from "@/components/common/StatusPill";
 import { EmptyState } from "@/components/common/EmptyState";
+import { DateTime } from "@/components/common/DateTime";
 import { SourceBadge } from "./SourceBadge";
 
 interface CronRunDetailModalProps {
@@ -73,7 +74,7 @@ export function CronRunDetailModal({
             </div>
             <div>
               <span style={{ fontSize: "11px", color: "var(--muted)", display: "block" }}>زمان شروع:</span>
-              <span style={{ fontSize: "12px" }}>{formatDate(runDetail.run.started_at)}</span>
+              <DateTime value={runDetail.run.started_at} showIcon className="text-xs" />
             </div>
             <div>
               <span style={{ fontSize: "11px", color: "var(--muted)", display: "block" }}>مدت زمان:</span>
@@ -227,7 +228,9 @@ export function CronRunDetailModal({
                               tone={snap.availability}
                             />
                           </td>
-                          <td style={{ fontSize: "11.5px", color: "var(--muted)" }}>{formatDate(snap.observed_at)}</td>
+                          <td style={{ fontSize: "11.5px", color: "var(--muted)" }}>
+                            <DateTime value={snap.observed_at} />
+                          </td>
                         </tr>
                       ))}
                     </tbody>

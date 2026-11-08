@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PriceRunner } from '@/lib/runner';
-import { getDatabase, getManagedTargets, startRun, isUserTrackingProduct, isProductEligibleForCollection } from '@/lib/db';
+import {
+  getDatabase,
+  getManagedTargets,
+  startRun,
+  isUserTrackingProduct,
+  isProductEligibleForCollection,
+  hasUserRefreshedProductToday,
+  recordProductRefresh,
+} from '@/lib/db';
 import { requireAuth } from '@/lib/api-guard';
 import { TargetConfig } from '@/lib/types';
 
@@ -49,6 +57,20 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       }
     }
 
+    // Rate limit for regular users: exactly once per day per product
+    if (auth.user.role !== 'admin') {
+      const alreadyRefreshedToday = hasUserRefreshedProductToday(db, auth.user.id, productKey);
+      if (alreadyRefreshedToday) {
+        return NextResponse.json(
+          {
+            error: 'امکان استعلام قیمت این کالا برای کاربران عادی فقط یک بار در روز مجاز است.',
+            code: 'DAILY_REFRESH_LIMIT_EXCEEDED',
+          },
+          { status: 429 }
+        );
+      }
+    }
+
     const managedTargets = getManagedTargets(db);
     const candidateTargets = managedTargets.filter((t) => t.product_key === productKey);
 
@@ -84,7 +106,13 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const runId = startRun(db, null, null, activeTargets, undefined, 'product_refresh', {
       product_key: productKey,
       initiated_by: auth.user.username,
+      user_id: auth.user.id,
     });
+
+    if (auth.user.role !== 'admin') {
+      recordProductRefresh(db, auth.user.id, productKey);
+    }
+
     const runner = new PriceRunner();
     const summary = await runner.executeRun(null, runId, activeTargets, { force: true });
 
@@ -95,6 +123,8 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       error_count: summary.error_count,
       status: summary.status,
       product_key: productKey,
+      can_refresh: auth.user.role === 'admin',
+      last_manual_refresh_at: new Date().toISOString(),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 500 });

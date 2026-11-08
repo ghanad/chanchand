@@ -1,9 +1,10 @@
 import React from "react";
 import { RunRow } from "@/types/dashboard";
-import { formatNumber, formatDate, statusText, formatDuration } from "@/lib/formatters";
+import { formatNumber, statusText, formatDuration } from "@/lib/formatters";
 import { StatusPill } from "@/components/common/StatusPill";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Pagination } from "@/components/common/Pagination";
+import { DateTime } from "@/components/common/DateTime";
 import { SourceBadge } from "./SourceBadge";
 
 interface CronRunsTableProps {
@@ -116,7 +117,9 @@ export function CronRunsTable({
                   </td>
 
                   {/* ۵. زمان شروع */}
-                  <td style={{ fontSize: "12.5px", color: "var(--muted)" }}>{formatDate(row.started_at)}</td>
+                  <td style={{ fontSize: "12.5px", color: "var(--muted)" }}>
+                    <DateTime value={row.started_at} />
+                  </td>
 
                   {/* ۶. مدت زمان */}
                   <td>

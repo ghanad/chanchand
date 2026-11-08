@@ -148,7 +148,9 @@
 .product-date-text {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }
 
 .date-clock-icon {

@@ -45,6 +45,7 @@ export interface ManagedProductRow {
   active_end_hour?: number | null;
   owner_username?: string | null;
   is_tracked_by_user?: boolean;
+  last_manual_refresh_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +55,7 @@ export interface UserProductRow {
   user_id: number;
   product_key: string;
   custom_title: string | null;
+  last_manual_refresh_at?: string | null;
   created_at: string;
 }
 

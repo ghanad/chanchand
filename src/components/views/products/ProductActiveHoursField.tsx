@@ -31,6 +31,8 @@ export function ProductActiveHoursField({
   onChangeStart,
   onChangeEnd,
 }: ProductActiveHoursFieldProps) {
+  const is24Hours = startHour === 0 && endHour === 23;
+
   return (
     <div
       style={{
@@ -45,8 +47,29 @@ export function ProductActiveHoursField({
         gap: "8px",
       }}
     >
-      <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
-        بازه زمانی جمع‌آوری قیمت (ساعات شبانه‌روز)
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
+          بازه زمانی جمع‌آوری قیمت (ساعات شبانه‌روز)
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            onChangeStart(0);
+            onChangeEnd(23);
+          }}
+          style={{
+            fontSize: "11px",
+            padding: "2px 8px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            border: is24Hours ? "1px solid #0f766e" : "1px solid var(--border-color, #ccc)",
+            background: is24Hours ? "rgba(15, 118, 110, 0.12)" : "transparent",
+            color: is24Hours ? "#0f766e" : "var(--text-muted, #666)",
+            fontWeight: is24Hours ? 600 : 400,
+          }}
+        >
+          {is24Hours ? "✓ ۲۴ ساعته (فعال)" : "تنظیم روی ۲۴ ساعته"}
+        </button>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
         <label style={{ fontSize: "12px", margin: 0 }}>
@@ -79,7 +102,9 @@ export function ProductActiveHoursField({
         </label>
       </div>
       <div style={{ fontSize: "11px", color: "var(--text-muted, #71717a)", lineHeight: 1.4 }}>
-        قیمت این کالا فقط در این بازه ساعتی استخراج خواهد شد. پیش‌فرض: ۰۸:۰۰ صبح تا ۲۳:۰۰ شب.
+        {is24Hours
+          ? "این کالا به صورت ۲۴ ساعته در تمام ساعات شبانه‌روز (۰۰:۰۰ تا ۲۳:۰۰) جمع‌آوری خواهد شد."
+          : `قیمت این کالا در بازه ${String(startHour).padStart(2, "0")}:00 تا ${String(endHour).padStart(2, "0")}:00 استخراج خواهد شد.`}
       </div>
     </div>
   );

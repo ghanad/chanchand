@@ -32,7 +32,7 @@ export function useProductsState() {
     source_key: "",
     is_public: false,
     show_usd_chart: false,
-    active_start_hour: 8,
+    active_start_hour: 0,
     active_end_hour: 23,
   });
   const [editProductKey, setEditProductKey] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function useProductsState() {
     source_key: "",
     is_public: false,
     show_usd_chart: false,
-    active_start_hour: 8,
+    active_start_hour: 0,
     active_end_hour: 23,
   });
 
@@ -275,7 +275,7 @@ export function useProductsState() {
         source_key: current.source_key,
         is_public: false,
         show_usd_chart: false,
-        active_start_hour: 8,
+        active_start_hour: 0,
         active_end_hour: 23,
         adapter_settings: undefined,
       }));
@@ -303,7 +303,7 @@ export function useProductsState() {
       source_key: product.primary_target.source_key,
       is_public: Boolean(product.is_public),
       show_usd_chart: Boolean(product.show_usd_chart),
-      active_start_hour: product.active_start_hour ?? 8,
+      active_start_hour: product.active_start_hour ?? 0,
       active_end_hour: product.active_end_hour ?? 23,
     });
   }
@@ -316,7 +316,7 @@ export function useProductsState() {
       source_key: "",
       is_public: false,
       show_usd_chart: false,
-      active_start_hour: 8,
+      active_start_hour: 0,
       active_end_hour: 23,
     });
   }
@@ -443,7 +443,7 @@ export function useProductsState() {
   }
 
   const handleRefreshProduct = async (product: ProductRow) => {
-    if (busyAction !== null) return;
+    if (busyAction !== null || product.can_refresh === false) return;
     setBusyAction(`refresh:${product.key}`);
     try {
       const res = await requestJson<{

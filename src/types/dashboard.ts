@@ -28,6 +28,8 @@ export interface ProductRow {
   active_start_hour?: number;
   active_end_hour?: number;
   can_edit?: boolean;
+  can_refresh?: boolean;
+  last_manual_refresh_at?: string | null;
   configured: boolean;
   target_count: number;
   enabled_target_count: number;

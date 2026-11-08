@@ -1,4 +1,5 @@
 import { AppConfig, FetchErrorRow, PriceSnapshotRow, RunRow } from './types';
+import { getDayBounds } from './db/scheduler';
 
 export const USD_PRODUCT_KEY = 'usd';
 export const USD_HISTORY_LIMIT = 10000;
@@ -88,6 +89,7 @@ export function productsPayload(
     active_start_hour?: number | null;
     active_end_hour?: number | null;
     is_tracked_by_user?: boolean;
+    last_manual_refresh_at?: string | null;
   }> = [],
   managedTargets?: Array<{
     product_key: string;
@@ -106,6 +108,16 @@ export function productsPayload(
     const isAdmin = currentUser?.role === 'admin';
     const canEdit = isAdmin || ((isOwner || isTracked) && !isPublic);
 
+    let canRefresh = true;
+    if (!isAdmin && currentUser) {
+      if (dbProduct.last_manual_refresh_at) {
+        const { startOfDay, endOfDay } = getDayBounds();
+        if (dbProduct.last_manual_refresh_at >= startOfDay && dbProduct.last_manual_refresh_at <= endOfDay) {
+          canRefresh = false;
+        }
+      }
+    }
+
     products[dbProduct.key] = {
       key: dbProduct.key,
       title: dbProduct.title,
@@ -113,9 +125,11 @@ export function productsPayload(
       owner_username: dbProduct.owner_username ?? null,
       is_public: isPublic,
       show_usd_chart: Boolean(dbProduct.show_usd_chart),
-      active_start_hour: dbProduct.active_start_hour ?? 8,
+      active_start_hour: dbProduct.active_start_hour ?? 0,
       active_end_hour: dbProduct.active_end_hour ?? 23,
       can_edit: canEdit,
+      can_refresh: canRefresh,
+      last_manual_refresh_at: dbProduct.last_manual_refresh_at ?? null,
       configured: true,
       target_count: 0,
       enabled_target_count: 0,
@@ -133,9 +147,10 @@ export function productsPayload(
         owner_username: null,
         is_public: true,
         show_usd_chart: false,
-        active_start_hour: 8,
+        active_start_hour: 0,
         active_end_hour: 23,
         can_edit: currentUser?.role === 'admin',
+        can_refresh: currentUser?.role === 'admin',
         configured: true,
         target_count: 0,
         enabled_target_count: 0,

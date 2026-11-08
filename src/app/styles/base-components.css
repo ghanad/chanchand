@@ -497,6 +497,53 @@ tbody tr:last-child td {
   opacity: 1;
 }
 
+/* ==========================================================================
+   DateTime & BiDi Text Formatting
+   ========================================================================== */
+.datetime-badge,
+.datetime-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  direction: rtl;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+.datetime-date {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.2px;
+}
+
+.datetime-sep {
+  color: var(--muted);
+  opacity: 0.7;
+  user-select: none;
+  font-weight: 400;
+  padding: 0 1px;
+}
+
+.datetime-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.2px;
+}
+
+.datetime-clock-icon {
+  flex-shrink: 0;
+  opacity: 0.65;
+  color: var(--muted);
+}
+
+.datetime-empty {
+  color: var(--muted);
+}
+
 @media (max-width: 1100px) {
   .metric-grid,
   .product-summary-grid,

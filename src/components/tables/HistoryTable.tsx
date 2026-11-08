@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { PriceRow } from "../../types/dashboard";
-import { formatNumber, formatDate, availabilityText, productLinkUrl } from "../../lib/formatters";
+import { formatNumber, availabilityText, productLinkUrl } from "../../lib/formatters";
 import { DataTable } from "../common/DataTable";
 import { StatusPill } from "../common/StatusPill";
 import { Pagination } from "../common/Pagination";
+import { DateTime } from "../common/DateTime";
 
 interface HistoryTableProps {
   rows: PriceRow[];
@@ -48,7 +49,9 @@ export function HistoryTable({ rows, initialPageSize = 10 }: HistoryTableProps) 
 
           return (
             <tr key={row.id}>
-              <td>{formatDate(row.observed_at)}</td>
+              <td>
+                <DateTime value={row.observed_at} />
+              </td>
               <td>{row.source_key}</td>
               <td>
                 {url ? (

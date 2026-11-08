@@ -2,6 +2,19 @@ import { Availability, RunStatus, PriceRow } from "../types/dashboard";
 
 export const numberFormatter = new Intl.NumberFormat("fa-IR");
 
+export const dateOnlyFormatter = new Intl.DateTimeFormat("fa-IR", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+export const timeOnlyFormatter = new Intl.DateTimeFormat("fa-IR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+  hour12: false,
+});
+
 export const dateFormatter = new Intl.DateTimeFormat("fa-IR", {
   year: "numeric",
   month: "2-digit",
@@ -12,14 +25,45 @@ export const dateFormatter = new Intl.DateTimeFormat("fa-IR", {
   hour12: false,
 });
 
+export const PERSIAN_COMMA = "،";
+
+export interface DateTimeParts {
+  date: string;
+  time: string;
+}
+
+export function splitDateTime(value: string | null | undefined): DateTimeParts | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return {
+    date: dateOnlyFormatter.format(date),
+    time: timeOnlyFormatter.format(date),
+  };
+}
+
 export function formatNumber(value: number | null | undefined): string {
   return value === null || value === undefined ? "-" : numberFormatter.format(value);
 }
 
-export function formatDate(value: string | null | undefined): string {
+export function formatDate(value: string | null | undefined, separator: string = PERSIAN_COMMA): string {
+  if (!value) return "-";
+  const parts = splitDateTime(value);
+  if (!parts) return value;
+  return `${parts.date}${separator} ${parts.time}`;
+}
+
+export function formatDateOnly(value: string | null | undefined): string {
   if (!value) return "-";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+  return Number.isNaN(date.getTime()) ? value : dateOnlyFormatter.format(date);
+}
+
+export function formatTimeOnly(value: string | null | undefined): string {
+  if (!value) return "-";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : timeOnlyFormatter.format(date);
 }
 
 export function productLinkUrl(row: Pick<PriceRow, "url">): string | null {

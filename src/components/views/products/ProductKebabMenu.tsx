@@ -103,10 +103,12 @@ export function ProductKebabMenu({
               onCloseKebab();
               onRefresh();
             }}
-            disabled={busyAction !== null || product.enabled_target_count === 0}
+            disabled={busyAction !== null || product.enabled_target_count === 0 || product.can_refresh === false}
             title={
               product.enabled_target_count === 0
                 ? "محصول هدف فعالی ندارد"
+                : product.can_refresh === false
+                ? "امکان استعلام برای کاربران عادی فقط یک بار در روز است (استعلام امروز انجام شده)"
                 : "استعلام آنلاین و فوری قیمت این کالا"
             }
           >
@@ -124,7 +126,7 @@ export function ProductKebabMenu({
               <polyline points="23 4 23 10 17 10" />
               <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
-            <span>استعلام فوری قیمت</span>
+            <span>{product.can_refresh === false ? "استعلام امروز انجام شده" : "استعلام فوری قیمت"}</span>
           </button>
 
           {product.primary_target?.url && (

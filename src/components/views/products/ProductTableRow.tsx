@@ -1,7 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatNumber, formatDate } from "../../../lib/formatters";
+import { formatNumber } from "../../../lib/formatters";
+import { DateTime } from "@/components/common/DateTime";
 import { ProductTableRowProps } from "./types";
 import { ProductStatusSwitch } from "./ProductStatusSwitch";
 import { ProductKebabMenu } from "./ProductKebabMenu";
@@ -58,31 +59,43 @@ export function ProductTableRow({
                 {product.title}
               </strong>
             </Link>
-            {showPublicIndicator && product.is_public ? (
-              <span
-                className="public-market-indicator"
-                title={`کالای بازار عمومی (ساعت جمع‌آوری: ${String(product.active_start_hour ?? 8).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00)`}
-                aria-label="کالای بازار عمومی"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <svg
-                  width="13"
-                  height="13"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+            {showPublicIndicator && product.is_public ? (() => {
+              const is24Hours =
+                product.key === "usd" ||
+                ((product.active_start_hour === 0 || product.active_start_hour === undefined || product.active_start_hour === null) &&
+                  (product.active_end_hour === 23 || product.active_end_hour === undefined || product.active_end_hour === null)) ||
+                (product.active_start_hour === 0 && product.active_end_hour === 23);
+
+              return (
+                <span
+                  className="public-market-indicator"
+                  title={
+                    is24Hours
+                      ? "کالای بازار عمومی (جمع‌آوری ۲۴ ساعته شبانه‌روزی)"
+                      : `کالای بازار عمومی (ساعت جمع‌آوری: ${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00)`
+                  }
+                  aria-label="کالای بازار عمومی"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="2" y1="12" x2="22" y2="12" />
-                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                </svg>
-                <span className="public-indicator-text">عمومی</span>
-              </span>
-            ) : null}
+                  <svg
+                    width="13"
+                    height="13"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="2" y1="12" x2="22" y2="12" />
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                  </svg>
+                  <span className="public-indicator-text">عمومی {is24Hours ? "(۲۴ ساعته)" : ""}</span>
+                </span>
+              );
+            })() : null}
           </div>
           <span className="product-row-slug" title={product.key} dir="ltr">
             {product.key}
@@ -248,28 +261,12 @@ export function ProductTableRow({
       {/* 6. Last Check Observation Time */}
       <td className="col-date">
         <div className="product-info-text">
-          {product.latestSnapshot?.observed_at ? (
-            <span className="muted-text product-date-text" title={product.latestSnapshot.observed_at}>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-                className="date-clock-icon"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <polyline points="12 6 12 12 16 14" />
-              </svg>
-              <span>{formatDate(product.latestSnapshot.observed_at)}</span>
-            </span>
-          ) : (
-            <span className="muted-text product-date-empty">-</span>
-          )}
+          <DateTime
+            value={product.latestSnapshot?.observed_at}
+            showIcon
+            className="product-date-text muted-text"
+            emptyText="-"
+          />
         </div>
       </td>
 

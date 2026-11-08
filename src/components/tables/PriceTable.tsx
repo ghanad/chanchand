@@ -1,8 +1,9 @@
 import React from "react";
 import { PriceRow } from "../../types/dashboard";
-import { formatNumber, formatDate, availabilityText } from "../../lib/formatters";
+import { formatNumber, availabilityText } from "../../lib/formatters";
 import { DataTable } from "../common/DataTable";
 import { StatusPill } from "../common/StatusPill";
+import { DateTime } from "../common/DateTime";
 
 interface PriceTableProps {
   rows: PriceRow[];
@@ -32,7 +33,9 @@ export function PriceTable({ rows, compact = false }: PriceTableProps) {
               <StatusPill text={availabilityText(row.availability)} tone={row.availability} />
             </td>
             <td>{row.seller || "-"}</td>
-            <td>{formatDate(row.observed_at)}</td>
+            <td>
+              <DateTime value={row.observed_at} />
+            </td>
           </tr>
         ))}
       </tbody>

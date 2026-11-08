@@ -143,11 +143,20 @@ export function initDatabase(db: Database.Database): void {
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       product_key VARCHAR(128) NOT NULL REFERENCES managed_products(key) ON DELETE CASCADE,
       custom_title TEXT,
+      last_manual_refresh_at DATETIME DEFAULT NULL,
       created_at DATETIME NOT NULL,
       UNIQUE(user_id, product_key)
     );
     CREATE INDEX IF NOT EXISTS ix_user_products_user_id ON user_products(user_id);
     CREATE INDEX IF NOT EXISTS ix_user_products_product_key ON user_products(product_key);
+
+    CREATE TABLE IF NOT EXISTS product_refresh_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_key VARCHAR(128) NOT NULL,
+      refreshed_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS ix_product_refresh_logs_user_product ON product_refresh_logs(user_id, product_key, refreshed_at);
 
     CREATE TABLE IF NOT EXISTS wallet_transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -322,6 +331,14 @@ export function initDatabase(db: Database.Database): void {
         db.prepare('ALTER TABLE managed_products ADD COLUMN active_end_hour INTEGER NOT NULL DEFAULT 23').run();
       }
 
+      // Ensure market products (usd, gold, coin) and default public market products have 24-hour collection (00:00 - 23:00)
+      db.prepare(`
+        UPDATE managed_products
+        SET active_start_hour = 0, active_end_hour = 23
+        WHERE key IN ('usd', 'gold', 'coin', 'sekkeh', 'tala', 'gold-18k', 'gold-24k', 'coin-quarter', 'coin-half', 'coin-emami')
+           OR (is_public = 1 AND active_start_hour = 8 AND active_end_hour = 23)
+      `).run();
+
       // Backfill user_id for existing products to first admin if available
       const adminUser = db
         .prepare("SELECT id FROM users WHERE role = 'admin' ORDER BY id ASC LIMIT 1")
@@ -352,6 +369,15 @@ export function initDatabase(db: Database.Database): void {
     }
   } catch (err) {
     console.warn('[DB] managed_products migration warning:', err);
+  }
+
+  try {
+    const userProdCols = db.prepare('PRAGMA table_info(user_products)').all() as { name: string }[];
+    if (userProdCols.length > 0 && !userProdCols.some((col) => col.name === 'last_manual_refresh_at')) {
+      db.prepare('ALTER TABLE user_products ADD COLUMN last_manual_refresh_at DATETIME DEFAULT NULL').run();
+    }
+  } catch (err) {
+    console.warn('[DB] user_products column migration warning:', err);
   }
 
   try {

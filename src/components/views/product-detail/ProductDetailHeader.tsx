@@ -60,15 +60,27 @@ export function ProductDetailHeader({
               <span className="product-slug-pill" title="شناسه یکتای محصول">
                 {product.key}
               </span>
-              {product.is_public ? (
-                <span
-                  className="adapter-badge brsapi_market"
-                  style={{ fontSize: "0.75rem", padding: "2px 8px" }}
-                  title={`ساعات جمع‌آوری: ${String(product.active_start_hour ?? 8).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`}
-                >
-                  عمومی ({String(product.active_start_hour ?? 8).padStart(2, "0")}:00 - {String(product.active_end_hour ?? 23).padStart(2, "0")}:00)
-                </span>
-              ) : null}
+              {product.is_public ? (() => {
+                const is24Hours =
+                  product.key === "usd" ||
+                  ((product.active_start_hour === 0 || product.active_start_hour === undefined || product.active_start_hour === null) &&
+                    (product.active_end_hour === 23 || product.active_end_hour === undefined || product.active_end_hour === null)) ||
+                  (product.active_start_hour === 0 && product.active_end_hour === 23);
+
+                return (
+                  <span
+                    className="adapter-badge brsapi_market"
+                    style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                    title={
+                      is24Hours
+                        ? "ساعات جمع‌آوری: ۲۴ ساعته (شبانه‌روزی)"
+                        : `ساعات جمع‌آوری: ${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`
+                    }
+                  >
+                    عمومی ({is24Hours ? "۲۴ ساعته" : `${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 - ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`})
+                  </span>
+                );
+              })() : null}
               {isAdmin && product.owner_username ? (
                 <span className="adapter-badge generic_html" style={{ fontSize: "0.75rem", padding: "2px 8px" }}>
                   کاربر: {product.owner_username}
@@ -156,14 +168,24 @@ export function ProductDetailHeader({
                 type="button"
                 className="secondary-button"
                 onClick={onRunNow}
-                disabled={isRunningNow || !isActive}
-                title={isActive ? "استعلام فوری و بروزرسانی قیمت همین محصول" : "محصول غیرفعال است"}
+                disabled={isRunningNow || !isActive || (!isAdmin && product.can_refresh === false)}
+                title={
+                  !isActive
+                    ? "محصول غیرفعال است"
+                    : !isAdmin && product.can_refresh === false
+                    ? "امکان استعلام برای کاربران عادی فقط یک بار در روز است (استعلام امروز انجام شده)"
+                    : "استعلام فوری و بروزرسانی قیمت همین محصول"
+                }
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: 6 }}>
                   <polyline points="23 4 23 10 17 10" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                 </svg>
-                {isRunningNow ? "در حال دریافت قیمت..." : "استعلام قیمت این کالا"}
+                {isRunningNow
+                  ? "در حال دریافت قیمت..."
+                  : !isAdmin && product.can_refresh === false
+                  ? "استعلام امروز انجام شده"
+                  : "استعلام قیمت این کالا"}
               </button>
             )}
 
