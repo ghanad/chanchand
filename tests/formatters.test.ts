@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest';
 import {
   formatNumber,
   formatDate,
+  formatDateOnly,
+  formatTimeOnly,
+  splitDateTime,
+  PERSIAN_COMMA,
   productLinkUrl,
   priceAxisDomain,
   availabilityText,
@@ -34,6 +38,9 @@ describe('formatters module', () => {
       const result = formatDate('2026-10-23T12:00:00.000Z');
       expect(result).not.toBe('-');
       expect(result.length).toBeGreaterThan(3);
+      // Uses Persian comma and never ASCII comma
+      expect(result).toContain(PERSIAN_COMMA);
+      expect(result).not.toContain(',');
     });
 
     it('formats time in 24-hour format without ambiguous 12-hour values', () => {
@@ -47,8 +54,33 @@ describe('formatters module', () => {
       expect(formatted).not.toContain('بعدازظهر');
     });
 
+    it('supports custom separator like dash', () => {
+      const result = formatDate('2026-10-23T12:00:00.000Z', ' -');
+      expect(result).toContain(' - ');
+      expect(result).not.toContain(PERSIAN_COMMA);
+    });
+
     it('returns raw string if not parsable as valid date', () => {
       expect(formatDate('not-a-valid-date')).toBe('not-a-valid-date');
+    });
+
+    it('splitDateTime splits valid date into date and time parts correctly', () => {
+      const parts = splitDateTime('2026-10-23T12:00:00.000Z');
+      expect(parts).not.toBeNull();
+      expect(parts?.date).toMatch(/^[۰-۹]{4}\/[۰-۹]{2}\/[۰-۹]{2}$/);
+      expect(parts?.time).toMatch(/^[۰-۹]{2}:[۰-۹]{2}$/);
+      expect(splitDateTime(null)).toBeNull();
+      expect(splitDateTime('invalid')).toBeNull();
+    });
+
+    it('formatDateOnly and formatTimeOnly return isolated strings', () => {
+      const dateOnly = formatDateOnly('2026-10-23T12:00:00.000Z');
+      expect(dateOnly).toMatch(/^[۰-۹]{4}\/[۰-۹]{2}\/[۰-۹]{2}$/);
+      expect(formatDateOnly(null)).toBe('-');
+
+      const timeOnly = formatTimeOnly('2026-10-23T12:00:00.000Z');
+      expect(timeOnly).toMatch(/^[۰-۹]{2}:[۰-۹]{2}$/);
+      expect(formatTimeOnly(null)).toBe('-');
     });
   });
 

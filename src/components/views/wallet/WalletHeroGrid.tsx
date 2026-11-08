@@ -1,5 +1,5 @@
 import React from "react";
-import { formatNumber } from "@/lib/formatters";
+import { formatNumber, formatDateOnly } from "@/lib/formatters";
 import { WalletData } from "./types";
 
 interface WalletHeroGridProps {
@@ -185,7 +185,7 @@ export function WalletHeroGrid({
             سهمیه پایه (۳ محصول) دائمی و رایگان است. اسلات‌های اضافه به صورت اشتراک ماهانه (۳۰ روزه) فعال می‌شوند.
             {quota.slotExpiresAt && !quota.isExpired && (
               <strong style={{ marginInlineStart: "6px", color: "var(--ok)" }}>
-                (اعتبار فعال تا: {new Date(quota.slotExpiresAt).toLocaleDateString("fa-IR")} — {quota.daysRemaining} روز مانده)
+                (اعتبار فعال تا: {formatDateOnly(quota.slotExpiresAt)} — {quota.daysRemaining} روز مانده)
               </strong>
             )}
             {quota.isExpired && (

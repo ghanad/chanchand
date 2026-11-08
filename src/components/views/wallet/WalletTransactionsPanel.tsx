@@ -1,7 +1,8 @@
 import React from "react";
 import { PaymentTransactionRow, UserSubscriptionRow, WalletTransactionRow } from "@/lib/types";
-import { formatNumber, formatDate } from "@/lib/formatters";
+import { formatNumber } from "@/lib/formatters";
 import { EmptyState } from "@/components/common/EmptyState";
+import { DateTime } from "@/components/common/DateTime";
 
 interface WalletTransactionsPanelProps {
   walletTransactions: WalletTransactionRow[];
@@ -123,7 +124,7 @@ export function WalletTransactionsPanel({
                         {tx.description || "-"}
                       </td>
                       <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        {formatDate(tx.created_at)}
+                        <DateTime value={tx.created_at} />
                       </td>
                     </tr>
                   );
@@ -219,7 +220,7 @@ export function WalletTransactionsPanel({
                       )}
                     </td>
                     <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                      {formatDate(tx.paid_at || tx.created_at)}
+                      <DateTime value={tx.paid_at || tx.created_at} />
                     </td>
                   </tr>
                 ))}
@@ -270,10 +271,10 @@ export function WalletTransactionsPanel({
                       </td>
                       <td>{formatNumber(sub.duration_days)} روز</td>
                       <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        {formatDate(sub.starts_at)}
+                        <DateTime value={sub.starts_at} />
                       </td>
                       <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        {formatDate(sub.expires_at)}
+                        <DateTime value={sub.expires_at} />
                       </td>
                       <td>
                         <span
