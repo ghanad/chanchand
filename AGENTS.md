@@ -21,7 +21,7 @@ Core flow:
 5. `src/lib/runner.ts` loops through active targets (from SQLite `managed_targets`), enforces per-source rate limits, calls adapters, and records results.
 6. `src/lib/adapters/*` fetch and parse source-specific price data into `PriceObservation`.
 7. `src/lib/payment/*` provides pluggable payment gateways (`PaymentGateway` interface with Zarinpal REST v4 & Mock adapters).
-8. `src/lib/db/*` executes SQLite queries and writes with `better-sqlite3` (modular submodules under `src/lib/db/` for `connection`, `schema`, `migrations`, `seeds`, `sources`, `targets`, `products`, `productRefreshes`, `users`, `runs`, `scheduler`, `payments`, re-exported via `index.ts`).
+8. `src/lib/db/*` executes SQLite queries and writes with `better-sqlite3` (modular submodules under `src/lib/db/` for `connection`, `schema`, `migrations`, `seeds`, `sources`, `targets`, `products`, `productRefreshes`, `users`, `runs`, `snapshots`, `errors`, `scheduler`, `payments`, re-exported via `index.ts`).
 9. `src/app/api/*` and `src/app/admin/*` serve JSON endpoints for Next.js App Router.
 10. `src/app/*` renders the modular App Router dashboard pages using `src/components/views/*` and Recharts.
 

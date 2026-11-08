@@ -8,5 +8,7 @@ export * from './users';
 export * from './products';
 export * from './productRefreshes';
 export * from './runs';
+export * from './snapshots';
+export * from './errors';
 export * from './scheduler';
 export * from './payments';
