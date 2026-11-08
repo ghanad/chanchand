@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeDigits, parsePriceToIrr, detectAvailability } from '../src/lib/pricing';
-import { usdRateFor } from '../src/lib/serializers';
+import { usdRateFor, serializePrice } from '../src/lib/serializers';
 
 describe('pricing module', () => {
   it('normalizes Persian and Arabic digits', () => {
@@ -80,6 +80,65 @@ describe('usdRateFor and serializeHistoryPrices', () => {
     // Tolerance is 24 hours (86,400,000 ms), but rate is 90 days away
     const chosenRate = usdRateFor(productSnapshot, [usdThreeMonthsAgo], 24 * 60 * 60 * 1000);
     expect(chosenRate).toBeNull();
+  });
+});
+
+describe('serializePrice with previous price diffs', () => {
+  const baseSnapshot = {
+    id: 1,
+    run_id: 1,
+    product_key: 'item-1',
+    source_key: 'source-1',
+    url: 'http://example.com',
+    title: 'Item 1',
+    seller: null,
+    availability: 'in_stock',
+    observed_at: '2026-11-08T12:00:00Z',
+    raw_observation: '{}',
+  };
+
+  it('calculates positive price change and percentage', () => {
+    // Current price: 110,000 Toman (1,100,000 IRR), Previous: 100,000 Toman (1,000,000 IRR) -> +10%
+    const res = serializePrice({
+      ...baseSnapshot,
+      price_irr: 1100000,
+      previous_price_irr: 1000000,
+    });
+    expect(res.price_toman).toBe(110000);
+    expect(res.previous_price_toman).toBe(100000);
+    expect(res.diff_toman).toBe(10000);
+    expect(res.diff_percent).toBe(10);
+  });
+
+  it('calculates negative price change and percentage', () => {
+    // Current: 95,000 Toman, Previous: 100,000 Toman -> -5%
+    const res = serializePrice({
+      ...baseSnapshot,
+      price_irr: 950000,
+      previous_price_irr: 1000000,
+    });
+    expect(res.diff_toman).toBe(-5000);
+    expect(res.diff_percent).toBe(-5);
+  });
+
+  it('calculates neutral price change (0%) when price is identical', () => {
+    const res = serializePrice({
+      ...baseSnapshot,
+      price_irr: 1000000,
+      previous_price_irr: 1000000,
+    });
+    expect(res.diff_toman).toBe(0);
+    expect(res.diff_percent).toBe(0);
+  });
+
+  it('returns null diffs when there is no previous price', () => {
+    const res = serializePrice({
+      ...baseSnapshot,
+      price_irr: 1000000,
+    });
+    expect(res.previous_price_toman).toBeNull();
+    expect(res.diff_toman).toBeNull();
+    expect(res.diff_percent).toBeNull();
   });
 });
 

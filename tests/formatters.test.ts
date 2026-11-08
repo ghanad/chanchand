@@ -10,6 +10,7 @@ import {
   priceAxisDomain,
   availabilityText,
   statusText,
+  formatPercentChange,
 } from '../src/lib/formatters';
 
 describe('formatters module', () => {
@@ -141,6 +142,24 @@ describe('formatters module', () => {
       expect(statusText('partial')).toBe('نیمه‌کامل');
       expect(statusText('running')).toBe('در حال اجرا');
       expect(statusText(null)).toBe('-');
+    });
+  });
+
+  describe('formatPercentChange', () => {
+    it('returns "-" for null or undefined', () => {
+      expect(formatPercentChange(null)).toBe('-');
+      expect(formatPercentChange(undefined)).toBe('-');
+    });
+
+    it('formats 0% properly', () => {
+      expect(formatPercentChange(0)).toBe('۰٪');
+    });
+
+    it('formats positive and negative percentages using absolute Persian number', () => {
+      expect(formatPercentChange(5)).toBe('۵٪');
+      expect(formatPercentChange(-5)).toBe('۵٪');
+      expect(formatPercentChange(2.5)).toMatch(/[۰-۹]/);
+      expect(formatPercentChange(2.5)).toContain('٪');
     });
   });
 });

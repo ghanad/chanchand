@@ -73,6 +73,23 @@ describe('db module', () => {
     expect(snapshots.length).toBe(1);
     expect(snapshots[0].product_key).toBe('item_1');
     expect(snapshots[0].price_irr).toBe(500000);
+    expect(snapshots[0].previous_price_irr).toBeUndefined();
+
+    // Record a second run with a new price
+    const runId2 = startRun(db, null, config);
+    recordPrice(db, runId2, config.targets![0], {
+      title: 'Item One',
+      seller: 'Test Seller',
+      price_irr: 600000,
+      availability: 'in_stock',
+    });
+    finishRun(db, runId2, 1, 0, 1);
+
+    const snapshots2 = latestSnapshots(db);
+    expect(snapshots2.length).toBe(1);
+    expect(snapshots2[0].product_key).toBe('item_1');
+    expect(snapshots2[0].price_irr).toBe(600000);
+    expect(snapshots2[0].previous_price_irr).toBe(500000);
 
     db.close();
   });
