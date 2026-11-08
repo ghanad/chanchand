@@ -485,8 +485,15 @@
 
   .col-price .price-cell-stacked {
     display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+  }
+
+  .col-price .price-value-line {
+    display: inline-flex !important;
     align-items: baseline !important;
-    gap: 4px !important;
+    gap: 3px !important;
   }
 
   .col-price .product-price-value {

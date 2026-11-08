@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatNumber } from "../../../lib/formatters";
+import { formatNumber, formatPercentChange } from "../../../lib/formatters";
 import { DateTime } from "@/components/common/DateTime";
 import { ProductTableRowProps } from "./types";
 import { ProductStatusSwitch } from "./ProductStatusSwitch";
@@ -233,10 +233,84 @@ export function ProductTableRow({
           {product.latestSnapshot?.price_toman !== undefined &&
           product.latestSnapshot.price_toman !== null ? (
             <div className="price-cell-stacked">
-              <span className="product-price-value">
-                {formatNumber(product.latestSnapshot.price_toman)}
-              </span>
-              <span className="product-price-unit">تومان</span>
+              <div className="price-value-line">
+                <span className="product-price-value">
+                  {formatNumber(product.latestSnapshot.price_toman)}
+                </span>
+                <span className="product-price-unit">تومان</span>
+              </div>
+              {product.latestSnapshot.diff_percent !== undefined &&
+              product.latestSnapshot.diff_percent !== null ? (
+                <span
+                  className={`price-change-pill ${
+                    (product.latestSnapshot.diff_toman ?? 0) > 0
+                      ? "is-up"
+                      : (product.latestSnapshot.diff_toman ?? 0) < 0
+                      ? "is-down"
+                      : "is-neutral"
+                  }`}
+                  title={
+                    (product.latestSnapshot.diff_toman ?? 0) === 0
+                      ? `بدون تغییر نسبت به قیمت قبلی (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان)`
+                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} نسبت به قیمت قبلی (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان): ${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "+" : ""}${formatNumber(product.latestSnapshot.diff_toman)} تومان`
+                  }
+                  aria-label={
+                    (product.latestSnapshot.diff_toman ?? 0) === 0
+                      ? "بدون تغییر"
+                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} ${formatPercentChange(product.latestSnapshot.diff_percent)}`
+                  }
+                >
+                  {(product.latestSnapshot.diff_toman ?? 0) > 0 ? (
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="price-change-arrow"
+                    >
+                      <polyline points="18 15 12 9 6 15" />
+                    </svg>
+                  ) : (product.latestSnapshot.diff_toman ?? 0) < 0 ? (
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="price-change-arrow"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                      className="price-change-arrow"
+                    >
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                    </svg>
+                  )}
+                  <span className="price-change-text" dir="ltr">
+                    {formatPercentChange(product.latestSnapshot.diff_percent)}
+                  </span>
+                </span>
+              ) : null}
             </div>
           ) : (
             <span className="price-empty-state" title="هنوز قیمتی ثبت نشده است">

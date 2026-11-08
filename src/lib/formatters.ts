@@ -47,6 +47,18 @@ export function formatNumber(value: number | null | undefined): string {
   return value === null || value === undefined ? "-" : numberFormatter.format(value);
 }
 
+export function formatPercentChange(percent: number | null | undefined): string {
+  if (percent === null || percent === undefined) return "-";
+  const abs = Math.abs(percent);
+  if (abs === 0) return "۰٪";
+  const maxDecimals = abs < 0.1 ? 2 : 1;
+  const formatted = new Intl.NumberFormat("fa-IR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: maxDecimals,
+  }).format(abs);
+  return `${formatted}٪`;
+}
+
 export function formatDate(value: string | null | undefined, separator: string = PERSIAN_COMMA): string {
   if (!value) return "-";
   const parts = splitDateTime(value);

@@ -19,11 +19,27 @@ export function priceUsd(priceIrr: number | null | undefined, usdRateIrr: number
 
 export function serializePrice(
   row: PriceSnapshotRow,
-  usdRateIrr?: number | null
+  usdRateIrr?: number | null,
+  previousPriceIrr?: number | null
 ): Record<string, any> {
   const تومان = priceToman(row.price_irr);
   const دلار = priceUsd(row.price_irr, usdRateIrr);
   const usdRateToman = priceToman(usdRateIrr);
+
+  const prevIrr = previousPriceIrr !== undefined ? previousPriceIrr : (row.previous_price_irr ?? null);
+  const prevToman = priceToman(prevIrr);
+
+  let diffPercent: number | null = null;
+  let diffToman: number | null = null;
+
+  if (تومان !== null && prevToman !== null) {
+    diffToman = تومان - prevToman;
+    if (prevToman > 0) {
+      diffPercent = Math.round(((تومان - prevToman) / prevToman) * 10000) / 100;
+    } else if (prevToman === 0 && تومان === 0) {
+      diffPercent = 0;
+    }
+  }
 
   return {
     id: row.id,
@@ -35,6 +51,10 @@ export function serializePrice(
     seller: row.seller,
     price_irr: row.price_irr,
     price_toman: تومان,
+    previous_price_irr: prevIrr,
+    previous_price_toman: prevToman,
+    diff_toman: diffToman,
+    diff_percent: diffPercent,
     price_usd: دلار,
     usd_rate_irr: usdRateIrr ?? null,
     usd_rate_toman: usdRateToman,

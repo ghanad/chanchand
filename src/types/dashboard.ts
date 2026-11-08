@@ -11,6 +11,10 @@ export interface PriceRow {
   seller: string | null;
   price_irr: number | null;
   price_toman: number | null;
+  previous_price_irr?: number | null;
+  previous_price_toman?: number | null;
+  diff_toman?: number | null;
+  diff_percent?: number | null;
   price_usd: number | null;
   usd_rate_irr: number | null;
   usd_rate_toman: number | null;

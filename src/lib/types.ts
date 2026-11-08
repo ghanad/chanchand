@@ -108,6 +108,7 @@ export interface PriceSnapshotRow {
   availability: string;
   observed_at: string;
   raw_observation: string;
+  previous_price_irr?: number | null;
 }
 
 export interface FetchErrorRow {

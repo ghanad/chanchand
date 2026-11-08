@@ -213,18 +213,34 @@ export function latestSnapshots(
   `).all() as PriceSnapshotRow[];
 
   const seen = new Set<string>();
-  const latest: PriceSnapshotRow[] = [];
+  const hasPrev = new Set<string>();
+  const latestMap = new Map<string, PriceSnapshotRow>();
+  const latestOrder: string[] = [];
+
   for (const row of rows) {
     if (allowedSet && !allowedSet.has(row.product_key)) {
       continue;
     }
     const key = `${row.product_key}:${row.source_key}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    latest.push(row);
-    if (latest.length >= limit) break;
+    if (!seen.has(key)) {
+      if (latestOrder.length < limit) {
+        seen.add(key);
+        latestMap.set(key, { ...row });
+        latestOrder.push(key);
+      }
+    } else if (!hasPrev.has(key) && row.price_irr !== null && row.price_irr !== undefined) {
+      hasPrev.add(key);
+      const latestItem = latestMap.get(key);
+      if (latestItem) {
+        latestItem.previous_price_irr = row.price_irr;
+      }
+      if (latestOrder.length >= limit && hasPrev.size === latestOrder.length) {
+        break;
+      }
+    }
   }
-  return latest;
+
+  return latestOrder.slice(0, limit).map((key) => latestMap.get(key)!);
 }
 
 export function productHistory(

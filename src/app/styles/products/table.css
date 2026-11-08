@@ -44,6 +44,74 @@
   white-space: nowrap;
 }
 
+/* Price cell and minimal change pill */
+.product-compact-table .price-cell-stacked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.product-compact-table .price-value-line {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.product-compact-table .product-price-value {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--accent-strong);
+  font-feature-settings: "tnum";
+  letter-spacing: -0.2px;
+}
+
+.product-compact-table .product-price-unit {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.price-change-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  font-feature-settings: "tnum";
+  user-select: none;
+  cursor: default;
+}
+
+.price-change-pill.is-up {
+  color: var(--ok);
+  background: rgba(19, 118, 79, 0.09);
+}
+
+.price-change-pill.is-down {
+  color: var(--danger);
+  background: rgba(180, 59, 59, 0.09);
+}
+
+.price-change-pill.is-neutral {
+  color: var(--muted);
+  background: rgba(101, 115, 118, 0.09);
+}
+
+.price-change-arrow {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+}
+
+.price-change-text {
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
 .product-compact-table th.col-th-status,
 .product-compact-table td.col-status {
   width: 12%;
