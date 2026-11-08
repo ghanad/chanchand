@@ -410,6 +410,73 @@ describe('Hourly Public Product Scheduler (8 AM - 23 PM)', () => {
 
       db.close();
     });
+
+    it('treats Iranjib vehicle products from regular users as regular private products (not market targets collected hourly)', () => {
+      const db = getDatabase();
+      const user = createUser(db, {
+        username: 'regular_car_user',
+        password_hash: 'dummy-hash',
+        role: 'viewer',
+      });
+
+      const iranjibUrl = 'https://www.iranjib.ir/showgroup/45/prices/';
+
+      // User adds a car product from Iranjib (private by default)
+      const car1 = addManagedProduct(db, {
+        title: 'دنا پلاس توربو اتوماتیک',
+        url: iranjibUrl,
+        source_key: 'iranjib',
+        user_id: user.id,
+        is_public: false,
+      });
+
+      expect(isPublicProduct(db, car1.product_key)).toBe(false);
+
+      const targets: TargetConfig[] = [
+        {
+          product_key: car1.product_key,
+          source_key: 'iranjib',
+          url: iranjibUrl,
+          enabled: true,
+          adapter_settings: { item_name: 'دنا پلاس توربو اتوماتیک' },
+        },
+      ];
+
+      const now10am = new Date('2026-11-03T06:30:00.000Z'); // 10:00 AM Tehran
+      const batch1 = getScheduledBatchTargets(db, targets, { now: now10am, runsPerDay: 24 });
+
+      // Car target must NOT be in marketTargets
+      expect(batch1.totalMarketTargets).toBe(0);
+      expect(batch1.totalPrivateTargets).toBe(1);
+      expect(batch1.eligiblePrivateTargets).toBe(1);
+      expect(batch1.targets.map((t) => t.product_key)).toContain(car1.product_key);
+
+      // Now record a price snapshot for car1 at 10:00 AM
+      const runId = startRun(db, null, null, targets, undefined, 'cron');
+      recordPrice(db, runId, targets[0], {
+        title: 'دنا پلاس توربو اتوماتیک',
+        seller: 'ایران خودرو',
+        price_irr: 9500000000,
+        availability: 'in_stock',
+        raw_observation: {},
+      });
+      db.prepare('UPDATE price_snapshots SET observed_at = ? WHERE product_key = ?').run(
+        now10am.toISOString(),
+        car1.product_key
+      );
+
+      // At 11:00 AM (or any subsequent hour today):
+      // The car should NOT be collected again because it is a regular private product collected once per day!
+      const now11am = new Date('2026-11-03T07:30:00.000Z'); // 11:00 AM Tehran
+      const batch2 = getScheduledBatchTargets(db, targets, { now: now11am, runsPerDay: 24 });
+
+      expect(batch2.totalMarketTargets).toBe(0);
+      expect(batch2.totalPrivateTargets).toBe(1);
+      expect(batch2.eligiblePrivateTargets).toBe(0);
+      expect(batch2.targets.map((t) => t.product_key)).not.toContain(car1.product_key);
+
+      db.close();
+    });
   });
 });
 

@@ -4,21 +4,10 @@ import { USD_PRODUCT_KEY } from '../serializers';
 import { FREE_PRODUCT_LIMIT } from './connection';
 
 export function isMarketSource(sourceKey?: string, adapter?: string): boolean {
-  if (
-    adapter === 'brsapi_market' ||
-    adapter === 'servix_market' ||
-    adapter === 'iranjib' ||
-    adapter === 'iranjib_car'
-  )
-    return true;
+  if (adapter === 'brsapi_market' || adapter === 'servix_market') return true;
   if (!sourceKey) return false;
   const lower = sourceKey.toLowerCase();
-  return (
-    lower.includes('market') ||
-    lower.includes('servix') ||
-    lower.includes('brsapi') ||
-    lower.includes('iranjib')
-  );
+  return lower.includes('market') || lower.includes('servix') || lower.includes('brsapi');
 }
 
 export function getAppTimezone(): string {
