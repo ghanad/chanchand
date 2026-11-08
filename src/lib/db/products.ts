@@ -1,8 +1,11 @@
 import Database from 'better-sqlite3';
-import { ManagedProductRow, ManagedTargetRow } from '../types';
-import { normalizeTargetUrl, getTargetDeduplicationKey } from '../urls';
+import { ManagedProductRow } from '../types';
+import { normalizeTargetUrl } from '../urls';
 import { getUserById, getUserQuota } from './users';
-import { getDayBounds } from './scheduler';
+import { findManagedTargetByUrl, isUserTrackingProduct } from './targets';
+
+export * from './targets';
+export * from './productRefreshes';
 
 export function makeProductKey(
   title: string,
@@ -28,46 +31,47 @@ export function makeProductKey(
   return candidate;
 }
 
-export function isUserTrackingProduct(
-  db: Database.Database,
-  userId: number,
-  productKey: string
-): boolean {
-  const row = db
-    .prepare('SELECT 1 FROM user_products WHERE user_id = ? AND product_key = ? LIMIT 1')
-    .get(userId, productKey);
-  return Boolean(row);
+export function resolveTargetSourceKey(rawUrl: string, sourceKey?: string | null): string {
+  let key = sourceKey?.trim();
+  if (rawUrl.includes('iranjib.ir')) {
+    if (!key || key === 'brsapi_market' || key === 'digikala_api') {
+      key = 'iranjib';
+    }
+  } else if (!key) {
+    key = 'digikala_api';
+  }
+  return key;
 }
 
-export function findManagedTargetByUrl(
-  db: Database.Database,
-  rawUrl: string,
-  sourceKey?: string | null,
-  adapterSettings?: Record<string, any> | string
-): ManagedTargetRow | undefined {
-  const norm = normalizeTargetUrl(rawUrl);
-  if (!norm) return undefined;
-
-  const targetKey = getTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings);
-  const isMultiItem =
-    (sourceKey &&
-      (sourceKey.includes('market') ||
-        sourceKey.includes('servix') ||
-        sourceKey.includes('brsapi') ||
-        sourceKey.includes('iranjib'))) ||
-    targetKey.includes('::');
-
-  // If it's a multi-item endpoint without an explicit symbol, we cannot safely match by URL alone
-  const symbolPart = targetKey.includes('::') ? targetKey.split('::')[2] : '';
-  if (isMultiItem && !symbolPart) {
-    return undefined;
+export function parseAdapterSettings(
+  sourceKey: string,
+  settings: Record<string, any> | string | undefined,
+  defaultItemName?: string
+): Record<string, any> {
+  let obj: Record<string, any> = {};
+  if (settings) {
+    try {
+      obj = typeof settings === 'string' ? JSON.parse(settings) : { ...settings };
+    } catch {
+      obj = {};
+    }
   }
+  if (sourceKey === 'iranjib' && !obj.item_name && !obj.name && defaultItemName) {
+    obj.item_name = defaultItemName;
+  }
+  return obj;
+}
 
-  const allTargets = db.prepare('SELECT * FROM managed_targets').all() as ManagedTargetRow[];
-  return allTargets.find((t) => {
-    const key = getTargetDeduplicationKey(t.source_key, t.url, t.adapter_settings);
-    return key === targetKey;
-  });
+export function assertUserCanAddProduct(db: Database.Database, userId: number): void {
+  const userRow = getUserById(db, userId);
+  if (userRow && userRow.role !== 'admin') {
+    const quota = getUserQuota(db, userId, false);
+    if (!quota.canAdd) {
+      throw new Error(
+        `سقف ظرفیت محصولات شما (${quota.totalLimit} محصول) تکمیل شده است. لطفاً ابتدا ظرفیت اضافه خریداری کنید.`
+      );
+    }
+  }
 }
 
 export function getManagedProducts(
@@ -127,15 +131,6 @@ export function getManagedProducts(
     .all() as ManagedProductRow[];
 }
 
-export function getManagedTargets(db: Database.Database, productKey?: string): ManagedTargetRow[] {
-  if (productKey) {
-    return db
-      .prepare('SELECT * FROM managed_targets WHERE product_key = ? ORDER BY id ASC')
-      .all(productKey) as ManagedTargetRow[];
-  }
-  return db.prepare('SELECT * FROM managed_targets ORDER BY id ASC').all() as ManagedTargetRow[];
-}
-
 export function addManagedProduct(
   db: Database.Database,
   options: {
@@ -156,15 +151,7 @@ export function addManagedProduct(
   const cleanUrl = options.url.trim();
   if (!cleanUrl) throw new Error('url cannot be empty');
 
-  let sourceKey = options.source_key?.trim();
-  if (cleanUrl.includes('iranjib.ir')) {
-    if (!sourceKey || sourceKey === 'brsapi_market' || sourceKey === 'digikala_api') {
-      sourceKey = 'iranjib';
-    }
-  } else if (!sourceKey) {
-    sourceKey = cleanUrl.includes('digikala.com') ? 'digikala_api' : 'digikala_api';
-  }
-
+  const sourceKey = resolveTargetSourceKey(cleanUrl, options.source_key);
   const userId = options.user_id ?? null;
   const isPublic = options.is_public ? 1 : 0;
   const showUsdChart = options.show_usd_chart ? 1 : 0;
@@ -189,20 +176,7 @@ export function addManagedProduct(
     }
   }
 
-  let adapterSettingsObj: Record<string, any> = {};
-  if (options.adapter_settings) {
-    try {
-      adapterSettingsObj =
-        typeof options.adapter_settings === 'string'
-          ? JSON.parse(options.adapter_settings)
-          : { ...options.adapter_settings };
-    } catch {
-      adapterSettingsObj = {};
-    }
-  }
-  if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
-    adapterSettingsObj.item_name = cleanTitle;
-  }
+  const adapterSettingsObj = parseAdapterSettings(sourceKey, options.adapter_settings, cleanTitle);
   const adapterSettingsStr = JSON.stringify(adapterSettingsObj);
 
   // Deduplication check: does a target with this URL and symbol/item_name already exist?
@@ -213,17 +187,9 @@ export function addManagedProduct(
       .get(existingTarget.product_key) as ManagedProductRow | undefined;
     if (existingProd) {
       if (userId != null) {
-        const alreadyLinked = db
-          .prepare('SELECT 1 FROM user_products WHERE user_id = ? AND product_key = ?')
-          .get(userId, existingTarget.product_key);
+        const alreadyLinked = isUserTrackingProduct(db, userId, existingTarget.product_key);
         if (!alreadyLinked) {
-          const userRow = getUserById(db, userId);
-          if (userRow && userRow.role !== 'admin') {
-            const quota = getUserQuota(db, userId, false);
-            if (!quota.canAdd) {
-              throw new Error(`سقف ظرفیت محصولات شما (${quota.totalLimit} محصول) تکمیل شده است. لطفاً ابتدا ظرفیت اضافه خریداری کنید.`);
-            }
-          }
+          assertUserCanAddProduct(db, userId);
         }
         db.prepare(`
           INSERT INTO user_products (user_id, product_key, custom_title, created_at)
@@ -237,13 +203,7 @@ export function addManagedProduct(
 
   // Check quota for new product creation if user is not admin
   if (userId != null) {
-    const userRow = getUserById(db, userId);
-    if (userRow && userRow.role !== 'admin') {
-      const quota = getUserQuota(db, userId, false);
-      if (!quota.canAdd) {
-        throw new Error(`سقف ظرفیت محصولات شما (${quota.totalLimit} محصول) تکمیل شده است. لطفاً ابتدا ظرفیت اضافه خریداری کنید.`);
-      }
-    }
+    assertUserCanAddProduct(db, userId);
   }
 
   const existing = new Set(
@@ -298,14 +258,7 @@ export function updateManagedProduct(
   const cleanUrl = options.url.trim();
   if (!cleanUrl) throw new Error('url cannot be empty');
 
-  let sourceKey = options.source_key?.trim();
-  if (cleanUrl.includes('iranjib.ir')) {
-    if (!sourceKey || sourceKey === 'brsapi_market' || sourceKey === 'digikala_api') {
-      sourceKey = 'iranjib';
-    }
-  } else if (!sourceKey) {
-    sourceKey = cleanUrl.includes('digikala.com') ? 'digikala_api' : 'digikala_api';
-  }
+  const sourceKey = resolveTargetSourceKey(cleanUrl, options.source_key);
 
   const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
   if (!prod) throw new Error(`unknown product: ${productKey}`);
@@ -349,7 +302,7 @@ export function updateManagedProduct(
 
   const existingTarget = db
     .prepare('SELECT * FROM managed_targets WHERE product_key = ? LIMIT 1')
-    .get(productKey) as ManagedTargetRow | undefined;
+    .get(productKey) as any;
 
   const isUrlChanging = existingTarget ? normalizeTargetUrl(existingTarget.url) !== normalizeTargetUrl(cleanUrl) : true;
   const trackersCount = (
@@ -387,15 +340,7 @@ export function updateManagedProduct(
       );
     }
     if (existingTarget) {
-      let adapterSettingsObj: Record<string, any> = {};
-      try {
-        adapterSettingsObj = JSON.parse(existingTarget.adapter_settings || '{}');
-      } catch {
-        adapterSettingsObj = {};
-      }
-      if (sourceKey === 'iranjib' && !adapterSettingsObj.item_name && !adapterSettingsObj.name) {
-        adapterSettingsObj.item_name = cleanTitle;
-      }
+      const adapterSettingsObj = parseAdapterSettings(sourceKey, existingTarget.adapter_settings, cleanTitle);
       db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, adapter_settings = ?, updated_at = ? WHERE id = ?').run(
         sourceKey,
         cleanUrl,
@@ -464,89 +409,3 @@ export function deleteManagedProduct(
 
   return { product_key: productKey };
 }
-
-export function setManagedProductEnabled(
-  db: Database.Database,
-  productKey: string,
-  enabled: boolean,
-  requestingUser?: { id: number; role: string }
-): { product_key: string } {
-  const prod = db.prepare('SELECT * FROM managed_products WHERE key = ?').get(productKey) as ManagedProductRow | undefined;
-  if (!prod) throw new Error(`unknown product: ${productKey}`);
-
-  const isTracker = requestingUser ? isUserTrackingProduct(db, requestingUser.id, productKey) : false;
-  const isOwner = requestingUser ? prod.user_id === requestingUser.id : false;
-
-  if (requestingUser && requestingUser.role !== 'admin') {
-    if (prod.is_public === 1) {
-      throw new Error('دسترسی غیرمجاز: وضعیت محصولات عمومی بازار فقط توسط مدیر قابل تغییر است.');
-    }
-    if (!isOwner && !isTracker) {
-      throw new Error('دسترسی غیرمجاز: شما فقط امکان تغییر وضعیت محصولات خود را دارید.');
-    }
-  }
-
-  const now = new Date().toISOString();
-  db.prepare('UPDATE managed_targets SET enabled = ?, updated_at = ? WHERE product_key = ?').run(
-    enabled ? 1 : 0,
-    now,
-    productKey
-  );
-
-  return { product_key: productKey };
-}
-
-export function hasUserRefreshedProductToday(
-  db: Database.Database,
-  userId: number,
-  productKey: string,
-  now = new Date()
-): boolean {
-  const { startOfDay, endOfDay } = getDayBounds(now);
-
-  const logRow = db
-    .prepare(`
-      SELECT id FROM product_refresh_logs
-      WHERE user_id = ? AND product_key = ? AND refreshed_at >= ? AND refreshed_at <= ?
-      LIMIT 1
-    `)
-    .get(userId, productKey, startOfDay, endOfDay);
-
-  if (logRow) return true;
-
-  const upRow = db
-    .prepare(`
-      SELECT last_manual_refresh_at FROM user_products
-      WHERE user_id = ? AND product_key = ?
-    `)
-    .get(userId, productKey) as { last_manual_refresh_at?: string | null } | undefined;
-
-  if (upRow?.last_manual_refresh_at) {
-    if (upRow.last_manual_refresh_at >= startOfDay && upRow.last_manual_refresh_at <= endOfDay) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-export function recordProductRefresh(
-  db: Database.Database,
-  userId: number,
-  productKey: string,
-  now = new Date()
-): void {
-  const timestamp = now.toISOString();
-
-  db.prepare(`
-    INSERT INTO product_refresh_logs (user_id, product_key, refreshed_at)
-    VALUES (?, ?, ?)
-  `).run(userId, productKey, timestamp);
-
-  db.prepare(`
-    UPDATE user_products
-    SET last_manual_refresh_at = ?
-    WHERE user_id = ? AND product_key = ?
-  `).run(timestamp, userId, productKey);
-}
-
