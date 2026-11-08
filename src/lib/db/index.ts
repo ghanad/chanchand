@@ -1,5 +1,7 @@
 export * from './connection';
 export * from './schema';
+export * from './migrations';
+export * from './seeds';
 export * from './sources';
 export * from './users';
 export * from './products';

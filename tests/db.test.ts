@@ -82,6 +82,7 @@ describe('db module', () => {
       seller: 'Test Seller',
       price_irr: 600000,
       availability: 'in_stock',
+      raw_observation: { test: true },
     });
     finishRun(db, runId2, 1, 0, 1);
 
