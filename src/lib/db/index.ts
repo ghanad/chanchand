@@ -12,4 +12,5 @@ export * from './snapshots';
 export * from './errors';
 export * from './scheduler';
 export * from './schedulerTime';
+export * from './wallet';
 export * from './payments';
