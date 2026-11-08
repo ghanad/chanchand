@@ -5,7 +5,7 @@ export interface DateTimeProps {
   value: string | null | undefined;
   showIcon?: boolean;
   className?: string;
-  separator?: string;
+  separator?: string | null;
   emptyText?: string;
 }
 
@@ -13,7 +13,7 @@ export function DateTime({
   value,
   showIcon = false,
   className = "",
-  separator = PERSIAN_COMMA,
+  separator,
   emptyText = "-",
 }: DateTimeProps) {
   if (!value) {
@@ -26,13 +26,13 @@ export function DateTime({
   }
 
   const { date, time } = parts;
+  const hasSep = separator !== undefined ? Boolean(separator) : !showIcon;
+  const sepChar = separator ?? PERSIAN_COMMA;
 
   return (
     <span dir="rtl" className={`datetime-badge ${className}`} title={value}>
-      <span className="datetime-date">
-        <bdi>{date}</bdi>
-      </span>
-      <span className="datetime-sep">{separator}</span>
+      <bdi className="datetime-date">{date}</bdi>
+      {hasSep && <span className="datetime-sep">{sepChar}</span>}
       <span className="datetime-time">
         {showIcon && (
           <svg

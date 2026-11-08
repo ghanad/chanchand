@@ -504,7 +504,7 @@ tbody tr:last-child td {
 .datetime-inline {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.5rem;
   direction: rtl;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
@@ -515,6 +515,8 @@ tbody tr:last-child td {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: 0.2px;
+  color: var(--text);
+  font-weight: 500;
 }
 
 .datetime-sep {
@@ -522,13 +524,16 @@ tbody tr:last-child td {
   opacity: 0.7;
   user-select: none;
   font-weight: 400;
-  padding: 0 1px;
+  margin-inline-start: -0.35rem;
+  margin-inline-end: 0.15rem;
 }
 
 .datetime-time {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.94em;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
   letter-spacing: 0.2px;
@@ -536,7 +541,7 @@ tbody tr:last-child td {
 
 .datetime-clock-icon {
   flex-shrink: 0;
-  opacity: 0.65;
+  opacity: 0.75;
   color: var(--muted);
 }
 
