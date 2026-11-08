@@ -13,6 +13,7 @@ export interface PriceRow {
   price_toman: number | null;
   previous_price_irr?: number | null;
   previous_price_toman?: number | null;
+  previous_observed_at?: string | null;
   diff_toman?: number | null;
   diff_percent?: number | null;
   price_usd: number | null;

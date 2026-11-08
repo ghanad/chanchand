@@ -28,6 +28,7 @@ export function serializePrice(
 
   const prevIrr = previousPriceIrr !== undefined ? previousPriceIrr : (row.previous_price_irr ?? null);
   const prevToman = priceToman(prevIrr);
+  const prevObservedAt = row.previous_observed_at ?? null;
 
   let diffPercent: number | null = null;
   let diffToman: number | null = null;
@@ -53,6 +54,7 @@ export function serializePrice(
     price_toman: تومان,
     previous_price_irr: prevIrr,
     previous_price_toman: prevToman,
+    previous_observed_at: prevObservedAt,
     diff_toman: diffToman,
     diff_percent: diffPercent,
     price_usd: دلار,

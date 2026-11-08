@@ -206,14 +206,15 @@ export function latestSnapshots(
     ? (allowedProductKeys instanceof Set ? allowedProductKeys : new Set(allowedProductKeys))
     : null;
 
-  // Return latest snapshot for each (product_key, source_key)
+  // Return latest snapshot for each (product_key, source_key) with previous different price
   const rows = db.prepare(`
     SELECT * FROM price_snapshots
     ORDER BY observed_at DESC, id DESC
   `).all() as PriceSnapshotRow[];
 
   const seen = new Set<string>();
-  const hasPrev = new Set<string>();
+  const hasDiff = new Set<string>();
+  const samePriceFallback = new Map<string, PriceSnapshotRow>();
   const latestMap = new Map<string, PriceSnapshotRow>();
   const latestOrder: string[] = [];
 
@@ -228,14 +229,27 @@ export function latestSnapshots(
         latestMap.set(key, { ...row });
         latestOrder.push(key);
       }
-    } else if (!hasPrev.has(key) && row.price_irr !== null && row.price_irr !== undefined) {
-      hasPrev.add(key);
+    } else if (!hasDiff.has(key) && row.price_irr !== null && row.price_irr !== undefined) {
+      const latestItem = latestMap.get(key);
+      if (latestItem && latestItem.price_irr !== null && latestItem.price_irr !== undefined) {
+        if (row.price_irr !== latestItem.price_irr) {
+          hasDiff.add(key);
+          latestItem.previous_price_irr = row.price_irr;
+          latestItem.previous_observed_at = row.observed_at;
+        } else if (!samePriceFallback.has(key)) {
+          samePriceFallback.set(key, row);
+        }
+      }
+    }
+  }
+
+  // If price never changed historically across runs, fall back to identical price
+  for (const [key, fallback] of samePriceFallback.entries()) {
+    if (!hasDiff.has(key)) {
       const latestItem = latestMap.get(key);
       if (latestItem) {
-        latestItem.previous_price_irr = row.price_irr;
-      }
-      if (latestOrder.length >= limit && hasPrev.size === latestOrder.length) {
-        break;
+        latestItem.previous_price_irr = fallback.price_irr;
+        latestItem.previous_observed_at = fallback.observed_at;
       }
     }
   }

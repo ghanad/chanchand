@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatNumber, formatPercentChange } from "../../../lib/formatters";
+import { formatNumber, formatDate, formatPercentChange } from "../../../lib/formatters";
 import { DateTime } from "@/components/common/DateTime";
 import { ProductTableRowProps } from "./types";
 import { ProductStatusSwitch } from "./ProductStatusSwitch";
@@ -251,8 +251,8 @@ export function ProductTableRow({
                   }`}
                   title={
                     (product.latestSnapshot.diff_toman ?? 0) === 0
-                      ? `بدون تغییر نسبت به قیمت قبلی (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان)`
-                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} نسبت به قیمت قبلی (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان): ${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "+" : ""}${formatNumber(product.latestSnapshot.diff_toman)} تومان`
+                      ? `بدون تغییر قیمت (همواره ${formatNumber(product.latestSnapshot.price_toman)} تومان)`
+                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} نسبت به آخرین تغییر قیمت (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان${product.latestSnapshot.previous_observed_at ? ` در ${formatDate(product.latestSnapshot.previous_observed_at)}` : ""}): ${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "+" : ""}${formatNumber(product.latestSnapshot.diff_toman)} تومان`
                   }
                   aria-label={
                     (product.latestSnapshot.diff_toman ?? 0) === 0

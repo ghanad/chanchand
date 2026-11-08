@@ -92,6 +92,23 @@ describe('db module', () => {
     expect(snapshots2[0].price_irr).toBe(600000);
     expect(snapshots2[0].previous_price_irr).toBe(500000);
 
+    // Record a third run with the SAME price (600,000)
+    // It should still remember the last DIFFERENT price (500,000)!
+    const runId3 = startRun(db, null, config);
+    recordPrice(db, runId3, config.targets![0], {
+      title: 'Item One',
+      seller: 'Test Seller',
+      price_irr: 600000,
+      availability: 'in_stock',
+      raw_observation: { test: true },
+    });
+    finishRun(db, runId3, 1, 0, 1);
+
+    const snapshots3 = latestSnapshots(db);
+    expect(snapshots3.length).toBe(1);
+    expect(snapshots3[0].price_irr).toBe(600000);
+    expect(snapshots3[0].previous_price_irr).toBe(500000); // Preserves last different price!
+
     db.close();
   });
 
