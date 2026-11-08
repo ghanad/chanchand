@@ -1,11 +1,12 @@
 import React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatNumber, formatDate, formatPercentChange } from "../../../lib/formatters";
 import { DateTime } from "@/components/common/DateTime";
 import { ProductTableRowProps } from "./types";
 import { ProductStatusSwitch } from "./ProductStatusSwitch";
 import { ProductKebabMenu } from "./ProductKebabMenu";
+import { ProductTitleCell } from "./ProductTitleCell";
+import { ProductUrlCell } from "./ProductUrlCell";
+import { ProductPriceCell } from "./ProductPriceCell";
 
 export function ProductTableRow({
   product,
@@ -46,62 +47,11 @@ export function ProductTableRow({
       }}
     >
       {/* 1. Title & Slug (bold title with 2-line clamp, bidi handling, full tooltip) */}
-      <td className="col-title">
-        <div className="product-title-cell product-info-text">
-          <div className="product-title-line">
-            <Link
-              href={detailUrl}
-              className="product-row-title-link"
-              title={product.title}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <strong className="product-row-title" title={product.title} dir="auto">
-                {product.title}
-              </strong>
-            </Link>
-            {showPublicIndicator && product.is_public ? (() => {
-              const is24Hours =
-                product.key === "usd" ||
-                ((product.active_start_hour === 0 || product.active_start_hour === undefined || product.active_start_hour === null) &&
-                  (product.active_end_hour === 23 || product.active_end_hour === undefined || product.active_end_hour === null)) ||
-                (product.active_start_hour === 0 && product.active_end_hour === 23);
-
-              return (
-                <span
-                  className="public-market-indicator"
-                  title={
-                    is24Hours
-                      ? "کالای بازار عمومی (جمع‌آوری ۲۴ ساعته شبانه‌روزی)"
-                      : `کالای بازار عمومی (ساعت جمع‌آوری: ${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00)`
-                  }
-                  aria-label="کالای بازار عمومی"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="2" y1="12" x2="22" y2="12" />
-                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-                  </svg>
-                  <span className="public-indicator-text">عمومی {is24Hours ? "(۲۴ ساعته)" : ""}</span>
-                </span>
-              );
-            })() : null}
-          </div>
-          <span className="product-row-slug" title={product.key} dir="ltr">
-            {product.key}
-          </span>
-        </div>
-      </td>
+      <ProductTitleCell
+        product={product}
+        detailUrl={detailUrl}
+        showPublicIndicator={showPublicIndicator}
+      />
 
       {/* Owner Column for Admin */}
       {isAdmin && (
@@ -147,178 +97,15 @@ export function ProductTableRow({
       </td>
 
       {/* 3. Address Column */}
-      <td className="col-url" onClick={(e) => e.stopPropagation()}>
-        <div className="product-info-text">
-          {product.is_public && !isAdmin ? (
-            <span
-              className="public-link-badge"
-              title="کالای پایش عمومی سیستم — لینک اختصاصی در حالت اشتراکی نمایش داده نمی‌شود"
-            >
-              کالای عمومی
-            </span>
-          ) : product.primary_target?.url ? (
-            <div className="url-action-group">
-              <a
-                href={product.primary_target.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="action-icon-button external-link-btn"
-                aria-label={`مشاهده منبع ${product.title}`}
-                title="مشاهده صفحه منبع در تب جدید"
-              >
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </a>
-              <button
-                type="button"
-                className={`action-icon-button copy-link-btn ${copiedKey === product.key ? "copied" : ""}`}
-                onClick={() => onCopyUrl(product.primary_target!.url)}
-                aria-label={`کپی لینک منبع برای ${product.title}`}
-                title={copiedKey === product.key ? "کپی شد!" : "کپی لینک منبع"}
-              >
-                {copiedKey === product.key ? (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="var(--ok)"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="14"
-                    height="14"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
-                  >
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          ) : (
-            <span className="muted-text">-</span>
-          )}
-        </div>
-      </td>
+      <ProductUrlCell
+        product={product}
+        isAdmin={isAdmin}
+        copiedKey={copiedKey}
+        onCopyUrl={onCopyUrl}
+      />
 
       {/* 4. Price Column */}
-      <td className="col-price">
-        <div className="product-info-text">
-          {product.latestSnapshot?.price_toman !== undefined &&
-          product.latestSnapshot.price_toman !== null ? (
-            <div className="price-cell-stacked">
-              <div className="price-value-line">
-                <span className="product-price-value">
-                  {formatNumber(product.latestSnapshot.price_toman)}
-                </span>
-                <span className="product-price-unit">تومان</span>
-              </div>
-              {product.latestSnapshot.diff_percent !== undefined &&
-              product.latestSnapshot.diff_percent !== null ? (
-                <span
-                  className={`price-change-pill ${
-                    (product.latestSnapshot.diff_toman ?? 0) > 0
-                      ? "is-up"
-                      : (product.latestSnapshot.diff_toman ?? 0) < 0
-                      ? "is-down"
-                      : "is-neutral"
-                  }`}
-                  title={
-                    (product.latestSnapshot.diff_toman ?? 0) === 0
-                      ? `بدون تغییر قیمت (همواره ${formatNumber(product.latestSnapshot.price_toman)} تومان)`
-                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} نسبت به آخرین تغییر قیمت (${formatNumber(product.latestSnapshot.previous_price_toman)} تومان${product.latestSnapshot.previous_observed_at ? ` در ${formatDate(product.latestSnapshot.previous_observed_at)}` : ""}): ${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "+" : ""}${formatNumber(product.latestSnapshot.diff_toman)} تومان`
-                  }
-                  aria-label={
-                    (product.latestSnapshot.diff_toman ?? 0) === 0
-                      ? "بدون تغییر"
-                      : `${(product.latestSnapshot.diff_toman ?? 0) > 0 ? "افزایش" : "کاهش"} ${formatPercentChange(product.latestSnapshot.diff_percent)}`
-                  }
-                >
-                  {(product.latestSnapshot.diff_toman ?? 0) > 0 ? (
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="price-change-arrow"
-                    >
-                      <polyline points="18 15 12 9 6 15" />
-                    </svg>
-                  ) : (product.latestSnapshot.diff_toman ?? 0) < 0 ? (
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="price-change-arrow"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="10"
-                      height="10"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                      className="price-change-arrow"
-                    >
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                    </svg>
-                  )}
-                  <span className="price-change-text" dir="ltr">
-                    {formatPercentChange(product.latestSnapshot.diff_percent)}
-                  </span>
-                </span>
-              ) : null}
-            </div>
-          ) : (
-            <span className="price-empty-state" title="هنوز قیمتی ثبت نشده است">
-              —
-            </span>
-          )}
-        </div>
-      </td>
+      <ProductPriceCell latestSnapshot={product.latestSnapshot} />
 
       {/* 5. Status Column (Interactive Switch for editable, Static Badge for read-only public) */}
       <td className="col-status" onClick={(e) => e.stopPropagation()}>
