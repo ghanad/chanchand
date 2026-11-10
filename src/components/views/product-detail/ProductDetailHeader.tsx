@@ -36,6 +36,10 @@ export function ProductDetailHeader({
   onOpenDelete,
 }: ProductDetailHeaderProps) {
   const canModify = isAdmin || Boolean(product.can_edit);
+  const isIranjib =
+    product.sources?.some((s) => s.toLowerCase().includes("iranjib")) ||
+    Boolean(product.primary_target?.source_key?.toLowerCase().includes("iranjib")) ||
+    Boolean(product.primary_target?.url?.toLowerCase().includes("iranjib.ir"));
 
   return (
     <>
@@ -100,7 +104,7 @@ export function ProductDetailHeader({
             </div>
             <h1 className="product-detail-title">{product.title}</h1>
 
-            {product.is_public && !isAdmin ? (
+            {isIranjib ? null : product.is_public && !isAdmin ? (
               <div
                 className="product-url-wrapper product-detail-url muted-text"
                 style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "6px" }}
