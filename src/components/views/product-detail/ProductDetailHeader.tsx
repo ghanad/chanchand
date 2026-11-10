@@ -41,6 +41,15 @@ export function ProductDetailHeader({
     Boolean(product.primary_target?.source_key?.toLowerCase().includes("iranjib")) ||
     Boolean(product.primary_target?.url?.toLowerCase().includes("iranjib.ir"));
 
+  const displayUrl = React.useMemo(() => {
+    if (!product.primary_target?.url) return "";
+    try {
+      return decodeURI(product.primary_target.url);
+    } catch {
+      return product.primary_target.url;
+    }
+  }, [product.primary_target?.url]);
+
   return (
     <>
       {/* Top Breadcrumb & Quick Navigation */}
@@ -153,8 +162,8 @@ export function ProductDetailHeader({
                   dir="ltr"
                   title={product.primary_target.url}
                 >
-                  {product.primary_target.url}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6 }}>
+                  <span className="product-url-text">{displayUrl}</span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginRight: 6 }}>
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                     <polyline points="15 3 21 3 21 9" />
                     <line x1="10" y1="14" x2="21" y2="3" />
