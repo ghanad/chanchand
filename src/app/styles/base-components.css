@@ -211,6 +211,11 @@
   pointer-events: none;
 }
 
+.chart-panel .recharts-cartesian-axis-tick text {
+  direction: ltr !important;
+  text-anchor: end !important;
+}
+
 .chart-tooltip {
   background: var(--surface);
   border: 1px solid var(--line);

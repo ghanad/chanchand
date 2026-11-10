@@ -11,6 +11,7 @@ import {
   availabilityText,
   statusText,
   formatPercentChange,
+  formatPriceAxis,
 } from '../src/lib/formatters';
 
 describe('formatters module', () => {
@@ -160,6 +161,38 @@ describe('formatters module', () => {
       expect(formatPercentChange(-5)).toBe('۵٪');
       expect(formatPercentChange(2.5)).toMatch(/[۰-۹]/);
       expect(formatPercentChange(2.5)).toContain('٪');
+    });
+  });
+
+  describe('formatPriceAxis', () => {
+    it('returns "-" for null, undefined or NaN', () => {
+      expect(formatPriceAxis(null)).toBe('-');
+      expect(formatPriceAxis(undefined)).toBe('-');
+      expect(formatPriceAxis(NaN)).toBe('-');
+    });
+
+    it('formats values under 100k normally without abbreviation', () => {
+      const formatted = formatPriceAxis(50000);
+      expect(formatted).not.toContain('هزار');
+      expect(formatted).toMatch(/[۰-۹]/);
+    });
+
+    it('formats values in millions with Persian million abbreviation', () => {
+      const formatted = formatPriceAxis(2631545);
+      expect(formatted).toContain('میلیون');
+      expect(formatted).toMatch(/[۰-۹]/);
+    });
+
+    it('formats values in billions with Persian billion abbreviation', () => {
+      const formatted = formatPriceAxis(4299250000);
+      expect(formatted).toContain('میلیارد');
+      expect(formatted).toMatch(/[۰-۹]/);
+    });
+
+    it('adapts precision when domain spread is small to prevent identical ticks', () => {
+      const tick1 = formatPriceAxis(4210750000, 80000000);
+      const tick2 = formatPriceAxis(4245750000, 80000000);
+      expect(tick1).not.toBe(tick2);
     });
   });
 });

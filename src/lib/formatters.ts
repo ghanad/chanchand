@@ -101,6 +101,33 @@ export function priceAxisDomain(rows: Array<{ price: number }>): [number, number
   return [Math.max(0, Math.floor(min - padding)), Math.ceil(max + padding)];
 }
 
+export function formatPriceAxis(value: number | null | undefined, spread?: number): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  const num = Number(value);
+  const abs = Math.abs(num);
+
+  // If value is small (< 100,000, e.g. USD prices or sub-100k toman), format normally with commas
+  if (abs < 100_000) {
+    return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 2 }).format(num);
+  }
+
+  // Determine needed fraction digits based on domain spread to avoid identical tick labels
+  let maxDigits = 2;
+  if (spread !== undefined && spread > 0) {
+    if (abs >= 1_000_000_000) {
+      maxDigits = spread < 50_000_000 ? 3 : 2;
+    } else if (abs >= 1_000_000) {
+      maxDigits = spread < 50_000 ? 3 : 2;
+    }
+  }
+
+  return new Intl.NumberFormat("fa-IR", {
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: maxDigits,
+  }).format(num);
+}
+
 export function availabilityText(value: Availability): string {
   const labels: Record<string, string> = {
     in_stock: "موجود",

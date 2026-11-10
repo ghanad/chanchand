@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 import { HistoryMetric } from "@/types/dashboard";
-import { formatNumber, numberFormatter, priceAxisDomain } from "@/lib/formatters";
+import { formatNumber, numberFormatter, priceAxisDomain, formatPriceAxis } from "@/lib/formatters";
 import { PanelHead } from "@/components/common/PanelHead";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ChartRow } from "./types";
@@ -65,6 +65,11 @@ export function ProductDetailChart({
   const chartPriceDomain = useMemo(() => {
     return visibleRows.length ? priceAxisDomain(visibleRows) : undefined;
   }, [visibleRows]);
+
+  const priceSpread = useMemo(() => {
+    if (!chartPriceDomain) return undefined;
+    return chartPriceDomain[1] - chartPriceDomain[0];
+  }, [chartPriceDomain]);
 
   const handleMouseDown = useCallback((e: any) => {
     if (!e) return;
@@ -243,10 +248,15 @@ export function ProductDetailChart({
             <XAxis dataKey="time" tick={{ fill: "#647174", fontSize: 12 }} />
             <YAxis
               domain={chartPriceDomain}
-              tickMargin={12}
-              width={96}
-              tickFormatter={(value) => numberFormatter.format(Number(value))}
-              tick={{ fill: "#647174", fontSize: 12, dx: -40 }}
+              tickMargin={8}
+              width={82}
+              tickFormatter={(value) => formatPriceAxis(Number(value), priceSpread)}
+              tick={{
+                fill: "#647174",
+                fontSize: 12,
+                textAnchor: "end",
+                style: { direction: "ltr" },
+              }}
             />
             <Tooltip
               formatter={(value) => [
