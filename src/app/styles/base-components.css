@@ -211,9 +211,9 @@
   pointer-events: none;
 }
 
-.chart-panel .recharts-cartesian-axis-tick text {
-  direction: ltr !important;
-  text-anchor: end !important;
+.chart-panel .recharts-yAxis .recharts-cartesian-axis-tick text {
+  direction: rtl !important;
+  text-anchor: start !important;
 }
 
 .chart-tooltip {

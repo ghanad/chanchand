@@ -249,13 +249,13 @@ export function ProductDetailChart({
             <YAxis
               domain={chartPriceDomain}
               tickMargin={8}
-              width={82}
+              width={88}
               tickFormatter={(value) => formatPriceAxis(Number(value), priceSpread)}
               tick={{
                 fill: "#647174",
                 fontSize: 12,
-                textAnchor: "end",
-                style: { direction: "ltr" },
+                textAnchor: "start",
+                style: { direction: "rtl" },
               }}
             />
             <Tooltip
