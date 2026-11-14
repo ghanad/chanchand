@@ -4,6 +4,7 @@ import { getDatabase, getManagedTargets, startRun } from '@/lib/db';
 import { requireAdmin } from '@/lib/api-guard';
 import { TargetConfig } from '@/lib/types';
 import { acquireRunLock, releaseRunLock, getActiveRunInfo } from '@/lib/run-lock';
+import { describeError, logError } from '@/lib/logger';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,7 +113,7 @@ export async function POST(req: NextRequest) {
     runner
       .executeRun(null, runId, activeTargets)
       .catch((err) => {
-        console.error('[RunNow] background run error:', err);
+        logError('RunNow', 'background run error', describeError(err));
       })
       .finally(() => {
         releaseRunLock();

@@ -177,6 +177,59 @@ describe('adapters', () => {
     expect(obs.availability).toBe('in_stock');
   });
 
+  it('reports a Servix rate limit (429) with the retry-after window', async () => {
+    const originalFetch = globalThis.fetch;
+    const prevApiKey = process.env.SERVIX_API_KEY;
+    process.env.SERVIX_API_KEY = 'test-servix-key';
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ message: 'Too Many Requests' }), {
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '90' },
+      })) as any;
+
+    try {
+      const adapter = new ServixMarketAdapter();
+      let caught: any;
+      try {
+        await adapter.fetch({
+          source: {
+            adapter: 'servix_market',
+            timeout_seconds: 10,
+            rate_limit_seconds: 0,
+            currency: 'IRR',
+            price_multiplier: 1,
+            headers: {},
+            settings: {},
+          },
+          target: {
+            product_key: 'coin-emami',
+            source_key: 'servix_market',
+            url: 'https://servix.cc/api/v1/assets',
+            enabled: true,
+            adapter_settings: { symbol: 'SEKKEH_RLS' },
+          },
+        });
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught.name).toBe('HttpRequestError');
+      expect(caught.status).toBe(429);
+      expect(caught.retryAfterSeconds).toBe(90);
+      expect(caught.responseExcerpt).toContain('Too Many Requests');
+      expect(caught.message).toContain('Servix rate limit exceeded (HTTP 429 Too Many Requests)');
+      expect(caught.message).toContain('retry after 90s');
+      expect(caught.hint).toContain('rate_limit_seconds');
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (prevApiKey === undefined) delete process.env.SERVIX_API_KEY;
+      else process.env.SERVIX_API_KEY = prevApiKey;
+    }
+  });
+
   it('fetchWithCookieRedirect follows 307 redirects and forwards Set-Cookie headers', async () => {
     const { fetchWithCookieRedirect } = await import('../src/lib/adapters/fetchUtils');
     const originalFetch = globalThis.fetch;

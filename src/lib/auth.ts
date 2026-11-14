@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { SafeUser } from './types';
 import { countUsers, createUser } from './db';
 import { AUTH_COOKIE_NAME, SessionTokenPayload, verifyAuthToken } from './jwt';
+import { describeError, logError, logInfo, logWarn } from './logger';
 
 export * from './jwt';
 
@@ -34,8 +35,9 @@ export async function ensureDefaultAdmin(db: Database.Database): Promise<SafeUse
     if (!initialPassword) {
       if (process.env.NODE_ENV === 'production') {
         initialPassword = crypto.randomBytes(12).toString('base64url');
-        console.warn(
-          `[SECURITY NOTICE] ADMIN_INITIAL_PASSWORD not set. Generated secure random password for admin account: "${initialPassword}". Save this password immediately!`
+        logWarn(
+          'Auth',
+          `ADMIN_INITIAL_PASSWORD not set. Generated a random password for the admin account: "${initialPassword}". Save this password immediately!`
         );
       } else {
         initialPassword = 'admin123456';
@@ -50,10 +52,10 @@ export async function ensureDefaultAdmin(db: Database.Database): Promise<SafeUse
       email: null,
     });
 
-    console.log(`[Auth] Default admin account created with username: "${username}"`);
+    logInfo('Auth', `default admin account created with username: "${username}"`);
     return admin;
   } catch (err) {
-    console.error('[Auth] Failed to initialize default admin user:', err);
+    logError('Auth', 'failed to initialize default admin user', describeError(err));
     return null;
   }
 }

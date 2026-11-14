@@ -113,6 +113,21 @@ docker compose ps
 docker compose logs -f app
 ```
 
+### Reading the logs
+
+Runner and CLI lines are timestamped in the app timezone (default `Asia/Tehran`) and end with `key=value` details, so a failing target explains itself:
+
+```text
+[2026-11-14 22:39:36 +03:30] INFO [Runner] run 371: fetching coin-emami/servix_market | adapter=servix_market url=https://servix.cc/api/v1/assets rate_limit_seconds=3
+[2026-11-14 22:39:37 +03:30] WARN [Runner] run 371: failed coin-emami/servix_market | adapter=servix_market rate_limit_seconds=3 elapsed_ms=412 error_name=HttpRequestError error="Servix rate limit exceeded (HTTP 429 Too Many Requests); retry after 60s" status=429 retry_after=60 hint="source is throttling requests; raise rate_limit_seconds for this source or retry later"
+[2026-11-14 22:41:02 +03:30] INFO [Runner] run 371 finished: status=failed success=0 errors=6 | targets=6 started_at="2026-11-14 22:39:36 +03:30" duration_ms=86000
+```
+
+- `status=429` with `retry_after` means the provider throttled the request: raise that source's `rate_limit_seconds` (admin → sources) or run the collector less often.
+- `status=401/403` points at the API key or request headers, `status=404` at a moved target URL, and `observed` timeouts are logged as `… request timed out after Ns`.
+- `LOG_LEVEL=debug` also logs the configured rate-limit waits; `LOG_LEVEL=warn` keeps only skips/failures.
+- The same reason is stored in `fetch_errors.message` (shown in the admin run detail and by `npm run errors`, which prints local timestamps).
+
 ### Check the running version without SSH
 
 The admin user menu (click the avatar in the top-right) shows a small `نسخه v1.6.1 · 622248a` line in its footer; clicking it copies the full build info (version, commit, build time) to the clipboard. This value is baked into the image at build time, so it always describes the container that is actually serving requests — no need to inspect `docker-compose.yml`.

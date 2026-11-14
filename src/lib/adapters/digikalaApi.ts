@@ -1,7 +1,7 @@
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
-import { fetchWithCookieRedirect } from './fetchUtils';
+import { createHttpErrorFromResponse, fetchWithCookieRedirect } from './fetchUtils';
 
 export function extractProductId(url: string): string | null {
   const match = url.match(/(?:dkp-|(?:\/product\/))(\d+)/i);
@@ -69,7 +69,7 @@ export class DigikalaApiAdapter implements PriceAdapter {
     });
 
     if (!response.ok) {
-      throw new Error(`Digikala API request failed: ${response.status} ${response.statusText}`);
+      throw await createHttpErrorFromResponse('Digikala API', apiUrl, response);
     }
 
     let payload: any = await response.json();

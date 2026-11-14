@@ -20,6 +20,15 @@ import { getAdapter } from './adapters';
 import { loadConfig } from './config';
 import { USD_PRODUCT_KEY } from './serializers';
 import { normalizeTargetUrl, getTargetDeduplicationKey } from './urls';
+import {
+  describeError,
+  formatTimestamp,
+  logDebug,
+  logError,
+  logInfo,
+  logWarn,
+  redactUrl,
+} from './logger';
 
 export interface RunSummary {
   run_id: number;
@@ -84,6 +93,7 @@ export class PriceRunner {
     options?: { force?: boolean }
   ): Promise<RunSummary> {
     const db = getDatabase(this.dbUrl);
+    const runStartedAt = new Date();
     let successCount = 0;
     let errorCount = 0;
     const lastRequestAt: Record<string, number> = {};
@@ -122,7 +132,7 @@ export class PriceRunner {
       const bIsUsd = b.product_key === USD_PRODUCT_KEY ? 0 : 1;
       return aIsUsd - bIsUsd;
     });
-    console.log(`[Runner] run ${runId} started: ${activeTargets.length} active targets`);
+    logInfo('Runner', `run ${runId} started: ${activeTargets.length} active targets`);
 
     const sources = config?.sources || getSourcesMap(db);
     const fetchedObservations = new Map<string, PriceObservation>();
@@ -135,7 +145,9 @@ export class PriceRunner {
       for (const target of activeTargets) {
         const source = sources[target.source_key];
         if (!source) {
-          console.warn(`[Runner] run ${runId}: source ${target.source_key} not found for target ${target.product_key}`);
+          logWarn('Runner', `run ${runId}: source ${target.source_key} not found for target ${target.product_key}`, {
+            available_sources: Object.keys(sources),
+          });
           continue;
         }
 
@@ -146,21 +158,27 @@ export class PriceRunner {
           if (isPublic) {
             const sched = publicScheduleMap.get(target.product_key) ?? { startHour: 8, endHour: 23 };
             if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
-              console.log(
-                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (${sched.startHour}:00 - ${sched.endHour}:00)`
+              logInfo(
+                'Runner',
+                `run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (${sched.startHour}:00 - ${sched.endHour}:00)`,
+                { current_hour: currentHour, window: `${sched.startHour}:00-${sched.endHour}:00` }
               );
               continue;
             }
             if (hasSuccessfulPriceThisHour(db, target.product_key, now, target.url, target.source_key)) {
-              console.log(
-                `[Runner] run ${runId}: skipping public product ${target.product_key}/${target.source_key}, already collected this hour`
+              logInfo(
+                'Runner',
+                `run ${runId}: skipping public product ${target.product_key}/${target.source_key}, already collected this hour`,
+                { current_hour: currentHour }
               );
               continue;
             }
           } else {
             if (hasSuccessfulPriceToday(db, target.product_key, now, target.url, target.source_key)) {
-              console.log(
-                `[Runner] run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`
+              logInfo(
+                'Runner',
+                `run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`,
+                { current_hour: currentHour }
               );
               continue;
             }
@@ -172,8 +190,9 @@ export class PriceRunner {
           const cachedObservation = fetchedObservations.get(dedupKey)!;
           recordPrice(db, runId, target, cachedObservation);
           successCount++;
-          console.log(
-            `[Runner] run ${runId}: reused cached observation for ${target.product_key}/${target.source_key} price_irr=${cachedObservation.price_irr}`
+          logInfo(
+            'Runner',
+            `run ${runId}: reused cached observation for ${target.product_key}/${target.source_key} price_irr=${cachedObservation.price_irr}`
           );
           continue;
         }
@@ -181,10 +200,17 @@ export class PriceRunner {
         // Enforce rate limiting
         await this.respectRateLimit(target.source_key, source.rate_limit_seconds, lastRequestAt);
 
-        console.log(`[Runner] run ${runId}: fetching ${target.product_key}/${target.source_key}`);
+        logInfo('Runner', `run ${runId}: fetching ${target.product_key}/${target.source_key}`, {
+          adapter: source.adapter,
+          url: redactUrl(target.url),
+          rate_limit_seconds: source.rate_limit_seconds,
+        });
+
+        const requestStartedAt = Date.now();
         try {
           const adapter = getAdapter(source.adapter);
           const observation = await adapter.fetch({ source, target });
+          const elapsedMs = Date.now() - requestStartedAt;
 
           if (dedupKey) {
             fetchedObservations.set(dedupKey, observation);
@@ -192,13 +218,26 @@ export class PriceRunner {
 
           recordPrice(db, runId, target, observation);
           successCount++;
-          console.log(
-            `[Runner] run ${runId}: collected ${target.product_key}/${target.source_key} price_irr=${observation.price_irr}`
+          logInfo(
+            'Runner',
+            `run ${runId}: collected ${target.product_key}/${target.source_key} price_irr=${observation.price_irr}`,
+            { elapsed_ms: elapsedMs }
           );
         } catch (err: any) {
-          recordError(db, runId, target, err);
           errorCount++;
-          console.warn(`[Runner] run ${runId}: failed ${target.product_key}/${target.source_key}:`, err.message || err);
+          const details = describeError(err);
+          const errorDetails = {
+            adapter: source.adapter,
+            rate_limit_seconds: source.rate_limit_seconds,
+            elapsed_ms: Date.now() - requestStartedAt,
+            ...details,
+          };
+          recordError(db, runId, target, err, {
+            ...errorDetails,
+            product_key: target.product_key,
+            source_key: target.source_key,
+          });
+          logWarn('Runner', `run ${runId}: failed ${target.product_key}/${target.source_key}`, errorDetails);
         } finally {
           lastRequestAt[target.source_key] = Date.now();
         }
@@ -206,18 +245,25 @@ export class PriceRunner {
 
       finishRun(db, runId, successCount, errorCount, activeTargets.length);
     } catch (err) {
-      console.error(`[Runner] run ${runId} aborted unexpectedly:`, err);
+      logError('Runner', `run ${runId} aborted unexpectedly`, describeError(err));
       try {
         markRunFailed(db, runId);
       } catch (markErr) {
-        console.error(`[Runner] failed to mark run ${runId} as failed:`, markErr);
+        logError('Runner', `failed to mark run ${runId} as failed`, describeError(markErr));
       }
       throw err;
     }
 
     const runRow = db.prepare('SELECT * FROM runs WHERE id = ?').get(runId) as any;
-    console.log(
-      `[Runner] run ${runId} finished: status=${runRow.status} success=${successCount} errors=${errorCount}`
+    const runFinishedAt = new Date();
+    logInfo(
+      'Runner',
+      `run ${runId} finished: status=${runRow.status} success=${successCount} errors=${errorCount}`,
+      {
+        targets: activeTargets.length,
+        started_at: formatTimestamp(runStartedAt),
+        duration_ms: runFinishedAt.getTime() - runStartedAt.getTime(),
+      }
     );
 
     return {
@@ -242,7 +288,13 @@ export class PriceRunner {
       if (waitTime > 0) {
         // Add subtle random jitter for realistic intervals when rate_limit_seconds >= 1s
         const jitterMs = rateLimitSeconds >= 1 ? Math.floor(Math.random() * 600) + 200 : 0;
-        await sleep(waitTime * 1000 + jitterMs);
+        const waitMs = waitTime * 1000 + jitterMs;
+        logDebug('Runner', 'waiting for source rate limit', {
+          source: sourceKey,
+          rate_limit_seconds: rateLimitSeconds,
+          wait_ms: Math.round(waitMs),
+        });
+        await sleep(waitMs);
       }
     }
   }

@@ -3,6 +3,7 @@ import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { detectAvailability, parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
+import { createHttpErrorFromResponse } from './fetchUtils';
 
 export class GenericHtmlAdapter implements PriceAdapter {
   name = 'generic_html';
@@ -23,6 +24,11 @@ export class GenericHtmlAdapter implements PriceAdapter {
       headers,
       signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
     });
+
+    if (!res.ok) {
+      // HTML error pages are noisy; keep the log line focused on the status code.
+      throw await createHttpErrorFromResponse('generic_html', context.target.url, res, { readBody: false });
+    }
 
     const html = await res.text();
     return this.parse(html, context.source, context.target, res.status);

@@ -50,6 +50,18 @@ brsapi_api=your_api_key
 - `npm run errors`: show recent fetch failures.
 - `npm test`: run unit tests with Vitest.
 
+## Logs & Errors
+
+Runner output is timestamped in the app timezone (`APP_TIMEZONE`, default `Asia/Tehran`) and ends with `key=value` details such as HTTP status, `retry_after`, `elapsed_ms` and an actionable `hint`:
+
+```text
+[2026-11-14 22:39:37 +03:30] WARN [Runner] run 371: failed coin-emami/servix_market | adapter=servix_market rate_limit_seconds=3 elapsed_ms=412 error_name=HttpRequestError error="Servix rate limit exceeded (HTTP 429 Too Many Requests); retry after 60s" status=429 retry_after=60 hint="source is throttling requests; raise rate_limit_seconds for this source or retry later"
+```
+
+- `status=429` means the provider throttled the run: raise that source's `rate_limit_seconds` (admin → sources) or collect less often.
+- `npm run errors` lists recent failures with the same reason and a local timestamp.
+- `LOG_LEVEL` (`debug` | `info` | `warn` | `error`, default `info`) controls verbosity; `debug` also logs rate-limit waits.
+
 ## Docker Deployment
 
 Build and start with Docker Compose:

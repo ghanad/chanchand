@@ -1,5 +1,6 @@
 import * as jose from 'jose';
 import { UserRole } from './types';
+import { logWarn } from './logger';
 
 export const AUTH_COOKIE_NAME = 'pg_session';
 
@@ -16,8 +17,9 @@ function getJwtSecret(): Uint8Array {
       );
     }
     if (!devWarningLogged && process.env.NODE_ENV !== 'test') {
-      console.warn(
-        '[Security Warning] JWT_SECRET is not set. Using an insecure fallback secret for development only. Do not deploy to production without setting JWT_SECRET!'
+      logWarn(
+        'Security',
+        'JWT_SECRET is not set. Using an insecure fallback secret for development only. Do not deploy to production without setting JWT_SECRET!'
       );
       devWarningLogged = true;
     }

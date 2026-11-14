@@ -5,6 +5,7 @@ import os from 'os';
 import { PriceRunner } from '../src/lib/runner';
 import { getDatabase, startRun, recordPrice, latestSnapshots } from '../src/lib/db';
 import * as adaptersModule from '../src/lib/adapters';
+import { HttpRequestError, httpFailureHint } from '../src/lib/adapters/fetchUtils';
 import { USD_PRODUCT_KEY } from '../src/lib/serializers';
 import { AppConfig, PriceObservation } from '../src/lib/types';
 
@@ -238,6 +239,70 @@ describe('PriceRunner module', () => {
     expect(errorRows.length).toBe(1);
     expect(errorRows[0].product_key).toBe('failing_item');
     expect(errorRows[0].message).toContain('Timeout 504 Gateway');
+
+    db.close();
+  });
+
+  it('logs failures with a local timestamp and records the HTTP reason', async () => {
+    const db = getDatabase(tempDbUrl);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    vi.spyOn(adaptersModule, 'getAdapter').mockReturnValue({
+      fetch: async () => {
+        throw new HttpRequestError('Servix', 'https://servix.cc/api/v1/assets', 429, 'Too Many Requests', {
+          retryAfterSeconds: 60,
+          responseExcerpt: '{"message":"too many requests"}',
+          hint: httpFailureHint(429),
+        });
+      },
+    } as any);
+
+    const config: AppConfig = {
+      sources: {
+        servix_market: {
+          adapter: 'servix_market',
+          timeout_seconds: 5,
+          rate_limit_seconds: 3,
+          currency: 'IRR',
+          price_multiplier: 1,
+          headers: {},
+          settings: {},
+        },
+      },
+      products: {},
+      targets: [
+        {
+          product_key: 'coin-emami',
+          source_key: 'servix_market',
+          url: 'https://servix.cc/api/v1/assets',
+          enabled: true,
+        },
+      ],
+    };
+
+    const runner = new PriceRunner(tempDbUrl);
+    const summary = await runner.run(config);
+    expect(summary.status).toBe('failed');
+
+    const warnLines = warnSpy.mock.calls.map((call) => String(call[0]));
+    const failureLine = warnLines.find((line) => line.includes('failed coin-emami/servix_market'));
+    expect(failureLine).toBeDefined();
+    expect(failureLine).toMatch(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}\] WARN \[Runner\]/);
+    expect(failureLine).toContain('status=429');
+    expect(failureLine).toContain('retry_after=60');
+    expect(failureLine).toContain('Servix rate limit exceeded');
+    expect(failureLine).toContain('rate_limit_seconds=3');
+
+    const errorRow = db.prepare('SELECT * FROM fetch_errors ORDER BY id DESC LIMIT 1').get() as any;
+    expect(errorRow.error_type).toBe('HttpRequestError');
+    expect(errorRow.message).toContain('rate limit exceeded (HTTP 429 Too Many Requests)');
+    expect(errorRow.message).toContain('retry after 60s');
+
+    const raw = JSON.parse(errorRow.raw_observation);
+    expect(raw.status).toBe(429);
+    expect(raw.retry_after).toBe(60);
+    expect(raw.hint).toContain('rate_limit_seconds');
+    expect(raw.response_excerpt).toContain('too many requests');
 
     db.close();
   });

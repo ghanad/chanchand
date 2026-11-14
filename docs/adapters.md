@@ -12,6 +12,7 @@ Read this when adding or changing a price source.
 - BRSAPI gold and currency markets: `src/lib/adapters/brsapiMarket.ts`
 - Servix gold and currency markets: `src/lib/adapters/servixMarket.ts`
 - Iranjib car and market tables: `src/lib/adapters/iranjib.ts`
+- Fetch/HTTP failure helpers: `src/lib/adapters/fetchUtils.ts` (`fetchWithCookieRedirect`, `HttpRequestError`, `createHttpErrorFromResponse`, `wrapFetchError`)
 - Adapter tests: `tests/adapters.test.ts`
 
 ## Contracts
@@ -19,6 +20,8 @@ Read this when adding or changing a price source.
 - `PriceAdapter.fetch(target: ProductTarget, source: SourceConfig)` returns `Promise<PriceObservation>`.
 - Use `adapter_settings` for source-specific and target-specific options (e.g., CSS selector, API tokens).
 - Throw descriptive errors for expected source parsing/selection failures so `runner.ts` logs them to `fetch_errors`.
+- For non-2xx responses use `createHttpErrorFromResponse(provider, url, res)` (or `wrapFetchError` around `fetch`). It turns `429` into "`<provider> rate limit exceeded (HTTP 429)…; retry after Ns`", keeps `Retry-After`, a short body excerpt and an actionable `hint` so runner logs and `fetch_errors.message` explain the cause.
+- Pass `{ readBody: false }` when the body is large HTML (error pages are noise).
 - Normalize prices to IRR (`price_irr`) before returning observations (using `normalizeDigits` and `parsePriceString` from `src/lib/pricing.ts`).
 - Respect `price_multiplier` (e.g., 10 for TOMAN to IRR conversion).
 - Set `availability` to `'in_stock'`, `'out_of_stock'`, or `'unknown'`.

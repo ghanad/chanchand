@@ -38,6 +38,7 @@ Core flow:
 - Build/version badge data (version + git SHA + build time inlined from `next.config.mjs`): `src/lib/build-info.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
+- Logging & error descriptions (timestamped lines, `key=value` details, URL redaction, `LOG_LEVEL`): `src/lib/logger.ts`
 - Runner & orchestrator: `src/lib/runner.ts`
 - Adapters:
   - Digikala API: `src/lib/adapters/digikalaApi.ts`
@@ -46,7 +47,7 @@ Core flow:
   - Servix gold/currency: `src/lib/adapters/servixMarket.ts`
   - Generic HTML: `src/lib/adapters/genericHtml.ts`
   - Iranjib car/market: `src/lib/adapters/iranjib.ts`
-  - Fetch Utilities & Cookie Redirect: `src/lib/adapters/fetchUtils.ts`
+  - Fetch Utilities, Cookie Redirect & HTTP failure helpers (`HttpRequestError`, `Retry-After`): `src/lib/adapters/fetchUtils.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
 - Documentation: `docs/architecture.md`, `docs/adapters.md`, `docs/storage-config.md`, `docs/ui.md`, `docs/deploy.md`
@@ -78,4 +79,5 @@ docker compose up -d
 - Source adapter names allowed: `generic_html`, `digikala`, `digikala_api`, `digikala_web`, `brsapi_market`, `servix_market`, `iranjib`, `iranjib_car`.
 - Prices stored as `price_irr`.
 - `price_multiplier`: 10 for TOMAN, 1 for IRR.
-- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`, `TRIGGER_API_KEY`.
+- Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`, `TRIGGER_API_KEY`, `APP_TIMEZONE` (default `Asia/Tehran`), `LOG_LEVEL` (`debug`|`info`|`warn`|`error`, default `info`).
+- Runner/CLI log lines are timestamped in `APP_TIMEZONE` with a UTC offset and end with `key=value` details (HTTP status, `retry_after`, `hint`, `elapsed_ms`); adapter HTTP failures throw `HttpRequestError` so `fetch_errors.message` explains the cause.

@@ -3,6 +3,7 @@ import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { detectAvailability, normalizeDigits, parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
+import { createHttpErrorFromResponse } from './fetchUtils';
 
 const DEFAULT_CACHE_TTL_SECONDS = 60.0;
 
@@ -80,7 +81,8 @@ export class IranjibAdapter implements PriceAdapter {
     });
 
     if (!res.ok) {
-      throw new Error(`iranjib returned HTTP ${res.status}: ${res.statusText}`);
+      // HTML error pages are noisy; keep the log line focused on the status code.
+      throw await createHttpErrorFromResponse('Iranjib', cleanUrl, res, { readBody: false });
     }
 
     const html = await res.text();

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { ManagedTargetRow } from '../types';
 import { ALWAYS_ON_MARKET_PRODUCT_KEYS } from '../market';
 import { getTargetDeduplicationKey } from '../urls';
+import { describeError, logWarn } from '../logger';
 
 export function runMigrations(db: Database.Database): void {
   // 1. Runs table columns
@@ -17,7 +18,7 @@ export function runMigrations(db: Database.Database): void {
       db.exec('CREATE INDEX IF NOT EXISTS ix_runs_trigger_source ON runs(trigger_source);');
     }
   } catch (err) {
-    console.warn('[DB] runs table migration warning:', err);
+    logWarn('DB', 'runs table migration warning', describeError(err));
   }
 
   // 2. Users table columns
@@ -92,7 +93,7 @@ export function runMigrations(db: Database.Database): void {
       }
     }
   } catch (err) {
-    console.warn('[DB] packages seed/migration warning:', err);
+    logWarn('DB', 'packages seed/migration warning', describeError(err));
   }
 
   // 4. Managed products columns, hours and public defaults
@@ -169,7 +170,7 @@ export function runMigrations(db: Database.Database): void {
       `);
     }
   } catch (err) {
-    console.warn('[DB] managed_products migration warning:', err);
+    logWarn('DB', 'managed_products migration warning', describeError(err));
   }
 
   // 5. User products column migrations
@@ -179,7 +180,7 @@ export function runMigrations(db: Database.Database): void {
       db.prepare('ALTER TABLE user_products ADD COLUMN last_manual_refresh_at DATETIME DEFAULT NULL').run();
     }
   } catch (err) {
-    console.warn('[DB] user_products column migration warning:', err);
+    logWarn('DB', 'user_products column migration warning', describeError(err));
   }
 
   // 6. Deduplication and backfills
@@ -253,6 +254,6 @@ export function runMigrations(db: Database.Database): void {
       }
     }
   } catch (err) {
-    console.warn('[DB] user_products migration warning:', err);
+    logWarn('DB', 'user_products migration warning', describeError(err));
   }
 }

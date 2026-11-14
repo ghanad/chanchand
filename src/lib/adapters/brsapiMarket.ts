@@ -4,6 +4,7 @@ import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
+import { createHttpErrorFromResponse, wrapFetchError } from './fetchUtils';
 
 const DEFAULT_API_KEY_ENV = 'brsapi_api';
 const ALLOWED_API_KEY_ENVS = new Set(['brsapi_api', 'BRSAPI_API', 'BRSAPI_KEY']);
@@ -133,13 +134,18 @@ export class BrsapiMarketAdapter implements PriceAdapter {
       ...context.source.headers,
     };
 
-    const res = await fetch(apiUrl, {
-      headers,
-      signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
-    });
+    let res: Response;
+    try {
+      res = await fetch(apiUrl, {
+        headers,
+        signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
+      });
+    } catch (err) {
+      throw wrapFetchError('BRSAPI', apiUrl, err, context.source.timeout_seconds);
+    }
 
     if (!res.ok) {
-      throw new Error(`BRSAPI request failed with status ${res.status}`);
+      throw await createHttpErrorFromResponse('BRSAPI', apiUrl, res);
     }
 
     let payload: any;

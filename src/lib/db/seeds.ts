@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { AppConfig } from '../types';
 import { latestRun } from './runs';
+import { describeError, logWarn } from '../logger';
 
 export function seedManagedProductsIfEmpty(db: Database.Database, initialConfig?: AppConfig): void {
   try {
@@ -93,7 +94,7 @@ export function seedManagedProductsIfEmpty(db: Database.Database, initialConfig?
       txn();
     }
   } catch (err) {
-    console.warn('[DB] seedManagedProductsIfEmpty warning:', err);
+    logWarn('DB', 'seedManagedProductsIfEmpty warning', describeError(err));
   }
 }
 
@@ -232,6 +233,6 @@ export function seedDefaultSourcesIfEmpty(db: Database.Database): void {
     });
     txn();
   } catch (err) {
-    console.warn('[DB] seedDefaultSourcesIfEmpty warning:', err);
+    logWarn('DB', 'seedDefaultSourcesIfEmpty warning', describeError(err));
   }
 }

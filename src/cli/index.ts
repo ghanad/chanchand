@@ -19,6 +19,7 @@ import {
 import { PriceRunner } from '../lib/runner';
 import { priceToman } from '../lib/serializers';
 import { hashPassword } from '../lib/auth';
+import { describeError, formatTimestamp, logError, logInfo } from '../lib/logger';
 
 const program = new Command();
 program.name('price-getter').description('Price collection CLI service for public ecommerce and market sources');
@@ -87,12 +88,13 @@ program
       } else {
         summary = await runner.run();
       }
-      console.log(
+      logInfo(
+        'CLI',
         `Run ${summary.run_id} finished with status=${summary.status}; ` +
           `targets=${summary.target_count}, success=${summary.success_count}, errors=${summary.error_count}`
       );
     } catch (err: any) {
-      console.error(`Error: ${err.message}`);
+      logError('CLI', 'run failed', describeError(err));
       process.exit(1);
     }
   });
@@ -128,7 +130,7 @@ program
           irr: r.price_irr,
           availability: r.availability,
           seller: r.seller,
-          observed_at: r.observed_at,
+          observed_at: formatTimestamp(new Date(r.observed_at)),
         }))
       );
     } catch (err: any) {
@@ -168,7 +170,7 @@ program
           irr: r.price_irr,
           availability: r.availability,
           seller: r.seller,
-          observed_at: r.observed_at,
+          observed_at: formatTimestamp(new Date(r.observed_at)),
         }))
       );
     } catch (err: any) {
@@ -206,7 +208,7 @@ program
           source: r.source_key,
           error_type: r.error_type,
           message: r.message,
-          observed_at: r.observed_at,
+          observed_at: formatTimestamp(new Date(r.observed_at)),
         }))
       );
     } catch (err: any) {
