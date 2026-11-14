@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ProductRow, PriceRow } from "@/types/dashboard";
 import { StatusPill } from "@/components/common/StatusPill";
 import { availabilityText } from "@/lib/formatters";
+import { describeCollectionSchedule } from "@/lib/schedule";
 
 interface ProductDetailHeaderProps {
   product: ProductRow;
@@ -74,23 +75,32 @@ export function ProductDetailHeader({
                 {product.key}
               </span>
               {product.is_public ? (() => {
-                const is24Hours =
-                  product.key === "usd" ||
-                  ((product.active_start_hour === 0 || product.active_start_hour === undefined || product.active_start_hour === null) &&
-                    (product.active_end_hour === 23 || product.active_end_hour === undefined || product.active_end_hour === null)) ||
-                  (product.active_start_hour === 0 && product.active_end_hour === 23);
+                const schedule = describeCollectionSchedule(
+                  product.active_start_hour,
+                  product.active_end_hour
+                );
 
                 return (
                   <span
-                    className="adapter-badge brsapi_market"
+                    className="adapter-badge public-schedule"
                     style={{ fontSize: "0.75rem", padding: "2px 8px" }}
-                    title={
-                      is24Hours
-                        ? "ساعات جمع‌آوری: ۲۴ ساعته (شبانه‌روزی)"
-                        : `ساعات جمع‌آوری: ${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 تا ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`
-                    }
+                    title={`ساعات جمع‌آوری: ${schedule.summary}`}
                   >
-                    عمومی ({is24Hours ? "۲۴ ساعته" : `${String(product.active_start_hour ?? 0).padStart(2, "0")}:00 - ${String(product.active_end_hour ?? 23).padStart(2, "0")}:00`})
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <circle cx="12" cy="12" r="9" />
+                      <polyline points="12 7 12 12 15.5 14" />
+                    </svg>
+                    عمومی · {schedule.isFullDay ? schedule.durationLabel : schedule.summary}
                   </span>
                 );
               })() : null}

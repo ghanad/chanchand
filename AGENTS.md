@@ -33,6 +33,8 @@ Core flow:
 - Payment Gateways: `src/lib/payment/types.ts` (`PaymentGateway` interface), `src/lib/payment/zarinpal.ts` (ZarinPal REST v4 adapter), `src/lib/payment/mock.ts` (Mock adapter for testing/dev), `src/lib/payment/index.ts` (gateway registry & factory)
 - Database schema & CRUD: `src/lib/db/*` (modular database package with `src/lib/db/index.ts`, managing `managed_products` with `user_id`, `is_public`, `show_usd_chart`, `show_gold_chart` (grams of 18K gold from the `gold-18k` product), `active_start_hour`, `active_end_hour`, `managed_targets`, `user_products` watchlist with `last_manual_refresh_at`, `product_refresh_logs` audit, `users` with `must_change_password`, `mobile`, `extra_slots`, `slot_expires_at`, `packages` with `duration_days`, `payment_transactions`, `user_subscriptions`, `getScheduledBatchTargets` with per-product configurable public hours [24-hour / 0-23 by default] and LRU 24-hour private batching)
 - URL normalization & deduplication: `src/lib/urls.ts`
+- Collection-window labels (۲۴/۱۲/… ساعته for public products): `src/lib/schedule.ts`
+- Market source detection & always-on market product keys: `src/lib/market.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
 - Runner & orchestrator: `src/lib/runner.ts`

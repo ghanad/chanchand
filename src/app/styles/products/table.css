@@ -210,7 +210,11 @@
 }
 
 .public-indicator-text {
-  display: none;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .product-date-text {

@@ -240,7 +240,7 @@ export function ProductsTable({
           ) : activeTab === "personal" ? (
             filteredPersonal.map((product) => renderRow(product, false))
           ) : (
-            filteredPublic.map((product) => renderRow(product, false))
+            filteredPublic.map((product) => renderRow(product, true))
           )}
         </tbody>
       </table>

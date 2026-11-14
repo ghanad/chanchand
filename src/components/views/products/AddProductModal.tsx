@@ -4,6 +4,7 @@ import { ProductActiveHoursField } from "./ProductActiveHoursField";
 import { SourceRow } from "../../../types/dashboard";
 import { ProductFormState } from "./types";
 import { requestJson } from "@/lib/api-client";
+import { isAlwaysOnMarketProduct } from "@/lib/market";
 
 interface IranjibItemData {
   company: string;
@@ -42,6 +43,9 @@ export function AddProductModal({
   isAdmin,
   isBusy,
 }: AddProductModalProps) {
+  const alwaysOn = isAlwaysOnMarketProduct({
+    primary_target: { source_key: form.source_key },
+  });
   const [mode, setMode] = useState<"general" | "car">("general");
   const [carItems, setCarItems] = useState<IranjibItemData[]>([]);
   const [carCompanies, setCarCompanies] = useState<string[]>([]);
@@ -340,6 +344,7 @@ export function AddProductModal({
                       active_end_hour: hour,
                     }))
                   }
+                  alwaysOn={alwaysOn}
                 />
                 <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
                   <input

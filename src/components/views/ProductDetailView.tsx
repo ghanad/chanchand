@@ -146,6 +146,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           isOpen={showEditModal}
           onClose={() => setShowEditModal(false)}
           onSubmit={handleUpdateProduct}
+          productKey={product.key}
           productTitle={product.title}
           form={editForm}
           setForm={setEditForm}

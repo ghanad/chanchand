@@ -2,12 +2,14 @@ import React from "react";
 import { SourceRow } from "@/types/dashboard";
 import { Modal } from "@/components/common/Modal";
 import { ProductActiveHoursField } from "@/components/views/products/ProductActiveHoursField";
+import { isAlwaysOnMarketProduct } from "@/lib/market";
 import { ProductDetailEditForm } from "./types";
 
 interface ProductDetailEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  productKey: string;
   productTitle: string;
   form: ProductDetailEditForm;
   setForm: React.Dispatch<React.SetStateAction<ProductDetailEditForm>>;
@@ -20,6 +22,7 @@ export function ProductDetailEditModal({
   isOpen,
   onClose,
   onSubmit,
+  productKey,
   productTitle,
   form,
   setForm,
@@ -27,6 +30,11 @@ export function ProductDetailEditModal({
   isAdmin,
   isSaving,
 }: ProductDetailEditModalProps) {
+  const alwaysOn = isAlwaysOnMarketProduct({
+    key: productKey,
+    primary_target: { source_key: form.source_key },
+  });
+
   return (
     <Modal
       isOpen={isOpen}
@@ -83,6 +91,7 @@ export function ProductDetailEditModal({
                   endHour={form.active_end_hour}
                   onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
                   onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
+                  alwaysOn={alwaysOn}
                 />
                 <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
                   <input

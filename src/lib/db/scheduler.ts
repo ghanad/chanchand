@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { TargetConfig } from '../types';
 import { USD_PRODUCT_KEY } from '../serializers';
+import { isMarketSource } from '../market';
 import { FREE_PRODUCT_LIMIT } from './connection';
 import {
   getDayBounds,
@@ -9,14 +10,8 @@ import {
   isHourInWindow,
 } from './schedulerTime';
 
+export { isMarketSource } from '../market';
 export * from './schedulerTime';
-
-export function isMarketSource(sourceKey?: string, adapter?: string): boolean {
-  if (adapter === 'brsapi_market' || adapter === 'servix_market') return true;
-  if (!sourceKey) return false;
-  const lower = sourceKey.toLowerCase();
-  return lower.includes('market') || lower.includes('servix') || lower.includes('brsapi');
-}
 
 export function getPublicProductScheduleMap(
   db: Database.Database

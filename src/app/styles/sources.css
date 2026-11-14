@@ -91,6 +91,16 @@
   border-color: #fde68a;
 }
 
+/* Collection-window badge for public market products (24-hour / 12-hour / ...). */
+.adapter-badge.public-schedule {
+  gap: 4px;
+  direction: rtl;
+  background: rgba(15, 118, 110, 0.1);
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.28);
+  white-space: nowrap;
+}
+
 .adapter-badge.generic_html {
   background: #f0fdf4;
   color: #15803d;

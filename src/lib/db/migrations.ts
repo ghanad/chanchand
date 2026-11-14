@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { ManagedTargetRow } from '../types';
+import { ALWAYS_ON_MARKET_PRODUCT_KEYS } from '../market';
 import { getTargetDeduplicationKey } from '../urls';
 
 export function runMigrations(db: Database.Database): void {
@@ -98,6 +99,9 @@ export function runMigrations(db: Database.Database): void {
   try {
     const prodColumns = db.prepare('PRAGMA table_info(managed_products)').all() as { name: string }[];
     if (prodColumns.length > 0) {
+      const hadActiveStartHour = prodColumns.some((col) => col.name === 'active_start_hour');
+      const hadActiveEndHour = prodColumns.some((col) => col.name === 'active_end_hour');
+
       if (!prodColumns.some((col) => col.name === 'user_id')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN user_id INTEGER REFERENCES users(id)').run();
       }
@@ -110,20 +114,31 @@ export function runMigrations(db: Database.Database): void {
       if (!prodColumns.some((col) => col.name === 'show_gold_chart')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN show_gold_chart INTEGER NOT NULL DEFAULT 0').run();
       }
-      if (!prodColumns.some((col) => col.name === 'active_start_hour')) {
+      if (!hadActiveStartHour) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN active_start_hour INTEGER NOT NULL DEFAULT 8').run();
       }
-      if (!prodColumns.some((col) => col.name === 'active_end_hour')) {
+      if (!hadActiveEndHour) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN active_end_hour INTEGER NOT NULL DEFAULT 23').run();
       }
 
-      // Ensure market products (usd, gold, coin) and default public market products have 24-hour collection (00:00 - 23:00)
+      // One-time legacy normalization only: the old default public window (08:00-23:00)
+      // becomes the new 24-hour default. Never re-run on every connection, otherwise it
+      // would silently overwrite hours an admin has explicitly configured.
+      if (!hadActiveStartHour || !hadActiveEndHour) {
+        db.prepare(`
+          UPDATE managed_products
+          SET active_start_hour = 0, active_end_hour = 23
+          WHERE is_public = 1 AND active_start_hour = 8 AND active_end_hour = 23
+        `).run();
+      }
+
+      // Market products (usd, gold, coin) are collected on every run regardless of their
+      // configured window, so their stored schedule must stay 24-hour to match reality.
       db.prepare(`
         UPDATE managed_products
         SET active_start_hour = 0, active_end_hour = 23
-        WHERE key IN ('usd', 'gold', 'coin', 'sekkeh', 'tala', 'gold-18k', 'gold-24k', 'coin-quarter', 'coin-half', 'coin-emami')
-           OR (is_public = 1 AND active_start_hour = 8 AND active_end_hour = 23)
-      `).run();
+        WHERE key IN (${ALWAYS_ON_MARKET_PRODUCT_KEYS.map(() => '?').join(', ')})
+      `).run(...ALWAYS_ON_MARKET_PRODUCT_KEYS);
 
       // Backfill user_id for existing products to first admin if available
       const adminUser = db
