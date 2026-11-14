@@ -52,8 +52,11 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     maxToman,
     minUsd,
     maxUsd,
+    minGold,
+    maxGold,
     isPublicProduct,
     showUsd,
+    showGold,
     metricConfig,
     chartRows,
     isActive,
@@ -109,6 +112,9 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
         maxToman={maxToman}
         minUsd={minUsd}
         maxUsd={maxUsd}
+        minGold={minGold}
+        maxGold={maxGold}
+        showGold={showGold}
         historyLength={history.length}
       />
 
@@ -116,6 +122,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
         chartRows={chartRows}
         isPublicProduct={isPublicProduct}
         showUsdToggle={showUsd}
+        showGoldToggle={showGold}
         activeMetric={activeMetric}
         setChartMetric={setChartMetric}
         historyLimit={historyLimit}

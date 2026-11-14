@@ -33,6 +33,7 @@ export function useProductActions({
     source_key: "",
     is_public: false,
     show_usd_chart: false,
+    show_gold_chart: false,
     active_start_hour: 0,
     active_end_hour: 23,
   });
@@ -43,6 +44,7 @@ export function useProductActions({
     source_key: "",
     is_public: false,
     show_usd_chart: false,
+    show_gold_chart: false,
     active_start_hour: 0,
     active_end_hour: 23,
   });
@@ -67,6 +69,7 @@ export function useProductActions({
           source_key: form.source_key || null,
           is_public: isAdmin ? form.is_public : false,
           show_usd_chart: isAdmin && form.is_public ? form.show_usd_chart : false,
+          show_gold_chart: isAdmin && form.is_public ? form.show_gold_chart : false,
           active_start_hour: isAdmin ? form.active_start_hour : undefined,
           active_end_hour: isAdmin ? form.active_end_hour : undefined,
           adapter_settings:
@@ -81,6 +84,7 @@ export function useProductActions({
         source_key: current.source_key,
         is_public: false,
         show_usd_chart: false,
+        show_gold_chart: false,
         active_start_hour: 0,
         active_end_hour: 23,
         adapter_settings: undefined,
@@ -109,6 +113,7 @@ export function useProductActions({
       source_key: product.primary_target.source_key,
       is_public: Boolean(product.is_public),
       show_usd_chart: Boolean(product.show_usd_chart),
+      show_gold_chart: Boolean(product.show_gold_chart),
       active_start_hour: product.active_start_hour ?? 0,
       active_end_hour: product.active_end_hour ?? 23,
     });
@@ -122,6 +127,7 @@ export function useProductActions({
       source_key: "",
       is_public: false,
       show_usd_chart: false,
+      show_gold_chart: false,
       active_start_hour: 0,
       active_end_hour: 23,
     });
@@ -142,6 +148,7 @@ export function useProductActions({
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
             show_usd_chart: isAdmin ? (editForm.is_public ? editForm.show_usd_chart : false) : undefined,
+            show_gold_chart: isAdmin ? (editForm.is_public ? editForm.show_gold_chart : false) : undefined,
             active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
             active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),

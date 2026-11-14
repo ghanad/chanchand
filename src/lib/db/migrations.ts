@@ -107,6 +107,9 @@ export function runMigrations(db: Database.Database): void {
       if (!prodColumns.some((col) => col.name === 'show_usd_chart')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN show_usd_chart INTEGER NOT NULL DEFAULT 0').run();
       }
+      if (!prodColumns.some((col) => col.name === 'show_gold_chart')) {
+        db.prepare('ALTER TABLE managed_products ADD COLUMN show_gold_chart INTEGER NOT NULL DEFAULT 0').run();
+      }
       if (!prodColumns.some((col) => col.name === 'active_start_hour')) {
         db.prepare('ALTER TABLE managed_products ADD COLUMN active_start_hour INTEGER NOT NULL DEFAULT 8').run();
       }

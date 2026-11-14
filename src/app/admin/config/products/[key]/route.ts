@@ -33,6 +33,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ key:
         source_key: body.source_key,
         is_public: body.is_public !== undefined ? Boolean(body.is_public) : undefined,
         show_usd_chart: body.show_usd_chart !== undefined ? Boolean(body.show_usd_chart) : undefined,
+        show_gold_chart: body.show_gold_chart !== undefined ? Boolean(body.show_gold_chart) : undefined,
       },
       auth.user
     );

@@ -1,15 +1,18 @@
 import React from "react";
 import { PriceRow } from "@/types/dashboard";
-import { formatNumber, formatDate } from "@/lib/formatters";
+import { formatNumber, formatDate, formatGoldGram } from "@/lib/formatters";
 
 interface ProductDetailSummaryProps {
   latestSnapshot: PriceRow | null;
   isPublicProduct?: boolean;
   showUsd?: boolean;
+  showGold?: boolean;
   minToman: number | null;
   maxToman: number | null;
   minUsd: number | null;
   maxUsd: number | null;
+  minGold: number | null;
+  maxGold: number | null;
   historyLength: number;
 }
 
@@ -17,29 +20,42 @@ export function ProductDetailSummary({
   latestSnapshot,
   isPublicProduct = false,
   showUsd,
+  showGold,
   minToman,
   maxToman,
   minUsd,
   maxUsd,
+  minGold,
+  maxGold,
   historyLength,
 }: ProductDetailSummaryProps) {
   const canShowUsd = showUsd !== undefined ? showUsd : !isPublicProduct;
+  const canShowGold = showGold !== undefined ? showGold : !isPublicProduct;
 
   const hasLatestPrice =
     latestSnapshot?.price_toman !== null && latestSnapshot?.price_toman !== undefined;
 
+  const equivalentHint = (
+    usdValue: number | null | undefined,
+    goldValue: number | null | undefined
+  ): string | undefined => {
+    const parts: string[] = [];
+    if (canShowUsd && usdValue !== null && usdValue !== undefined) {
+      parts.push(`${formatNumber(usdValue)} دلار`);
+    }
+    if (canShowGold && goldValue !== null && goldValue !== undefined) {
+      parts.push(`${formatGoldGram(goldValue)} گرم طلا`);
+    }
+    return parts.length > 0 ? `معادل ${parts.join(" · ")}` : undefined;
+  };
+
   const latestHint =
-    canShowUsd && latestSnapshot?.price_usd
-      ? `معادل ${formatNumber(latestSnapshot.price_usd)} دلار`
-      : latestSnapshot?.seller
-      ? `فروشنده: ${latestSnapshot.seller}`
-      : undefined;
+    equivalentHint(latestSnapshot?.price_usd, latestSnapshot?.price_gold_gram) ??
+    (latestSnapshot?.seller ? `فروشنده: ${latestSnapshot.seller}` : undefined);
 
-  const minHint =
-    canShowUsd && minUsd !== null ? `معادل ${formatNumber(minUsd)} دلار` : undefined;
+  const minHint = equivalentHint(minUsd, minGold);
 
-  const maxHint =
-    canShowUsd && maxUsd !== null ? `معادل ${formatNumber(maxUsd)} دلار` : undefined;
+  const maxHint = equivalentHint(maxUsd, maxGold);
 
   const historyHint = latestSnapshot?.observed_at
     ? `آخرین: ${formatDate(latestSnapshot.observed_at)}`

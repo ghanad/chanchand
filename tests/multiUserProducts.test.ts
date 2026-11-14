@@ -295,5 +295,109 @@ describe('Multi-user Product Ownership and Public Market Items (API & RBAC)', ()
       expect(userProd.show_usd_chart).toBe(0);
       db3.close();
     });
+
+    it('allows admin to set and update show_gold_chart for public products, but ignores it for non-admin', async () => {
+      const reqAdminPost = new NextRequest('https://example.com/api/products', {
+        method: 'POST',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${adminCookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'طلای ۱۸ عیار تست',
+          url: 'https://example.com/gold-18k-test',
+          is_public: true,
+          show_gold_chart: true,
+        }),
+      });
+      const resAdminPost = await postProduct(reqAdminPost);
+      expect(resAdminPost.status).toBe(200);
+      const { product_key: goldKey } = await resAdminPost.json();
+
+      const db = getDatabase();
+      const goldProd = db.prepare('SELECT is_public, show_gold_chart FROM managed_products WHERE key = ?').get(goldKey) as any;
+      expect(goldProd.is_public).toBe(1);
+      expect(goldProd.show_gold_chart).toBe(1);
+      db.close();
+
+      const reqGet = new NextRequest('https://example.com/api/products', {
+        headers: { cookie: `${AUTH_COOKIE_NAME}=${adminCookie}` },
+      });
+      const resGet = await getProducts(reqGet);
+      const jsonGet = await resGet.json();
+      const foundGold = jsonGet.products.find((p: any) => p.key === goldKey);
+      expect(foundGold.show_gold_chart).toBe(true);
+
+      const reqAdminPut = new NextRequest(`https://example.com/api/products/${goldKey}`, {
+        method: 'PUT',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${adminCookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'طلای ۱۸ عیار تست',
+          url: 'https://example.com/gold-18k-test',
+          is_public: true,
+          show_gold_chart: false,
+        }),
+      });
+      const resAdminPut = await putProduct(reqAdminPut, { params: Promise.resolve({ key: goldKey }) });
+      expect(resAdminPut.status).toBe(200);
+
+      const db2 = getDatabase();
+      const goldProdUpdated = db2.prepare('SELECT show_gold_chart FROM managed_products WHERE key = ?').get(goldKey) as any;
+      expect(goldProdUpdated.show_gold_chart).toBe(0);
+      db2.close();
+
+      const reqUserPost = new NextRequest('https://example.com/api/products', {
+        method: 'POST',
+        headers: {
+          cookie: `${AUTH_COOKIE_NAME}=${user1Cookie}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'کالای کاربر با نمودار طلا',
+          url: 'https://example.com/regular-gold-item',
+          is_public: true,
+          show_gold_chart: true,
+        }),
+      });
+      const resUserPost = await postProduct(reqUserPost);
+      expect(resUserPost.status).toBe(200);
+      const { product_key: userItemKey } = await resUserPost.json();
+
+      const db3 = getDatabase();
+      const userProd = db3.prepare('SELECT is_public, show_gold_chart FROM managed_products WHERE key = ?').get(userItemKey) as any;
+      expect(userProd.is_public).toBe(0);
+      expect(userProd.show_gold_chart).toBe(0);
+      db3.close();
+    });
+
+    it('GET /api/history converts product prices to grams of 18K gold', async () => {
+      const db = getDatabase();
+      db.prepare(
+        "INSERT INTO runs (started_at, status, target_count, success_count, error_count, trigger_source) VALUES (?, 'success', 0, 0, 0, 'test')"
+      ).run(new Date().toISOString());
+      const runId = (db.prepare('SELECT MAX(id) AS id FROM runs').get() as { id: number }).id;
+
+      const insertSnapshot = db.prepare(`
+        INSERT INTO price_snapshots (
+          run_id, product_key, source_key, url, title, seller, price_irr, availability, observed_at, raw_observation
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+      `);
+      insertSnapshot.run(runId, 'gold-18k', 'servix_market', 'https://servix.cc/api/v1/assets', 'طلای ۱۸ عیار', null, 256_000_000, 'in_stock', '2026-11-01T10:00:00.000Z');
+      insertSnapshot.run(runId, 'gold-chart-item', 'digikala_api', 'https://example.com/item', 'کالای تست', null, 2_560_000_000, 'in_stock', '2026-11-01T10:05:00.000Z');
+      db.close();
+
+      const req = new NextRequest('https://example.com/api/history?product_key=gold-chart-item', {
+        headers: { cookie: `${AUTH_COOKIE_NAME}=${adminCookie}` },
+      });
+      const res = await getHistory(req);
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.rows).toHaveLength(1);
+      expect(json.rows[0].gold_rate_irr).toBe(256_000_000);
+      expect(json.rows[0].price_gold_gram).toBe(10);
+    });
   });
 });

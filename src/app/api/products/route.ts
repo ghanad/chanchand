@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
 
     const isPublic = auth.user.role === 'admin' ? Boolean(body.is_public) : false;
     const showUsdChart = auth.user.role === 'admin' && body.show_usd_chart !== undefined ? Boolean(body.show_usd_chart) : false;
+    const showGoldChart = auth.user.role === 'admin' && body.show_gold_chart !== undefined ? Boolean(body.show_gold_chart) : false;
     const startHour = auth.user.role === 'admin' && body.active_start_hour !== undefined ? Number(body.active_start_hour) : undefined;
     const endHour = auth.user.role === 'admin' && body.active_end_hour !== undefined ? Number(body.active_end_hour) : undefined;
 
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       user_id: auth.user.id,
       is_public: isPublic,
       show_usd_chart: showUsdChart,
+      show_gold_chart: showGoldChart,
       active_start_hour: startHour,
       active_end_hour: endHour,
       adapter_settings: body.adapter_settings,

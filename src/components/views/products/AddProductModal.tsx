@@ -354,6 +354,19 @@ export function AddProductModal({
                   />
                   <span>نمایش نمودار دلاری برای این کالا</span>
                 </label>
+                <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
+                  <input
+                    type="checkbox"
+                    checked={form.show_gold_chart}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        show_gold_chart: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>نمایش نمودار طلای ۱۸ عیار برای این کالا</span>
+                </label>
               </>
             ) : null}
           </>

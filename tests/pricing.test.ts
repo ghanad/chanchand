@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { normalizeDigits, parsePriceToIrr, detectAvailability } from '../src/lib/pricing';
-import { usdRateFor, serializePrice } from '../src/lib/serializers';
+import { usdRateFor, serializePrice, priceGoldGram, serializeHistoryPrices } from '../src/lib/serializers';
 
 describe('pricing module', () => {
   it('normalizes Persian and Arabic digits', () => {
@@ -142,3 +142,58 @@ describe('serializePrice with previous price diffs', () => {
   });
 });
 
+describe('gold gram pricing', () => {
+  const makeSnapshot = (observed_at: string, price_irr: number) => ({
+    id: 1,
+    run_id: 1,
+    product_key: 'gold-18k',
+    source_key: 'servix_market',
+    url: 'http://test',
+    title: 'Gold 18K',
+    seller: null,
+    price_irr,
+    availability: 'in_stock' as const,
+    observed_at,
+    raw_observation: '{}',
+  });
+
+  it('converts a rial price to grams of 18K gold', () => {
+    expect(priceGoldGram(25_600_000_000, 256_000_000)).toBe(100);
+    expect(priceGoldGram(1_000_000, 256_000_000)).toBe(0.0039);
+    expect(priceGoldGram(2_560_000_000, 256_000_000)).toBe(10);
+  });
+
+  it('returns null when either price or gold rate is missing/zero', () => {
+    expect(priceGoldGram(null, 256_000_000)).toBeNull();
+    expect(priceGoldGram(1_000_000, null)).toBeNull();
+    expect(priceGoldGram(1_000_000, 0)).toBeNull();
+  });
+
+  it('attaches the nearest gold rate to each history row', () => {
+    const productRow = {
+      ...makeSnapshot('2026-10-23T08:56:00.000Z', 2_560_000_000),
+      product_key: 'air-purifier',
+      source_key: 'digikala_api',
+    };
+    const goldBefore = makeSnapshot('2026-10-23T07:00:00.000Z', 260_000_000);
+    const goldAfter = makeSnapshot('2026-10-23T09:00:00.000Z', 256_000_000);
+
+    const [serialized] = serializeHistoryPrices([productRow], [], [goldBefore, goldAfter]);
+
+    expect(serialized.gold_rate_irr).toBe(256_000_000);
+    expect(serialized.price_gold_gram).toBe(10);
+    expect(serialized.price_usd).toBeNull();
+  });
+
+  it('leaves gold fields null when no gold rate has been collected', () => {
+    const productRow = {
+      ...makeSnapshot('2026-10-23T08:56:00.000Z', 2_560_000_000),
+      product_key: 'air-purifier',
+    };
+
+    const [serialized] = serializeHistoryPrices([productRow], [], []);
+
+    expect(serialized.gold_rate_irr).toBeNull();
+    expect(serialized.price_gold_gram).toBeNull();
+  });
+});

@@ -19,6 +19,9 @@ export interface PriceRow {
   price_usd: number | null;
   usd_rate_irr: number | null;
   usd_rate_toman: number | null;
+  price_gold_gram: number | null;
+  gold_rate_irr: number | null;
+  gold_rate_toman: number | null;
   availability: Availability;
   observed_at: string | null;
 }
@@ -30,6 +33,7 @@ export interface ProductRow {
   owner_username?: string | null;
   is_public?: boolean;
   show_usd_chart?: boolean;
+  show_gold_chart?: boolean;
   active_start_hour?: number;
   active_end_hour?: number;
   can_edit?: boolean;
@@ -127,5 +131,5 @@ export interface ProductsPayload {
 }
 
 export type Tab = "overview" | "prices" | "history" | "runs" | "products" | "sources";
-export type HistoryMetric = "toman" | "usd";
+export type HistoryMetric = "toman" | "usd" | "gold";
 export type AppMode = "public" | "admin";

@@ -3,6 +3,8 @@ import { getDayBounds } from './db/scheduler';
 
 export const USD_PRODUCT_KEY = 'usd';
 export const USD_HISTORY_LIMIT = 10000;
+export const GOLD_PRODUCT_KEY = 'gold-18k';
+export const GOLD_HISTORY_LIMIT = 10000;
 
 export function priceToman(priceIrr: number | null | undefined): number | null {
   if (priceIrr === null || priceIrr === undefined) return null;
@@ -17,14 +19,31 @@ export function priceUsd(priceIrr: number | null | undefined, usdRateIrr: number
   return Math.round((priceIrr / usdRateIrr) * 100) / 100;
 }
 
+/**
+ * Price expressed as grams of 18K gold: rial price / rial price of one gram of 18K gold.
+ * Uses four decimals so cheap items keep a meaningful value (e.g. 0.0039 gram).
+ */
+export function priceGoldGram(
+  priceIrr: number | null | undefined,
+  goldGramRateIrr: number | null | undefined
+): number | null {
+  if (priceIrr === null || priceIrr === undefined || !goldGramRateIrr || goldGramRateIrr <= 0) {
+    return null;
+  }
+  return Math.round((priceIrr / goldGramRateIrr) * 10000) / 10000;
+}
+
 export function serializePrice(
   row: PriceSnapshotRow,
   usdRateIrr?: number | null,
-  previousPriceIrr?: number | null
+  previousPriceIrr?: number | null,
+  goldGramRateIrr?: number | null
 ): Record<string, any> {
   const تومان = priceToman(row.price_irr);
   const دلار = priceUsd(row.price_irr, usdRateIrr);
   const usdRateToman = priceToman(usdRateIrr);
+  const طلا = priceGoldGram(row.price_irr, goldGramRateIrr);
+  const goldRateToman = priceToman(goldGramRateIrr);
 
   const prevIrr = previousPriceIrr !== undefined ? previousPriceIrr : (row.previous_price_irr ?? null);
   const prevToman = priceToman(prevIrr);
@@ -60,6 +79,9 @@ export function serializePrice(
     price_usd: دلار,
     usd_rate_irr: usdRateIrr ?? null,
     usd_rate_toman: usdRateToman,
+    price_gold_gram: طلا,
+    gold_rate_irr: goldGramRateIrr ?? null,
+    gold_rate_toman: goldRateToman,
     availability: row.availability,
     observed_at: row.observed_at,
   };
@@ -108,6 +130,7 @@ export function productsPayload(
     owner_username?: string | null;
     is_public?: number | boolean;
     show_usd_chart?: number | boolean;
+    show_gold_chart?: number | boolean;
     active_start_hour?: number | null;
     active_end_hour?: number | null;
     is_tracked_by_user?: boolean;
@@ -147,6 +170,7 @@ export function productsPayload(
       owner_username: dbProduct.owner_username ?? null,
       is_public: isPublic,
       show_usd_chart: Boolean(dbProduct.show_usd_chart),
+      show_gold_chart: Boolean(dbProduct.show_gold_chart),
       active_start_hour: dbProduct.active_start_hour ?? 0,
       active_end_hour: dbProduct.active_end_hour ?? 23,
       can_edit: canEdit,
@@ -169,6 +193,7 @@ export function productsPayload(
         owner_username: null,
         is_public: true,
         show_usd_chart: false,
+        show_gold_chart: false,
         active_start_hour: 0,
         active_end_hour: 23,
         can_edit: currentUser?.role === 'admin',
@@ -299,12 +324,25 @@ export function sourcesPayload(
 export function serializeHistoryPrices(
   rows: PriceSnapshotRow[],
   usdRows: PriceSnapshotRow[],
+  goldRows: PriceSnapshotRow[] = [],
   maxToleranceMs?: number
 ): Array<Record<string, any>> {
-  const usdRates = usdRows
+  const usdRates = sortRates(usdRows);
+  const goldRates = sortRates(goldRows);
+  return rows.map((row) =>
+    serializePrice(
+      row,
+      nearestRateFor(row, usdRates, maxToleranceMs),
+      undefined,
+      nearestRateFor(row, goldRates, maxToleranceMs)
+    )
+  );
+}
+
+function sortRates(rows: PriceSnapshotRow[]): PriceSnapshotRow[] {
+  return rows
     .filter((r) => r.price_irr && r.price_irr > 0 && r.observed_at)
     .sort((a, b) => new Date(a.observed_at).getTime() - new Date(b.observed_at).getTime());
-  return rows.map((row) => serializePrice(row, usdRateFor(row, usdRates, maxToleranceMs)));
 }
 
 export function usdRateFor(
@@ -312,30 +350,42 @@ export function usdRateFor(
   usdRates: PriceSnapshotRow[],
   maxToleranceMs?: number
 ): number | null {
-  if (!usdRates.length || !row.observed_at) return null;
+  return nearestRateFor(row, usdRates, maxToleranceMs);
+}
+
+/**
+ * Selects the observation of a rate product whose timestamp is closest to the
+ * given price row, optionally rejecting rates farther than `maxToleranceMs`.
+ */
+export function nearestRateFor(
+  row: PriceSnapshotRow,
+  rates: PriceSnapshotRow[],
+  maxToleranceMs?: number
+): number | null {
+  if (!rates.length || !row.observed_at) return null;
   const targetTime = new Date(row.observed_at).getTime();
   if (Number.isNaN(targetTime)) return null;
 
   let latestBefore: PriceSnapshotRow | null = null;
   let firstAfter: PriceSnapshotRow | null = null;
 
-  for (const usd of usdRates) {
-    if (!usd.observed_at) continue;
-    const usdTime = new Date(usd.observed_at).getTime();
-    if (Number.isNaN(usdTime)) continue;
+  for (const rate of rates) {
+    if (!rate.observed_at) continue;
+    const rateTime = new Date(rate.observed_at).getTime();
+    if (Number.isNaN(rateTime)) continue;
 
-    if (usdTime <= targetTime) {
-      latestBefore = usd;
+    if (rateTime <= targetTime) {
+      latestBefore = rate;
     } else {
-      firstAfter = usd;
+      firstAfter = rate;
       break;
     }
   }
 
   let selected: PriceSnapshotRow | null = null;
   if (latestBefore && firstAfter) {
-    const diffBefore = Math.abs(targetTime - new Date(latestBefore.observed_at).getTime());
-    const diffAfter = Math.abs(new Date(firstAfter.observed_at).getTime() - targetTime);
+    const diffBefore = Math.abs(targetTime - new Date(latestBefore.observed_at!).getTime());
+    const diffAfter = Math.abs(new Date(firstAfter.observed_at!).getTime() - targetTime);
     selected = diffBefore <= diffAfter ? latestBefore : firstAfter;
   } else {
     selected = latestBefore || firstAfter;

@@ -47,6 +47,45 @@ export function formatNumber(value: number | null | undefined): string {
   return value === null || value === undefined ? "-" : numberFormatter.format(value);
 }
 
+/** Formats a weight in grams of 18K gold, keeping up to four decimals. */
+export function formatGoldGram(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  return new Intl.NumberFormat("fa-IR", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  }).format(Number(value));
+}
+
+/**
+ * Axis tick formatter for gram values, selecting decimals based on the domain
+ * spread so sub-gram values do not collapse into identical labels.
+ */
+export function formatGoldGramAxis(
+  value: number | null | undefined,
+  spread?: number
+): string {
+  if (value === null || value === undefined || Number.isNaN(Number(value))) return "-";
+  const num = Number(value);
+  const magnitude = Math.max(Math.abs(num), spread && spread > 0 ? spread : 0);
+  const maxFractionDigits = magnitude >= 10 ? 2 : magnitude >= 1 ? 2 : magnitude >= 0.1 ? 3 : 4;
+  return new Intl.NumberFormat("fa-IR", { maximumFractionDigits: maxFractionDigits }).format(num);
+}
+
+/** Domain for the grams-of-gold chart, rounded with sub-gram precision. */
+export function goldGramAxisDomain(rows: Array<{ price: number }>): [number, number] {
+  const prices = rows.map((row) => row.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const spread = max - min;
+  const padding = spread > 0 ? spread * 0.15 : Math.max(max * 0.05, 0.0001);
+  const factor = max >= 10 ? 100 : max >= 1 ? 1000 : 10000;
+
+  return [
+    Math.max(0, Math.floor((min - padding) * factor) / factor),
+    Math.ceil((max + padding) * factor) / factor,
+  ];
+}
+
 export function formatPercentChange(percent: number | null | undefined): string {
   if (percent === null || percent === undefined) return "-";
   const abs = Math.abs(percent);

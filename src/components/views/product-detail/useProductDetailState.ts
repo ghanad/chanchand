@@ -34,6 +34,7 @@ export function useProductDetailState(productKey: string) {
     source_key: "",
     is_public: false,
     show_usd_chart: false,
+    show_gold_chart: false,
     active_start_hour: 0,
     active_end_hour: 23,
   });
@@ -58,6 +59,7 @@ export function useProductDetailState(productKey: string) {
           source_key: matched.primary_target?.source_key || "",
           is_public: Boolean(matched.is_public),
           show_usd_chart: Boolean(matched.show_usd_chart),
+          show_gold_chart: Boolean(matched.show_gold_chart),
           active_start_hour: matched.active_start_hour ?? 0,
           active_end_hour: matched.active_end_hour ?? 23,
         });
@@ -210,6 +212,7 @@ export function useProductDetailState(productKey: string) {
             source_key: editForm.source_key || null,
             is_public: isAdmin ? editForm.is_public : undefined,
             show_usd_chart: isAdmin ? (editForm.is_public ? editForm.show_usd_chart : false) : undefined,
+            show_gold_chart: isAdmin ? (editForm.is_public ? editForm.show_gold_chart : false) : undefined,
             active_start_hour: isAdmin ? editForm.active_start_hour : undefined,
             active_end_hour: isAdmin ? editForm.active_end_hour : undefined,
           }),
@@ -250,11 +253,13 @@ export function useProductDetailState(productKey: string) {
     return history[history.length - 1];
   }, [history]);
 
-  const { minToman, maxToman, minUsd, maxUsd } = useMemo(() => {
+  const { minToman, maxToman, minUsd, maxUsd, minGold, maxGold } = useMemo(() => {
     let minT: number | null = null;
     let maxT: number | null = null;
     let minU: number | null = null;
     let maxU: number | null = null;
+    let minG: number | null = null;
+    let maxG: number | null = null;
 
     for (const row of history) {
       if (row.price_toman !== null && Number.isFinite(row.price_toman)) {
@@ -265,26 +270,52 @@ export function useProductDetailState(productKey: string) {
         if (minU === null || row.price_usd < minU) minU = row.price_usd;
         if (maxU === null || row.price_usd > maxU) maxU = row.price_usd;
       }
+      if (row.price_gold_gram !== null && Number.isFinite(row.price_gold_gram)) {
+        if (minG === null || row.price_gold_gram < minG) minG = row.price_gold_gram;
+        if (maxG === null || row.price_gold_gram > maxG) maxG = row.price_gold_gram;
+      }
     }
 
-    return { minToman: minT, maxToman: maxT, minUsd: minU, maxUsd: maxU };
+    return {
+      minToman: minT,
+      maxToman: maxT,
+      minUsd: minU,
+      maxUsd: maxU,
+      minGold: minG,
+      maxGold: maxG,
+    };
   }, [history]);
 
   const isPublicProduct = Boolean(product?.is_public);
   const showUsd = !isPublicProduct || Boolean(product?.show_usd_chart);
-  const activeMetric: HistoryMetric = showUsd ? chartMetric : "toman";
+  const showGold = !isPublicProduct || Boolean(product?.show_gold_chart);
+  const activeMetric: HistoryMetric =
+    (chartMetric === "usd" && !showUsd) || (chartMetric === "gold" && !showGold)
+      ? "toman"
+      : chartMetric;
 
   const metricConfig = useMemo(() => {
+    if (activeMetric === "gold") {
+      return {
+        key: "price_gold_gram" as const,
+        label: "طلا",
+        name: "معادل طلا",
+        suffix: "گرم طلا",
+        empty: "برای نمایش نمودار طلا، نرخ گرم طلای ۱۸ عیار باید در سیستم ثبت شده باشد.",
+      };
+    }
     return activeMetric === "usd"
       ? {
           key: "price_usd" as const,
           label: "دلار",
+          name: "قیمت",
           suffix: "دلار",
           empty: "برای نمایش قیمت دلاری، نرخ دلار باید در سیستم ثبت شده باشد.",
         }
       : {
           key: "price_toman" as const,
           label: "تومان",
+          name: "قیمت",
           suffix: "تومان",
           empty: "هنوز داده‌ای برای نمودار ثبت نشده است.",
         };
@@ -338,8 +369,11 @@ export function useProductDetailState(productKey: string) {
     maxToman,
     minUsd,
     maxUsd,
+    minGold,
+    maxGold,
     isPublicProduct,
     showUsd,
+    showGold,
     activeMetric,
     metricConfig,
     chartRows,

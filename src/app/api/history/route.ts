@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, productHistoryChronological, isUserTrackingProduct } from '@/lib/db';
-import { serializeHistoryPrices, USD_HISTORY_LIMIT, USD_PRODUCT_KEY } from '@/lib/serializers';
+import { serializeHistoryPrices, GOLD_HISTORY_LIMIT, GOLD_PRODUCT_KEY, USD_HISTORY_LIMIT, USD_PRODUCT_KEY } from '@/lib/serializers';
 
 import { getAuthUserFromRequest } from '@/lib/auth';
 
@@ -38,9 +38,10 @@ export async function GET(req: NextRequest) {
 
     const rows = productHistoryChronological(db, productKey, sourceKey, limit);
     const usdRows = productHistoryChronological(db, USD_PRODUCT_KEY, undefined, USD_HISTORY_LIMIT);
+    const goldRows = productHistoryChronological(db, GOLD_PRODUCT_KEY, undefined, GOLD_HISTORY_LIMIT);
 
     return NextResponse.json({
-      rows: serializeHistoryPrices(rows, usdRows),
+      rows: serializeHistoryPrices(rows, usdRows, goldRows),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || String(err) }, { status: 500 });

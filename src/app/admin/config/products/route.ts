@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       user_id: auth.user.id,
       is_public: body.is_public !== undefined ? Boolean(body.is_public) : true,
       show_usd_chart: body.show_usd_chart !== undefined ? Boolean(body.show_usd_chart) : false,
+      show_gold_chart: body.show_gold_chart !== undefined ? Boolean(body.show_gold_chart) : false,
     });
 
     return NextResponse.json(result);

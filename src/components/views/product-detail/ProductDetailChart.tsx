@@ -10,7 +10,15 @@ import {
   YAxis,
 } from "recharts";
 import { HistoryMetric } from "@/types/dashboard";
-import { formatNumber, numberFormatter, priceAxisDomain, formatPriceAxis } from "@/lib/formatters";
+import {
+  formatNumber,
+  numberFormatter,
+  priceAxisDomain,
+  formatPriceAxis,
+  formatGoldGram,
+  formatGoldGramAxis,
+  goldGramAxisDomain,
+} from "@/lib/formatters";
 import { PanelHead } from "@/components/common/PanelHead";
 import { EmptyState } from "@/components/common/EmptyState";
 import { ChartRow } from "./types";
@@ -19,12 +27,14 @@ interface ProductDetailChartProps {
   chartRows: ChartRow[];
   isPublicProduct?: boolean;
   showUsdToggle?: boolean;
+  showGoldToggle?: boolean;
   activeMetric: HistoryMetric;
   setChartMetric: (metric: HistoryMetric) => void;
   historyLimit: string;
   setHistoryLimit: (limit: string) => void;
   metricConfig: {
     label: string;
+    name: string;
     suffix: string;
     empty: string;
   };
@@ -35,6 +45,7 @@ export function ProductDetailChart({
   chartRows,
   isPublicProduct = false,
   showUsdToggle,
+  showGoldToggle,
   activeMetric,
   setChartMetric,
   historyLimit,
@@ -43,6 +54,7 @@ export function ProductDetailChart({
   productKey,
 }: ProductDetailChartProps) {
   const canToggleUsd = showUsdToggle !== undefined ? showUsdToggle : !isPublicProduct;
+  const canToggleGold = showGoldToggle !== undefined ? showGoldToggle : !isPublicProduct;
   // Zoom & selection state
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
@@ -63,13 +75,24 @@ export function ProductDetailChart({
   }, [chartRows, zoomRange]);
 
   const chartPriceDomain = useMemo(() => {
-    return visibleRows.length ? priceAxisDomain(visibleRows) : undefined;
-  }, [visibleRows]);
+    if (!visibleRows.length) return undefined;
+    return activeMetric === "gold"
+      ? goldGramAxisDomain(visibleRows)
+      : priceAxisDomain(visibleRows);
+  }, [visibleRows, activeMetric]);
 
   const priceSpread = useMemo(() => {
     if (!chartPriceDomain) return undefined;
     return chartPriceDomain[1] - chartPriceDomain[0];
   }, [chartPriceDomain]);
+
+  const chartColor = activeMetric === "gold" ? "#b45309" : "#0f766e";
+  const chartFillId = `productPriceFill-${activeMetric}`;
+
+  const formatAxisTick = (value: number) =>
+    activeMetric === "gold"
+      ? formatGoldGramAxis(Number(value), priceSpread)
+      : formatPriceAxis(Number(value), priceSpread);
 
   const handleMouseDown = useCallback((e: any) => {
     if (!e) return;
@@ -196,7 +219,7 @@ export function ProductDetailChart({
               </button>
             )}
 
-            {canToggleUsd && (
+            {(canToggleUsd || canToggleGold) && (
               <div className="metric-toggle" aria-label="واحد نمایش نمودار">
                 <button
                   type="button"
@@ -205,13 +228,25 @@ export function ProductDetailChart({
                 >
                   تومان
                 </button>
-                <button
-                  type="button"
-                  className={activeMetric === "usd" ? "active" : ""}
-                  onClick={() => setChartMetric("usd")}
-                >
-                  دلار
-                </button>
+                {canToggleUsd && (
+                  <button
+                    type="button"
+                    className={activeMetric === "usd" ? "active" : ""}
+                    onClick={() => setChartMetric("usd")}
+                  >
+                    دلار
+                  </button>
+                )}
+                {canToggleGold && (
+                  <button
+                    type="button"
+                    className={activeMetric === "gold" ? "active" : ""}
+                    onClick={() => setChartMetric("gold")}
+                    title="نمودار بر حسب گرم طلای ۱۸ عیار"
+                  >
+                    گرم طلا
+                  </button>
+                )}
               </div>
             )}
 
@@ -239,9 +274,9 @@ export function ProductDetailChart({
             onMouseUp={handleZoom}
           >
             <defs>
-              <linearGradient id="productPriceFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#0f766e" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="#0f766e" stopOpacity={0.02} />
+              <linearGradient id={chartFillId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor={chartColor} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={chartColor} stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <CartesianGrid stroke="#dce4e5" vertical={false} />
@@ -250,7 +285,7 @@ export function ProductDetailChart({
               domain={chartPriceDomain}
               tickMargin={8}
               width={88}
-              tickFormatter={(value) => formatPriceAxis(Number(value), priceSpread)}
+              tickFormatter={formatAxisTick}
               tick={{
                 fill: "#647174",
                 fontSize: 12,
@@ -260,26 +295,30 @@ export function ProductDetailChart({
             />
             <Tooltip
               formatter={(value) => [
-                `${numberFormatter.format(Number(value))} ${metricConfig.suffix}`,
-                "قیمت",
+                `${
+                  activeMetric === "gold"
+                    ? formatGoldGram(Number(value))
+                    : numberFormatter.format(Number(value))
+                } ${metricConfig.suffix}`,
+                metricConfig.name,
               ]}
               labelFormatter={(value) => `زمان: ${value}`}
             />
             <Area
               type="monotone"
               dataKey="price"
-              stroke="#0f766e"
+              stroke={chartColor}
               strokeWidth={3}
-              fill="url(#productPriceFill)"
+              fill={`url(#${chartFillId})`}
             />
             {refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight && (
               <ReferenceArea
                 x1={refAreaLeft}
                 x2={refAreaRight}
-                stroke="#0f766e"
+                stroke={chartColor}
                 strokeOpacity={0.6}
                 strokeDasharray="4 4"
-                fill="#0f766e"
+                fill={chartColor}
                 fillOpacity={0.15}
                 isFront
               />

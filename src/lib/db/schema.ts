@@ -59,6 +59,7 @@ export function createTables(db: Database.Database): void {
       user_id INTEGER REFERENCES users(id),
       is_public INTEGER NOT NULL DEFAULT 0,
       show_usd_chart INTEGER NOT NULL DEFAULT 0,
+      show_gold_chart INTEGER NOT NULL DEFAULT 0,
       active_start_hour INTEGER NOT NULL DEFAULT 8,
       active_end_hour INTEGER NOT NULL DEFAULT 23,
       created_at DATETIME NOT NULL,
