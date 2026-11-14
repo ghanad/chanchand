@@ -113,6 +113,19 @@ docker compose ps
 docker compose logs -f app
 ```
 
+### Check the running version without SSH
+
+The admin user menu (click the avatar in the top-right) shows a small `نسخه v1.6.1 · 622248a` line in its footer; clicking it copies the full build info (version, commit, build time) to the clipboard. This value is baked into the image at build time, so it always describes the container that is actually serving requests — no need to inspect `docker-compose.yml`.
+
+To have the commit and build time populated, pass them as build args (the GitHub Actions release workflow already does this):
+
+```bash
+docker build \
+  --build-arg GIT_COMMIT=$(git rev-parse HEAD) \
+  --build-arg BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  -t ghanad/chanchand:latest .
+```
+
 ---
 
 ## 5. User Management via CLI (On Server)

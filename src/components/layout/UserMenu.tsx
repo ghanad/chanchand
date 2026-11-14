@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useDashboard } from "../../context/DashboardContext";
 import { formatNumber } from "../../lib/formatters";
+import { BuildVersionBadge } from "./header/BuildVersionBadge";
 
 export function UserMenu() {
   const { currentUser, logout } = useDashboard();
@@ -331,6 +332,14 @@ export function UserMenu() {
             </svg>
             <span>خروج از حساب</span>
           </button>
+
+          {/* هویت نسخهٔ در حال اجرا: فقط برای مدیر، کم‌رنگ و با کلیک کپی می‌شود */}
+          {currentUser.role === "admin" ? (
+            <>
+              <div className="user-dropdown-divider" role="separator" />
+              <BuildVersionBadge />
+            </>
+          ) : null}
         </div>
       )}
     </div>

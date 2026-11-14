@@ -399,3 +399,87 @@
 .ghost-button:hover {
   background: var(--danger-soft);
 }
+
+/* Build metadata (version / commit) in the user dropdown footer */
+.user-dropdown-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 4px 0;
+}
+
+.user-dropdown-meta-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-align: right;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.user-dropdown-meta-btn:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.user-dropdown-meta-btn:focus-visible {
+  outline: none;
+  color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.user-dropdown-meta-label {
+  flex-shrink: 0;
+  min-width: 3.2em;
+  color: inherit;
+  text-align: start;
+}
+
+.user-dropdown-meta-label.is-copied {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.user-dropdown-meta-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-feature-settings: "tnum";
+  letter-spacing: 0.01em;
+}
+
+.user-dropdown-meta-commit {
+  font-weight: 600;
+}
+
+.user-dropdown-meta-dot {
+  opacity: 0.45;
+}
+
+.user-dropdown-meta-copy,
+.user-dropdown-meta-check {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  opacity: 0.45;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.user-dropdown-meta-btn:hover .user-dropdown-meta-copy,
+.user-dropdown-meta-btn:focus-visible .user-dropdown-meta-copy {
+  opacity: 0.9;
+}
+
+.user-dropdown-meta-check {
+  color: var(--ok);
+  opacity: 1;
+}

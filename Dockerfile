@@ -2,6 +2,12 @@
 
 FROM node:22-alpine AS builder
 
+ARG GIT_COMMIT=""
+ARG BUILD_TIME=""
+
+ENV APP_COMMIT=$GIT_COMMIT \
+    APP_BUILT_AT=$BUILD_TIME
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -11,13 +17,18 @@ RUN npm run build
 
 FROM node:22-alpine AS runner
 
+ARG GIT_COMMIT=""
+ARG BUILD_TIME=""
+
 WORKDIR /app
 
 ENV NODE_ENV=production \
     PRICE_GETTER_CONFIG=/data/config.yml \
     PRICE_GETTER_DB_URL=sqlite:////data/price_getter.db \
     PRICE_GETTER_PORT=8000 \
-    PORT=8000
+    PORT=8000 \
+    APP_COMMIT=$GIT_COMMIT \
+    APP_BUILT_AT=$BUILD_TIME
 
 RUN mkdir -p /data
 
