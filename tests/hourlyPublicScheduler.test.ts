@@ -61,6 +61,8 @@ describe('Hourly Public Product Scheduler (8 AM - 23 PM)', () => {
         url: 'https://example.com/usd',
         source_key: 'servix_market',
         is_public: true,
+        active_start_hour: 0,
+        active_end_hour: 23,
         user_id: user.id,
       });
 
@@ -157,8 +159,10 @@ describe('Hourly Public Product Scheduler (8 AM - 23 PM)', () => {
       const batch03am = getScheduledBatchTargets(db, activeTargets, { now: now03am });
       expect(batch03am.isPublicCollectionHour).toBe(false);
       expect(batch03am.eligiblePublicTargets).toBe(0); // Public products not collected at night!
-      // Targets: 1 market + 0 public + 1 private = 2 targets
-      expect(batch03am.targets.length).toBe(2);
+      // Private products also honour their own 08:00-23:00 window, so at 03:00 only the
+      // explicitly 24-hour market product remains.
+      expect(batch03am.eligiblePrivateTargets).toBe(0);
+      expect(batch03am.targets.length).toBe(1);
       const keys03am = batch03am.targets.map((t) => t.product_key);
       expect(keys03am).toContain('usd');
       expect(keys03am).not.toContain('pub_laptop');

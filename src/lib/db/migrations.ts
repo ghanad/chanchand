@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import { ManagedTargetRow } from '../types';
-import { ALWAYS_ON_MARKET_PRODUCT_KEYS } from '../market';
 import { getTargetDeduplicationKey } from '../urls';
 import { describeError, logWarn } from '../logger';
 
@@ -132,14 +131,6 @@ export function runMigrations(db: Database.Database): void {
           WHERE is_public = 1 AND active_start_hour = 8 AND active_end_hour = 23
         `).run();
       }
-
-      // Market products (usd, gold, coin) are collected on every run regardless of their
-      // configured window, so their stored schedule must stay 24-hour to match reality.
-      db.prepare(`
-        UPDATE managed_products
-        SET active_start_hour = 0, active_end_hour = 23
-        WHERE key IN (${ALWAYS_ON_MARKET_PRODUCT_KEYS.map(() => '?').join(', ')})
-      `).run(...ALWAYS_ON_MARKET_PRODUCT_KEYS);
 
       // Backfill user_id for existing products to first admin if available
       const adminUser = db

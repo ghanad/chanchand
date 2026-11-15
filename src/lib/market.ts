@@ -1,7 +1,10 @@
 /**
- * Market-source products (USD, gold, coins) are polled on every scheduler run,
- * independently of the per-product active hour window. Keep this list aligned
- * with the migration in src/lib/db/migrations.ts and the UI hints.
+ * Well-known market product keys (USD, gold, coins).
+ *
+ * Market products are no longer forced to a 24-hour window: they honour their
+ * configured `active_start_hour`/`active_end_hour` so the provider's daily request
+ * quota (e.g. 50/day) can be controlled from the UI. This list is kept for
+ * detection/backfill purposes only.
  */
 export const ALWAYS_ON_MARKET_PRODUCT_KEYS = [
   'usd',
@@ -33,8 +36,10 @@ interface AlwaysOnProductShape {
 }
 
 /**
- * True when a product is collected on every run (24 hours a day) and therefore
- * ignores the configurable active-hour window.
+ * True when a product comes from a market provider (USD, gold, coins).
+ *
+ * Note: this no longer means "always on". Market products respect their configured
+ * collection window and are polled at most once per hour.
  */
 export function isAlwaysOnMarketProduct(product?: AlwaysOnProductShape | null): boolean {
   if (!product) return false;

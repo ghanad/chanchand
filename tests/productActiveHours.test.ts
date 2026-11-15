@@ -69,7 +69,7 @@ describe('Product collection hours persistence', () => {
     expect(row.active_end_hour).toBe(20);
   });
 
-  it('keeps always-on market products on the 24-hour schedule', () => {
+  it('keeps the admin-configured window for market products instead of forcing 24 hours', () => {
     const db = openDatabase();
     addManagedSource(db, {
       key: 'servix_market',
@@ -94,7 +94,8 @@ describe('Product collection hours persistence', () => {
       .get('usd') as { active_start_hour: number; active_end_hour: number };
     reopened.close();
 
-    expect(row.active_start_hour).toBe(0);
-    expect(row.active_end_hour).toBe(23);
+    // Market products now honour their window so the provider quota can be controlled.
+    expect(row.active_start_hour).toBe(8);
+    expect(row.active_end_hour).toBe(20);
   });
 });

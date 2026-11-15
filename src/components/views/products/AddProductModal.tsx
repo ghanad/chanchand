@@ -4,7 +4,6 @@ import { ProductActiveHoursField } from "./ProductActiveHoursField";
 import { SourceRow } from "../../../types/dashboard";
 import { ProductFormState } from "./types";
 import { requestJson } from "@/lib/api-client";
-import { isAlwaysOnMarketProduct } from "@/lib/market";
 
 interface IranjibItemData {
   company: string;
@@ -43,9 +42,6 @@ export function AddProductModal({
   isAdmin,
   isBusy,
 }: AddProductModalProps) {
-  const alwaysOn = isAlwaysOnMarketProduct({
-    primary_target: { source_key: form.source_key },
-  });
   const [mode, setMode] = useState<"general" | "car">("general");
   const [carItems, setCarItems] = useState<IranjibItemData[]>([]);
   const [carCompanies, setCarCompanies] = useState<string[]>([]);
@@ -327,25 +323,25 @@ export function AddProductModal({
               />
               <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
             </label>
+            <ProductActiveHoursField
+              startHour={form.active_start_hour}
+              endHour={form.active_end_hour}
+              onChangeStart={(hour) =>
+                setForm((current) => ({
+                  ...current,
+                  active_start_hour: hour,
+                }))
+              }
+              onChangeEnd={(hour) =>
+                setForm((current) => ({
+                  ...current,
+                  active_end_hour: hour,
+                }))
+              }
+            />
+
             {form.is_public ? (
               <>
-                <ProductActiveHoursField
-                  startHour={form.active_start_hour}
-                  endHour={form.active_end_hour}
-                  onChangeStart={(hour) =>
-                    setForm((current) => ({
-                      ...current,
-                      active_start_hour: hour,
-                    }))
-                  }
-                  onChangeEnd={(hour) =>
-                    setForm((current) => ({
-                      ...current,
-                      active_end_hour: hour,
-                    }))
-                  }
-                  alwaysOn={alwaysOn}
-                />
                 <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
                   <input
                     type="checkbox"

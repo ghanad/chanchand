@@ -1,5 +1,6 @@
 import React from "react";
 import { describeCollectionSchedule } from "@/lib/schedule";
+import { formatNumber } from "@/lib/formatters";
 
 export const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const hourStr = String(i).padStart(2, "0") + ":00";
@@ -24,8 +25,6 @@ interface ProductActiveHoursFieldProps {
   endHour: number;
   onChangeStart: (hour: number) => void;
   onChangeEnd: (hour: number) => void;
-  /** Market products are polled on every run, so their window cannot be changed. */
-  alwaysOn?: boolean;
 }
 
 export function ProductActiveHoursField({
@@ -33,12 +32,8 @@ export function ProductActiveHoursField({
   endHour,
   onChangeStart,
   onChangeEnd,
-  alwaysOn = false,
 }: ProductActiveHoursFieldProps) {
-  const schedule = describeCollectionSchedule(
-    alwaysOn ? 0 : startHour,
-    alwaysOn ? 23 : endHour
-  );
+  const schedule = describeCollectionSchedule(startHour, endHour);
   const is24Hours = schedule.isFullDay;
 
   return (
@@ -59,87 +54,62 @@ export function ProductActiveHoursField({
         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text)" }}>
           بازه زمانی جمع‌آوری قیمت (ساعات شبانه‌روز)
         </div>
-        {alwaysOn ? (
-          <span
-            style={{
-              fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "4px",
-              border: "1px solid #0f766e",
-              background: "rgba(15, 118, 110, 0.12)",
-              color: "#0f766e",
-              fontWeight: 600,
-            }}
-          >
-            ✓ ۲۴ ساعته (همیشگی)
-          </span>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              onChangeStart(0);
-              onChangeEnd(23);
-            }}
-            style={{
-              fontSize: "11px",
-              padding: "2px 8px",
-              borderRadius: "4px",
-              cursor: "pointer",
-              border: is24Hours ? "1px solid #0f766e" : "1px solid var(--border-color, #ccc)",
-              background: is24Hours ? "rgba(15, 118, 110, 0.12)" : "transparent",
-              color: is24Hours ? "#0f766e" : "var(--text-muted, #666)",
-              fontWeight: is24Hours ? 600 : 400,
-            }}
-          >
-            {is24Hours ? "✓ ۲۴ ساعته (فعال)" : "تنظیم روی ۲۴ ساعته"}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            onChangeStart(0);
+            onChangeEnd(23);
+          }}
+          style={{
+            fontSize: "11px",
+            padding: "2px 8px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            border: is24Hours ? "1px solid #0f766e" : "1px solid var(--border-color, #ccc)",
+            background: is24Hours ? "rgba(15, 118, 110, 0.12)" : "transparent",
+            color: is24Hours ? "#0f766e" : "var(--text-muted, #666)",
+            fontWeight: is24Hours ? 600 : 400,
+          }}
+        >
+          {is24Hours ? "✓ ۲۴ ساعته (فعال)" : "تنظیم روی ۲۴ ساعته"}
+        </button>
       </div>
-      {alwaysOn ? (
-        <div style={{ fontSize: "11px", color: "var(--text-muted, #71717a)", lineHeight: 1.6 }}>
-          این کالا از منابع بازار (دلار، طلا، سکه) است و به صورت{" "}
-          <strong>۲۴ ساعته (۰۰:۰۰ تا ۲۳:۰۰)</strong> در هر اجرا پایش می‌شود؛ بازه ساعتی
-          برای آن اعمال نمی‌شود.
-        </div>
-      ) : (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <label style={{ fontSize: "12px", margin: 0 }}>
-              از ساعت (شروع)
-              <select
-                value={startHour}
-                onChange={(e) => onChangeStart(Number(e.target.value))}
-                style={{ width: "100%", marginTop: "4px" }}
-              >
-                {HOUR_OPTIONS.map((opt) => (
-                  <option key={`start-${opt.value}`} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ fontSize: "12px", margin: 0 }}>
-              تا ساعت (پایان)
-              <select
-                value={endHour}
-                onChange={(e) => onChangeEnd(Number(e.target.value))}
-                style={{ width: "100%", marginTop: "4px" }}
-              >
-                {HOUR_OPTIONS.map((opt) => (
-                  <option key={`end-${opt.value}`} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div style={{ fontSize: "11px", color: "var(--text-muted, #71717a)", lineHeight: 1.4 }}>
-            {is24Hours
-              ? "این کالا به صورت ۲۴ ساعته در تمام ساعات شبانه‌روز (۰۰:۰۰ تا ۲۳:۰۰) جمع‌آوری خواهد شد."
-              : `قیمت این کالا به مدت ${schedule.durationLabel} در بازه ${schedule.rangeLabel} استخراج خواهد شد.`}
-          </div>
-        </>
-      )}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+        <label style={{ fontSize: "12px", margin: 0 }}>
+          از ساعت (شروع)
+          <select
+            value={startHour}
+            onChange={(e) => onChangeStart(Number(e.target.value))}
+            style={{ width: "100%", marginTop: "4px" }}
+          >
+            {HOUR_OPTIONS.map((opt) => (
+              <option key={`start-${opt.value}`} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label style={{ fontSize: "12px", margin: 0 }}>
+          تا ساعت (پایان)
+          <select
+            value={endHour}
+            onChange={(e) => onChangeEnd(Number(e.target.value))}
+            style={{ width: "100%", marginTop: "4px" }}
+          >
+            {HOUR_OPTIONS.map((opt) => (
+              <option key={`end-${opt.value}`} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div style={{ fontSize: "11px", color: "var(--text-muted, #71717a)", lineHeight: 1.5 }}>
+        {is24Hours
+          ? "این کالا به صورت ۲۴ ساعته در تمام ساعات شبانه‌روز (۰۰:۰۰ تا ۲۳:۰۰) جمع‌آوری خواهد شد."
+          : `قیمت این کالا فقط در بازه ${schedule.rangeLabel} (${schedule.durationLabel}) جمع‌آوری می‌شود؛ خارج از این بازه درخواستی به منبع ارسال نمی‌شود.`}
+        {` حداکثر ${formatNumber(schedule.durationHours)} درخواست در روز برای این کالا ارسال می‌شود و کالاهای هم‌منبع از یک پاسخ API مشترک استفاده می‌کنند.`}
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import React from "react";
 import { SourceRow } from "@/types/dashboard";
 import { Modal } from "@/components/common/Modal";
 import { ProductActiveHoursField } from "@/components/views/products/ProductActiveHoursField";
-import { isAlwaysOnMarketProduct } from "@/lib/market";
 import { ProductDetailEditForm } from "./types";
 
 interface ProductDetailEditModalProps {
@@ -30,10 +29,6 @@ export function ProductDetailEditModal({
   isAdmin,
   isSaving,
 }: ProductDetailEditModalProps) {
-  const alwaysOn = isAlwaysOnMarketProduct({
-    key: productKey,
-    primary_target: { source_key: form.source_key },
-  });
 
   return (
     <Modal
@@ -84,15 +79,15 @@ export function ProductDetailEditModal({
               />
               <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
             </label>
+            <ProductActiveHoursField
+              startHour={form.active_start_hour}
+              endHour={form.active_end_hour}
+              onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
+              onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
+            />
+
             {form.is_public ? (
               <>
-                <ProductActiveHoursField
-                  startHour={form.active_start_hour}
-                  endHour={form.active_end_hour}
-                  onChangeStart={(hour) => setForm((c) => ({ ...c, active_start_hour: hour }))}
-                  onChangeEnd={(hour) => setForm((c) => ({ ...c, active_end_hour: hour }))}
-                  alwaysOn={alwaysOn}
-                />
                 <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
                   <input
                     type="checkbox"

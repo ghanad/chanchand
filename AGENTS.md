@@ -33,8 +33,9 @@ Core flow:
 - Payment Gateways: `src/lib/payment/types.ts` (`PaymentGateway` interface), `src/lib/payment/zarinpal.ts` (ZarinPal REST v4 adapter), `src/lib/payment/mock.ts` (Mock adapter for testing/dev), `src/lib/payment/index.ts` (gateway registry & factory)
 - Database schema & CRUD: `src/lib/db/*` (modular database package with `src/lib/db/index.ts`, managing `managed_products` with `user_id`, `is_public`, `show_usd_chart`, `show_gold_chart` (grams of 18K gold from the `gold-18k` product), `active_start_hour`, `active_end_hour`, `managed_targets`, `user_products` watchlist with `last_manual_refresh_at`, `product_refresh_logs` audit, `users` with `must_change_password`, `mobile`, `extra_slots`, `slot_expires_at`, `packages` with `duration_days`, `payment_transactions`, `user_subscriptions`, `getScheduledBatchTargets` with per-product configurable public hours [24-hour / 0-23 by default] and LRU 24-hour private batching)
 - URL normalization & deduplication: `src/lib/urls.ts`
-- Collection-window labels (۲۴/۱۲/… ساعته for public products): `src/lib/schedule.ts`
-- Market source detection & always-on market product keys: `src/lib/market.ts`
+- Collection-window labels (۲۴/۱۲/… ساعته): `src/lib/schedule.ts`
+- Per-product collection windows (`active_start_hour`/`active_end_hour` for every product, incl. market): `src/lib/db/scheduler.ts` (`getProductScheduleMap`, `getPublicProductScheduleMap`)
+- Market source detection & well-known market product keys: `src/lib/market.ts`
 - Build/version badge data (version + git SHA + build time inlined from `next.config.mjs`): `src/lib/build-info.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
@@ -80,4 +81,5 @@ docker compose up -d
 - Prices stored as `price_irr`.
 - `price_multiplier`: 10 for TOMAN, 1 for IRR.
 - Environment variables: `PRICE_GETTER_CONFIG`, `PRICE_GETTER_DB_URL`, `PRICE_GETTER_PORT`, `brsapi_api`, `SERVIX_API_KEY`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_INITIAL_PASSWORD`, `TRIGGER_API_KEY`, `APP_TIMEZONE` (default `Asia/Tehran`), `LOG_LEVEL` (`debug`|`info`|`warn`|`error`, default `info`).
+- Market products (usd/gold/coin) honour their own `active_start_hour`/`active_end_hour`, are polled at most once per hour, and share one cached API response (`getAdapter` returns a process-wide singleton), so N market products cost 1 request per hour. Provider quotas (e.g. Servix 50/day) are controlled by narrowing the window.
 - Runner/CLI log lines are timestamped in `APP_TIMEZONE` with a UTC offset and end with `key=value` details (HTTP status, `retry_after`, `hint`, `elapsed_ms`); adapter HTTP failures throw `HttpRequestError` so `fetch_errors.message` explains the cause.

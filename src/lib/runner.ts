@@ -10,7 +10,7 @@ import {
   hasSuccessfulPriceThisHour,
   getTimezoneHour,
   getPublicProductKeys,
-  getPublicProductScheduleMap,
+  getProductScheduleMap,
   isHourInWindow,
   isMarketSource,
   getManagedTargets,
@@ -137,7 +137,7 @@ export class PriceRunner {
     const sources = config?.sources || getSourcesMap(db);
     const fetchedObservations = new Map<string, PriceObservation>();
     const publicKeys = getPublicProductKeys(db);
-    const publicScheduleMap = getPublicProductScheduleMap(db);
+    const scheduleMap = getProductScheduleMap(db);
     const now = new Date();
     const currentHour = getTimezoneHour(now);
 
@@ -154,34 +154,36 @@ export class PriceRunner {
         const isMarket = isMarketSource(target.source_key, source.adapter) || target.product_key === USD_PRODUCT_KEY;
         const isPublic = publicKeys.has(target.product_key);
 
-        if (!options?.force && !isMarket) {
-          if (isPublic) {
-            const sched = publicScheduleMap.get(target.product_key) ?? { startHour: 8, endHour: 23 };
-            if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
-              logInfo(
-                'Runner',
-                `run ${runId}: skipping public product ${target.product_key}/${target.source_key}, outside active window (${sched.startHour}:00 - ${sched.endHour}:00)`,
-                { current_hour: currentHour, window: `${sched.startHour}:00-${sched.endHour}:00` }
-              );
-              continue;
-            }
+        if (!options?.force) {
+          const sched = scheduleMap.get(target.product_key) ?? { startHour: 0, endHour: 23 };
+          if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
+            logInfo(
+              'Runner',
+              `run ${runId}: skipping ${target.product_key}/${target.source_key}, outside active window (${sched.startHour}:00 - ${sched.endHour}:00)`,
+              { current_hour: currentHour, window: `${sched.startHour}:00-${sched.endHour}:00` }
+            );
+            continue;
+          }
+
+          // Market and public products are collected at most once per hour; private
+          // products once per day. Market targets share a single API response, so a
+          // shared adapter cache keeps provider quota usage low.
+          if (isMarket || isPublic) {
             if (hasSuccessfulPriceThisHour(db, target.product_key, now, target.url, target.source_key)) {
               logInfo(
                 'Runner',
-                `run ${runId}: skipping public product ${target.product_key}/${target.source_key}, already collected this hour`,
+                `run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected this hour`,
                 { current_hour: currentHour }
               );
               continue;
             }
-          } else {
-            if (hasSuccessfulPriceToday(db, target.product_key, now, target.url, target.source_key)) {
-              logInfo(
-                'Runner',
-                `run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`,
-                { current_hour: currentHour }
-              );
-              continue;
-            }
+          } else if (hasSuccessfulPriceToday(db, target.product_key, now, target.url, target.source_key)) {
+            logInfo(
+              'Runner',
+              `run ${runId}: skipping ${target.product_key}/${target.source_key}, already collected today`,
+              { current_hour: currentHour }
+            );
+            continue;
           }
         }
 

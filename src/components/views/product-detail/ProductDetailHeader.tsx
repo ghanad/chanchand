@@ -74,7 +74,7 @@ export function ProductDetailHeader({
               <span className="product-slug-pill" title="شناسه یکتای محصول">
                 {product.key}
               </span>
-              {product.is_public ? (() => {
+              {product.is_public || isAdmin ? (() => {
                 const schedule = describeCollectionSchedule(
                   product.active_start_hour,
                   product.active_end_hour
@@ -100,7 +100,8 @@ export function ProductDetailHeader({
                       <circle cx="12" cy="12" r="9" />
                       <polyline points="12 7 12 12 15.5 14" />
                     </svg>
-                    عمومی · {schedule.isFullDay ? schedule.durationLabel : schedule.summary}
+                    {product.is_public ? "عمومی" : "بازه"} ·{" "}
+                    {schedule.isFullDay ? schedule.durationLabel : schedule.summary}
                   </span>
                 );
               })() : null}

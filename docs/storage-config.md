@@ -18,7 +18,8 @@ Read this when changing configuration schemas, database schema, or persistence b
 
 ### Tables Overview
 
-- `managed_products`: Product catalog definitions (`key`, `name`, `category`, `enabled`, `sort_order`, `notes`, `created_at`).
+- `managed_products`: Product catalog definitions (`key`, `title`, `user_id`, `is_public`, `show_usd_chart`, `show_gold_chart`, `active_start_hour`, `active_end_hour`, `created_at`, `updated_at`).
+  - `active_start_hour` / `active_end_hour` (0-23, `APP_TIMEZONE`) define the collection window of **every** product, public or private, including market products (USD/gold/coin). Nothing is collected outside the window; an overnight window such as 22→6 is supported. Market products additionally poll at most once per hour and share one API response, so the request count per day ≈ number of active hours.
 - `managed_sources`: Price source configurations (`key`, `name`, `adapter`, `base_url`, `rate_limit_per_second`, `adapter_settings_json`, `created_at`).
 - `managed_targets`: URL targets linking products to sources (`id`, `product_key`, `source_key`, `url`, `enabled`, `price_multiplier`, `adapter_settings_json`, `created_at`).
 - `runs`: Run execution records (`id`, `started_at`, `completed_at`, `status`, `target_count`, `success_count`, `error_count`).

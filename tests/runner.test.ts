@@ -354,7 +354,7 @@ describe('PriceRunner module', () => {
     db.close();
   });
 
-  it('collects all market targets sharing the same endpoint URL without skipping or cache collision', async () => {
+  it('collects all market targets sharing the same endpoint URL once per hour without cache collision', async () => {
     const runner = new PriceRunner(tempDbUrl);
     const fetchedSymbols: string[] = [];
 
@@ -409,9 +409,15 @@ describe('PriceRunner module', () => {
     expect(summary1.success_count).toBe(2);
     expect(fetchedSymbols).toEqual(['USD_RLS', 'GOLD_18_RLS']);
 
-    // Second run with force=false: market targets are market-live, so they are not skipped by single-URL collision
+    // Second run in the same hour: market products are throttled to one poll per hour so a
+    // small provider quota (e.g. 50 requests/day) is not burned by repeated cron triggers.
     const summary2 = await runner.run(config, undefined, config.targets, { force: false });
-    expect(summary2.success_count).toBe(2);
+    expect(summary2.success_count).toBe(0);
+    expect(fetchedSymbols).toEqual(['USD_RLS', 'GOLD_18_RLS']);
+
+    // force=true still refreshes them on demand (manual "run now").
+    const summary3 = await runner.run(config, undefined, config.targets, { force: true });
+    expect(summary3.success_count).toBe(2);
     expect(fetchedSymbols).toEqual(['USD_RLS', 'GOLD_18_RLS', 'USD_RLS', 'GOLD_18_RLS']);
 
     const db = getDatabase(tempDbUrl);

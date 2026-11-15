@@ -3,7 +3,6 @@ import { Modal } from "../../common/Modal";
 import { ProductActiveHoursField } from "./ProductActiveHoursField";
 import { SourceRow } from "../../../types/dashboard";
 import { ProductFormState } from "./types";
-import { isAlwaysOnMarketProduct } from "@/lib/market";
 
 interface EditProductModalProps {
   isOpen: boolean;
@@ -28,10 +27,6 @@ export function EditProductModal({
   isAdmin,
   isBusy,
 }: EditProductModalProps) {
-  const alwaysOn = isAlwaysOnMarketProduct({
-    key: productKey,
-    primary_target: { source_key: editForm.source_key },
-  });
 
   return (
     <Modal
@@ -101,15 +96,15 @@ export function EditProductModal({
               />
               <span>محصول عمومی بازار (قابل مشاهده برای تمام کاربران)</span>
             </label>
+            <ProductActiveHoursField
+              startHour={editForm.active_start_hour}
+              endHour={editForm.active_end_hour}
+              onChangeStart={(hour) => setEditForm((current) => ({ ...current, active_start_hour: hour }))}
+              onChangeEnd={(hour) => setEditForm((current) => ({ ...current, active_end_hour: hour }))}
+            />
+
             {editForm.is_public ? (
               <>
-                <ProductActiveHoursField
-                  startHour={editForm.active_start_hour}
-                  endHour={editForm.active_end_hour}
-                  onChangeStart={(hour) => setEditForm((current) => ({ ...current, active_start_hour: hour }))}
-                  onChangeEnd={(hour) => setEditForm((current) => ({ ...current, active_end_hour: hour }))}
-                  alwaysOn={alwaysOn}
-                />
                 <label className="modal-checkbox-row" style={{ marginTop: "4px" }}>
                   <input
                     type="checkbox"

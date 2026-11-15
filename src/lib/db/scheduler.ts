@@ -34,6 +34,31 @@ export function getPublicProductScheduleMap(
   return map;
 }
 
+/**
+ * Collection window for every product (public or private), used by the runner to
+ * decide whether a target may be fetched right now.
+ */
+export function getProductScheduleMap(
+  db: Database.Database
+): Map<string, { startHour: number; endHour: number }> {
+  const rows = db
+    .prepare('SELECT key, active_start_hour, active_end_hour FROM managed_products')
+    .all() as Array<{
+    key: string;
+    active_start_hour?: number | null;
+    active_end_hour?: number | null;
+  }>;
+
+  const map = new Map<string, { startHour: number; endHour: number }>();
+  for (const r of rows) {
+    map.set(r.key, {
+      startHour: r.active_start_hour ?? 8,
+      endHour: r.active_end_hour ?? 23,
+    });
+  }
+  return map;
+}
+
 export function getPublicProductKeys(db: Database.Database): Set<string> {
   const keys = db.prepare('SELECT key FROM managed_products WHERE is_public = 1').pluck().all() as string[];
   return new Set(keys);
@@ -102,6 +127,7 @@ export interface ScheduledBatchResult {
   batchSize: number;
   totalManagedTargets: number;
   totalMarketTargets: number;
+  eligibleMarketTargets?: number;
   totalNonMarketTargets: number;
   totalEligibleNonMarket: number;
   remainingToday: number;
@@ -144,6 +170,7 @@ export function getScheduledBatchTargets(
       batchSize: validTargets.length,
       totalManagedTargets: allActiveTargets.length,
       totalMarketTargets: marketTargets.length,
+      eligibleMarketTargets: marketTargets.length,
       totalNonMarketTargets: nonMarketTargets.length,
       totalEligibleNonMarket: nonMarketTargets.length,
       remainingToday: 0,
@@ -155,9 +182,20 @@ export function getScheduledBatchTargets(
     };
   }
 
-  // 1. Hourly check for public targets: each public product has its configured active hour window
+  // 1. Hourly check for public and market targets: each product has its own window
   const currentHour = getTimezoneHour(now);
   const publicScheduleMap = getPublicProductScheduleMap(db);
+  const scheduleMap = getProductScheduleMap(db);
+
+  // Market products (usd, gold, coin) share one API response, so they are polled at
+  // most once per hour instead of on every trigger; this keeps provider quotas safe.
+  const eligibleMarket = marketTargets.filter((t) => {
+    const sched = scheduleMap.get(t.product_key) ?? { startHour: 0, endHour: 23 };
+    if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
+      return false;
+    }
+    return !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key);
+  });
 
   const isPublicCollectionHour =
     publicTargets.length > 0
@@ -175,10 +213,17 @@ export function getScheduledBatchTargets(
     return !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key);
   });
 
-  // 2. Daily check for private targets: collected once a day across 24h
-  const eligiblePrivate = privateTargets.filter(
-    (t) => isProductEligibleForCollection(db, t.product_key) && !hasSuccessfulPriceToday(db, t.product_key, now, t.url, t.source_key)
-  );
+  // 2. Daily check for private targets: collected once a day, inside their window
+  const eligiblePrivate = privateTargets.filter((t) => {
+    const sched = scheduleMap.get(t.product_key) ?? { startHour: 0, endHour: 23 };
+    if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
+      return false;
+    }
+    return (
+      isProductEligibleForCollection(db, t.product_key) &&
+      !hasSuccessfulPriceToday(db, t.product_key, now, t.url, t.source_key)
+    );
+  });
 
   // If there are eligible private targets, prioritize LRU based on last attempt timestamp
   if (eligiblePrivate.length > 0) {
@@ -221,10 +266,11 @@ export function getScheduledBatchTargets(
   const remainingToday = Math.max(0, eligiblePrivate.length - selectedPrivate.length);
 
   return {
-    targets: [...marketTargets, ...eligiblePublic, ...selectedPrivate],
+    targets: [...eligibleMarket, ...eligiblePublic, ...selectedPrivate],
     batchSize: effectiveBatchSize,
     totalManagedTargets: allActiveTargets.length,
     totalMarketTargets: marketTargets.length,
+    eligibleMarketTargets: eligibleMarket.length,
     totalNonMarketTargets: nonMarketTargets.length,
     totalEligibleNonMarket: eligiblePublic.length + eligiblePrivate.length,
     remainingToday,
