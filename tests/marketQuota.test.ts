@@ -188,6 +188,45 @@ describe('Market provider quota (50 requests/day) and per-product collection win
     db.close();
   });
 
+  it('throttles market products by the configured poll interval', async () => {
+    const targets = seedMarketProducts();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify(servixPayload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const db = getDatabase();
+    // Ask the source to poll every 3 hours instead of the default 60 minutes.
+    db.prepare('UPDATE managed_sources SET settings = ? WHERE key = ?').run(
+      JSON.stringify({ market_poll_interval_minutes: 180 }),
+      'servix_market'
+    );
+
+    const firstRun = startRun(db, null, null, targets, undefined, 'cron');
+    await new PriceRunner().executeRun(null, firstRun, targets, { force: false });
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // One hour later the interval has not elapsed yet.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(Date.now() + 60 * 60 * 1000));
+    const secondRun = startRun(db, null, null, targets, undefined, 'cron');
+    const skipped = await new PriceRunner().executeRun(null, secondRun, targets, { force: false });
+    expect(skipped.success_count).toBe(0);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+    // Well past the 3-hour interval it polls again.
+    vi.setSystemTime(new Date(Date.now() + 4 * 60 * 60 * 1000));
+    const thirdRun = startRun(db, null, null, targets, undefined, 'cron');
+    const collected = await new PriceRunner().executeRun(null, thirdRun, targets, { force: false });
+    expect(collected.success_count).toBe(6);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+
+    vi.useRealTimers();
+    db.close();
+  });
+
   it('exposes the configured window of every product, public or private', () => {
     const targets = seedMarketProducts({ start: 11, end: 23 });
     const db = getDatabase();

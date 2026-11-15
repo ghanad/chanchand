@@ -8,6 +8,8 @@ import {
   recordError,
   hasSuccessfulPriceToday,
   hasSuccessfulPriceThisHour,
+  hasSuccessfulPriceWithinMinutes,
+  getMarketPollIntervalMinutes,
   getTimezoneHour,
   getPublicProductKeys,
   getProductScheduleMap,
@@ -165,10 +167,20 @@ export class PriceRunner {
             continue;
           }
 
-          // Market and public products are collected at most once per hour; private
-          // products once per day. Market targets share a single API response, so a
-          // shared adapter cache keeps provider quota usage low.
-          if (isMarket || isPublic) {
+          // Market products are throttled by a configurable interval (default 60 min)
+          // because providers cap daily requests; public products are hourly and
+          // private products daily. Market targets share one cached API response.
+          if (isMarket) {
+            const interval = getMarketPollIntervalMinutes(db, target.source_key);
+            if (hasSuccessfulPriceWithinMinutes(db, target.product_key, interval, now)) {
+              logInfo(
+                'Runner',
+                `run ${runId}: skipping market product ${target.product_key}/${target.source_key}, collected within the last ${interval} minutes`,
+                { current_hour: currentHour, poll_interval_minutes: interval }
+              );
+              continue;
+            }
+          } else if (isPublic) {
             if (hasSuccessfulPriceThisHour(db, target.product_key, now, target.url, target.source_key)) {
               logInfo(
                 'Runner',

@@ -188,13 +188,15 @@ export function getScheduledBatchTargets(
   const scheduleMap = getProductScheduleMap(db);
 
   // Market products (usd, gold, coin) share one API response, so they are polled at
-  // most once per hour instead of on every trigger; this keeps provider quotas safe.
+  // most once per configured interval instead of on every trigger; this keeps
+  // provider quotas (e.g. 50 requests/day) safe.
   const eligibleMarket = marketTargets.filter((t) => {
     const sched = scheduleMap.get(t.product_key) ?? { startHour: 0, endHour: 23 };
     if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
       return false;
     }
-    return !hasSuccessfulPriceThisHour(db, t.product_key, now, t.url, t.source_key);
+    const interval = getMarketPollIntervalMinutes(db, t.source_key);
+    return !hasSuccessfulPriceWithinMinutes(db, t.product_key, interval, now);
   });
 
   const isPublicCollectionHour =
@@ -312,6 +314,73 @@ export function hasSuccessfulPriceToday(
       LIMIT 1
     `).get(productKey, startOfDay, endOfDay);
   }
+
+  return !!row;
+}
+
+
+/** Default market polling interval: once per hour keeps a 50 req/day quota safe. */
+export const DEFAULT_MARKET_POLL_INTERVAL_MINUTES = 60;
+
+/**
+ * Polling interval for market products (USD/gold/coin). Providers such as Servix
+ * allow only a few dozen requests per day, so the interval is configurable per
+ * source via `managed_sources.settings.market_poll_interval_minutes`, with the
+ * `MARKET_POLL_INTERVAL_MINUTES` environment variable as a global override.
+ */
+export function getMarketPollIntervalMinutes(
+  db: Database.Database,
+  sourceKey?: string | null
+): number {
+  const fromEnv = Number(process.env.MARKET_POLL_INTERVAL_MINUTES);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) {
+    return Math.floor(fromEnv);
+  }
+
+  if (sourceKey) {
+    try {
+      const row = db
+        .prepare('SELECT settings FROM managed_sources WHERE key = ?')
+        .get(sourceKey) as { settings?: string } | undefined;
+      if (row?.settings) {
+        const settings = JSON.parse(row.settings);
+        const configured = Number(settings?.market_poll_interval_minutes);
+        if (Number.isFinite(configured) && configured > 0) {
+          return Math.floor(configured);
+        }
+      }
+    } catch {
+      // Fall through to the default interval.
+    }
+  }
+
+  return DEFAULT_MARKET_POLL_INTERVAL_MINUTES;
+}
+
+/**
+ * True when a successful snapshot exists within the last `minutes` minutes.
+ * Used to throttle market products independently of the hourly window.
+ */
+export function hasSuccessfulPriceWithinMinutes(
+  db: Database.Database,
+  productKey: string,
+  minutes: number,
+  now = new Date()
+): boolean {
+  if (!Number.isFinite(minutes) || minutes <= 0) return false;
+  const since = new Date(now.getTime() - minutes * 60 * 1000).toISOString();
+  const until = now.toISOString();
+
+  const row = db
+    .prepare(`
+      SELECT id FROM price_snapshots
+      WHERE product_key = ?
+        AND price_irr IS NOT NULL
+        AND observed_at >= ?
+        AND observed_at <= ?
+      LIMIT 1
+    `)
+    .get(productKey, since, until);
 
   return !!row;
 }
