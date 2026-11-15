@@ -2,9 +2,20 @@
 
 This file is the low-token map for LLMs working on چن چند (chanchand / Price Getter). Keep it short, accurate, and updated.
 
+## Product Rules (read before proposing features)
+
+- **What it is:** Persian/RTL web app for the ordinary Iranian shopper: see a product's price history in Toman, USD, and grams of 18K gold. Success metric: monthly active users (MAU). History accuracy beats feature count; every product page keeps the Toman/USD/gold views meaningful.
+- **Two product kinds:** **catalog (public)** products are created by admins, visible to all signed-in users, and cost no quota; **personal (private)** products are created by any user, owner-only, one slot each. Regular users cannot publish to the catalog. All routes require sign-in, so "public" means all signed-in users, not anonymous visitors.
+- **Quota:** 3 free slots per user plus time-limited purchased slots (wallet/Zarinpal packages); quota applies to personal products only. Manual refresh is 1/day per user per product.
+- **Market products** (`usd`, `gold`, `coin`, `gold-18k`, …) are admin-managed catalog products that give product prices USD/gold context; they are not a trading service, share one provider response, and are polled at most once per market interval.
+- **Product identity:** adding a URL that already exists reuses that product (no duplicate, no extra slot); a non-admin editing the URL of a product several users track forks a private copy for themselves; deleting a shared private product only untracks it for that user.
+- **Out of scope:** native mobile app (responsive web only).
+- **Undecided — ask the owner, do not assume or build:** pricing/plans, price alerts, B2B data/API sales, ads/affiliate, paywalling core history, stores outside Iran.
+
 ## Maintenance Rule
 
 Update this file in the same change whenever you:
+- change product rules, target user, non-goals, or success metrics;
 - add, remove, rename, or split modules;
 - change CLI commands, config fields, adapter names, database tables, or test commands;
 - change the recommended file-reading path for common tasks.

@@ -2,6 +2,8 @@
 
 **Chanchand** (formerly Price Getter) is a comprehensive service for real-time tracking, comparison, and analysis of consumer products and financial market prices, built with **Next.js**, **React**, **TypeScript**, and **SQLite**. It collects prices from online stores (such as Digikala) and financial markets (gold and currency) and analyzes them with equivalent rates.
 
+**Product intent:** see the "Product Rules" section in [AGENTS.md](AGENTS.md) for the business goal, target user, product rules, and non-goals.
+
 ## Quick Start
 
 ```bash
