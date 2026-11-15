@@ -5,9 +5,9 @@ export function recordPrice(
   db: Database.Database,
   runId: number,
   target: TargetConfig,
-  observation: PriceObservation
+  observation: PriceObservation,
+  observedAt: string = new Date().toISOString()
 ): number {
-  const observedAt = new Date().toISOString();
   const stmt = db.prepare(`
     INSERT INTO price_snapshots (
       run_id, product_key, source_key, url, title, seller, price_irr, availability, observed_at, raw_observation
@@ -26,6 +26,35 @@ export function recordPrice(
     JSON.stringify(observation.raw_observation ?? {})
   );
   return Number(res.lastInsertRowid);
+}
+
+/**
+ * Calendar days (`YYYY-MM-DD`, UTC) that already have a snapshot for a
+ * product/source pair. Used by the one-time Digikala history backfill so it
+ * never overwrites or duplicates days we already collected ourselves.
+ */
+export function snapshotDatesForProduct(
+  db: Database.Database,
+  productKey: string,
+  sourceKey?: string | null
+): Set<string> {
+  const rows = sourceKey
+    ? (db
+        .prepare(
+          `SELECT DISTINCT substr(observed_at, 1, 10) AS day
+           FROM price_snapshots
+           WHERE product_key = ? AND source_key = ?`
+        )
+        .all(productKey, sourceKey) as Array<{ day: string }>)
+    : (db
+        .prepare(
+          `SELECT DISTINCT substr(observed_at, 1, 10) AS day
+           FROM price_snapshots
+           WHERE product_key = ?`
+        )
+        .all(productKey) as Array<{ day: string }>);
+
+  return new Set(rows.map((r) => r.day).filter(Boolean));
 }
 
 export function latestSnapshots(

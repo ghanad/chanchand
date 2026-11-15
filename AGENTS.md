@@ -50,6 +50,8 @@ Core flow:
 - Build/version badge data (version + git SHA + build time inlined from `next.config.mjs`): `src/lib/build-info.ts`
 - Configuration validation: `src/lib/config.ts` (optional fallback)
 - Price parsing & digits normalization: `src/lib/pricing.ts`
+- Jalali ↔ Gregorian dates (Digikala chart days → `observed_at`): `src/lib/jalali.ts`
+- One-time Digikala price-history backfill on product creation (`price-chart` API, 30 days, per-variant group): `src/lib/digikalaHistory.ts`
 - Logging & error descriptions (timestamped lines, `key=value` details, URL redaction, `LOG_LEVEL`): `src/lib/logger.ts`
 - Runner & orchestrator: `src/lib/runner.ts`
 - Adapters:
@@ -62,7 +64,7 @@ Core flow:
   - Fetch Utilities, Cookie Redirect & HTTP failure helpers (`HttpRequestError`, `Retry-After`): `src/lib/adapters/fetchUtils.ts`
   - Registry: `src/lib/adapters/index.ts`
 - CLI entrypoint: `src/cli/index.ts`
-- Documentation: `docs/architecture.md`, `docs/adapters.md`, `docs/storage-config.md`, `docs/ui.md`, `docs/deploy.md`
+- Documentation: `docs/architecture.md`, `docs/adapters.md`, `docs/digikala-api-extraction.md`, `docs/storage-config.md`, `docs/ui.md`, `docs/deploy.md`
 - Deployment & Packaging: `Dockerfile`, `docker-compose.yml`, `docs/deploy.md`
 
 ## Local Commands

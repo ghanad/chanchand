@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -8,7 +8,7 @@ import { hashPassword, signAuthToken, AUTH_COOKIE_NAME } from '../src/lib/auth';
 import { GET as getHealth } from '../src/app/api/health/route';
 import { GET as getMe } from '../src/app/api/auth/me/route';
 import { POST as postLogin } from '../src/app/api/auth/login/route';
-import { GET as getProducts } from '../src/app/api/products/route';
+import { GET as getProducts, POST as postProduct } from '../src/app/api/products/route';
 import { GET as getIranjibItems } from '../src/app/api/sources/iranjib/items/route';
 
 describe('Next.js API Route Handlers Integration', () => {
@@ -165,6 +165,95 @@ describe('Next.js API Route Handlers Integration', () => {
       expect(json.sources).toBeDefined();
       expect(Array.isArray(json.products)).toBe(true);
       expect(json.products.some((p: any) => p.title === 'گوشی آیفون ۱۵')).toBe(true);
+    });
+  });
+
+  describe('POST /api/products', () => {
+    const chartPayload = {
+      status: 200,
+      data: {
+        today: '2026-11-14',
+        chart_selection_title: 'انتخاب رنگ',
+        price_chart: [
+          {
+            id: 0,
+            title: 'مشکی',
+            history: [
+              { day: '1405/08/21', selling_price: 1000000, rrp_price: 1100000, is_marketable: true, seller: 'فروشنده' },
+              { day: '1405/08/22', selling_price: 1050000, rrp_price: 1100000, is_marketable: true, seller: 'فروشنده' },
+            ],
+          },
+        ],
+      },
+    };
+
+    function stubDigikalaFetch() {
+      const calls: string[] = [];
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string) => {
+          calls.push(String(url));
+          return new Response(JSON.stringify(chartPayload), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        })
+      );
+      return calls;
+    }
+
+    it('seeds Digikala price history only when the product is new', async () => {
+      const db = getDatabase();
+      const user = createUser(db, {
+        username: 'dave',
+        password_hash: await hashPassword('secret123'),
+        role: 'admin',
+      });
+      db.close();
+
+      const token = await signAuthToken({ id: user.id, username: user.username, role: 'admin' });
+      const calls = stubDigikalaFetch();
+
+      const body = JSON.stringify({
+        title: 'هدفون تست',
+        url: 'https://www.digikala.com/product/dkp-424242/',
+        source_key: 'digikala_api',
+      });
+
+      const first = await postProduct(
+        new NextRequest('https://example.com/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: `${AUTH_COOKIE_NAME}=${token}` },
+          body,
+        })
+      );
+      expect(first.status).toBe(200);
+      const firstJson = await first.json();
+      expect(firstJson.reused).toBe(false);
+      expect(firstJson.history_backfill).toMatchObject({ inserted: 2, groups: 1 });
+      expect(calls.filter((c) => c.includes('price-chart'))).toHaveLength(1);
+
+      const dbAfter = getDatabase();
+      const snapshots = dbAfter
+        .prepare('SELECT COUNT(*) AS cnt FROM price_snapshots WHERE product_key = ?')
+        .get(firstJson.product_key) as { cnt: number };
+      dbAfter.close();
+      expect(snapshots.cnt).toBe(2);
+
+      // Adding the same URL again reuses the product and must not re-fetch.
+      const second = await postProduct(
+        new NextRequest('https://example.com/api/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Cookie: `${AUTH_COOKIE_NAME}=${token}` },
+          body,
+        })
+      );
+      const secondJson = await second.json();
+      expect(secondJson.reused).toBe(true);
+      expect(secondJson.history_backfill).toBeUndefined();
+      expect(calls.filter((c) => c.includes('price-chart'))).toHaveLength(1);
+
+      vi.unstubAllGlobals();
     });
   });
 

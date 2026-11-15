@@ -257,3 +257,82 @@ title = first title from title_fa, title_en, test_title_fa
 
 return normalized observation
 ```
+
+## Price History (last ~30 days)
+
+Digikala also exposes the data behind the "تاریخچه قیمت" chart. It is fetched
+**once per product**, when the product is first added to the database, so a new
+product starts with a populated chart instead of an empty one. Products that
+already exist keep the snapshots we collected ourselves; nothing is fetched
+again for them.
+
+### Endpoint
+
+```text
+GET https://api.digikala.com/v1/product/{product_id}/price-chart/
+Referer: https://www.digikala.com/
+Accept: application/json
+```
+
+The `Referer` header is **required**: without it the API answers `429`. The
+endpoint is also tightly rate limited (roughly two requests per burst), so keep
+at least ~5 seconds between calls.
+
+### Payload
+
+```json
+{
+  "status": 200,
+  "data": {
+    "today": "2026-11-14",
+    "chart_selection_title": "انتخاب رنگ",
+    "price_chart": [
+      {
+        "id": 0,
+        "title": "مشکی",
+        "history": [
+          {
+            "day": "1405/07/23",
+            "selling_price": 3589990000,
+            "rrp_price": 3933670000,
+            "is_marketable": true,
+            "seller": "دیجی‌کالا",
+            "product_warranty": "گارانتی اصلی"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Notes:
+
+- `data.today` is Gregorian; every `history[].day` is **Jalali** (`1405/07/23`).
+- `price_chart` is grouped by one variant dimension (colour or size), named by
+  `chart_selection_title`. Group `id` is an index, **not** a `variant_id`.
+- Prices are already in IRR.
+- Days without an offer simply have no row.
+- The window is fixed at ~30 days; `days`/`range`/`period`/`from`/`to` query
+  parameters are ignored.
+- Some products return an empty `price_chart` (no recent offers).
+- `product.has_price_chart` and `product.meta.price_chart_url` in the product
+  payload tell you whether a chart exists.
+
+### Picking the right group
+
+When there is more than one group, read the product's `default_variant` and
+match `color.title` / `size.title` against the group `title`; if nothing
+matches, choose the group whose latest price is closest to
+`default_variant.price.selling_price`. The product payload is served from
+`https://api.digikala.com/product/v1/products/{id}/` (the older
+`/v2/product/{id}/` path is kept as a fallback).
+
+### Implementation
+
+- `src/lib/digikalaHistory.ts` — fetch, parse, group selection and backfill.
+- `src/lib/jalali.ts` — Jalali → Gregorian conversion for `observed_at`.
+- Backfilled rows are written to `price_snapshots` under a `runs` row with
+  `trigger_source = 'backfill'` (excluded from the latest/cron run views).
+  Calendar days that already have a snapshot are skipped, so the backfill never
+  duplicates or overwrites our own collection.

@@ -12,6 +12,7 @@ import { getAuthUserFromRequest } from '@/lib/auth';
 import { requireAuth } from '@/lib/api-guard';
 import { validateSafeUrl } from '@/lib/security';
 import { isMarketSource } from '@/lib/market';
+import { backfillDigikalaPriceHistory } from '@/lib/digikalaHistory';
 
 export const dynamic = 'force-dynamic';
 
@@ -80,6 +81,18 @@ export async function POST(req: NextRequest) {
       active_end_hour: endHour,
       adapter_settings: body.adapter_settings,
     });
+
+    // First time this product enters the database: seed ~30 days of Digikala
+    // price history so the chart is not empty. Reused products already have it.
+    if (!result.reused) {
+      const target = getManagedTargets(db).find((t) => t.product_key === result.product_key);
+      const backfill = await backfillDigikalaPriceHistory(db, {
+        productKey: result.product_key,
+        url: body.url,
+        sourceKey: target?.source_key ?? body.source_key ?? 'digikala_api',
+      });
+      return NextResponse.json({ ...result, history_backfill: backfill });
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {

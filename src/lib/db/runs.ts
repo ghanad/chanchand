@@ -110,6 +110,29 @@ export function startRun(
   return runId;
 }
 
+/**
+ * Creates a lightweight run row for snapshots that were not produced by the
+ * regular runner (currently only the one-time Digikala history backfill).
+ * These runs are excluded from the "latest run" and cron-run views.
+ */
+export function startBackfillRun(
+  db: Database.Database,
+  triggerDetails?: Record<string, any> | string | null
+): number {
+  const now = new Date().toISOString();
+  let detailsStr: string | null = null;
+  if (triggerDetails) {
+    detailsStr = typeof triggerDetails === 'string' ? triggerDetails : JSON.stringify(triggerDetails);
+  }
+  const result = db
+    .prepare(`
+      INSERT INTO runs (started_at, finished_at, status, config_path, target_count, success_count, error_count, trigger_source, trigger_details)
+      VALUES (?, ?, 'success', NULL, 0, 0, 0, 'backfill', ?)
+    `)
+    .run(now, now, detailsStr);
+  return Number(result.lastInsertRowid);
+}
+
 export function finishRun(
   db: Database.Database,
   runId: number,
@@ -146,6 +169,7 @@ export function markRunFailed(db: Database.Database, runId: number): void {
 export function recentRuns(db: Database.Database, limit = 20): RunRow[] {
   return db.prepare(`
     SELECT * FROM runs
+    WHERE COALESCE(trigger_source, 'manual') != 'backfill'
     ORDER BY started_at DESC, id DESC
     LIMIT ?
   `).all(limit) as RunRow[];
@@ -157,7 +181,7 @@ export function getCronRuns(
   filterSource?: string,
   filterStatus?: string
 ): RunRow[] {
-  let query = 'SELECT * FROM runs WHERE 1=1';
+  let query = "SELECT * FROM runs WHERE COALESCE(trigger_source, 'manual') != 'backfill'";
   const params: any[] = [];
 
   if (filterSource && filterSource !== 'all') {
@@ -183,6 +207,7 @@ export function getCronRuns(
 export function latestRun(db: Database.Database): RunRow | null {
   return (db.prepare(`
     SELECT * FROM runs
+    WHERE COALESCE(trigger_source, 'manual') != 'backfill'
     ORDER BY started_at DESC, id DESC
     LIMIT 1
   `).get() as RunRow) || null;

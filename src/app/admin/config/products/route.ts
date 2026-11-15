@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase, addManagedProduct } from '@/lib/db';
+import { getDatabase, addManagedProduct, getManagedTargets } from '@/lib/db';
+import { backfillDigikalaPriceHistory } from '@/lib/digikalaHistory';
 import { requireAdmin } from '@/lib/api-guard';
 import { validateSafeUrl } from '@/lib/security';
 
@@ -32,6 +33,16 @@ export async function POST(req: NextRequest) {
       show_usd_chart: body.show_usd_chart !== undefined ? Boolean(body.show_usd_chart) : false,
       show_gold_chart: body.show_gold_chart !== undefined ? Boolean(body.show_gold_chart) : false,
     });
+
+    if (!result.reused) {
+      const target = getManagedTargets(db).find((t) => t.product_key === result.product_key);
+      const backfill = await backfillDigikalaPriceHistory(db, {
+        productKey: result.product_key,
+        url: body.url,
+        sourceKey: target?.source_key ?? body.source_key ?? 'digikala_api',
+      });
+      return NextResponse.json({ ...result, history_backfill: backfill });
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {
