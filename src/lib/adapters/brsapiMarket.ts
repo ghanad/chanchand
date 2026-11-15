@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { FetchContext, PriceAdapter } from './types';
+import { FetchContext, PriceAdapter, SharedFetchResult } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
@@ -22,6 +22,14 @@ export class BrsapiMarketAdapter implements PriceAdapter {
   private cache: Map<string, { timestamp: number; payload: any; statusCode: number }> = new Map();
 
   async fetch(context: FetchContext): Promise<PriceObservation> {
+    return this.parseShared(await this.fetchShared(context), context);
+  }
+
+  /**
+   * Fetches the whole BRSAPI snapshot once. The runner calls this once per
+   * source/URL and then uses `parseShared` for every market product.
+   */
+  async fetchShared(context: FetchContext): Promise<SharedFetchResult> {
     const urlCheck = validateSafeUrl(context.target.url);
     if (!urlCheck.valid) {
       throw new Error(`SSRF validation failed for BRSAPI target URL: ${urlCheck.reason}`);
@@ -47,9 +55,13 @@ export class BrsapiMarketAdapter implements PriceAdapter {
     const apiUrl = this.urlWithApiKey(context.target.url, apiKey);
     const { payload, statusCode } = await this.fetchPayload(context, apiUrl, settings);
 
-    return this.parseMarketPayload(payload, context.source, context.target, {
-      apiUrl,
-      statusCode,
+    return { payload, statusCode, apiUrl };
+  }
+
+  parseShared(shared: SharedFetchResult, context: FetchContext): PriceObservation {
+    return this.parseMarketPayload(shared.payload as Record<string, any>, context.source, context.target, {
+      apiUrl: shared.apiUrl,
+      statusCode: shared.statusCode,
     });
   }
 

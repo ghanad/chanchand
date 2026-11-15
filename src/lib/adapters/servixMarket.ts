@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { FetchContext, PriceAdapter } from './types';
+import { FetchContext, PriceAdapter, SharedFetchResult } from './types';
 import { PriceObservation, SourceConfig, TargetConfig } from '../types';
 import { parsePriceToIrr } from '../pricing';
 import { validateSafeUrl } from '../security';
@@ -11,7 +11,6 @@ import {
 
 const DEFAULT_API_KEY_ENV = 'SERVIX_API_KEY';
 const ALLOWED_API_KEY_ENVS = new Set(['SERVIX_API_KEY', 'servix_api_key', 'SERVIX_KEY']);
-const DEFAULT_CACHE_TTL_SECONDS = 300.0;
 
 const SERVIX_DEFAULT_HEADERS: Record<string, string> = {
   'User-Agent': 'price-getter/0.1 (+https://github.com/price-getter)',
@@ -20,9 +19,15 @@ const SERVIX_DEFAULT_HEADERS: Record<string, string> = {
 
 export class ServixMarketAdapter implements PriceAdapter {
   name = 'servix_market';
-  private cache: Map<string, { timestamp: number; payload: any; statusCode: number }> = new Map();
-
   async fetch(context: FetchContext): Promise<PriceObservation> {
+    return this.parseShared(await this.fetchShared(context), context);
+  }
+
+  /**
+   * Fetches the whole Servix snapshot once. The runner calls this once per
+   * source/URL and then uses `parseShared` for every market product.
+   */
+  async fetchShared(context: FetchContext): Promise<SharedFetchResult> {
     const urlCheck = validateSafeUrl(context.target.url);
     if (!urlCheck.valid) {
       throw new Error(`SSRF validation failed for Servix target URL: ${urlCheck.reason}`);
@@ -46,11 +51,15 @@ export class ServixMarketAdapter implements PriceAdapter {
     }
 
     const apiUrl = context.target.url;
-    const { payload, statusCode } = await this.fetchPayload(context, apiUrl, apiKey, settings);
+    const { payload, statusCode } = await this.fetchPayload(context, apiUrl, apiKey);
 
-    return this.parseMarketPayload(payload, context.source, context.target, {
-      apiUrl,
-      statusCode,
+    return { payload, statusCode, apiUrl };
+  }
+
+  parseShared(shared: SharedFetchResult, context: FetchContext): PriceObservation {
+    return this.parseMarketPayload(shared.payload, context.source, context.target, {
+      apiUrl: shared.apiUrl,
+      statusCode: shared.statusCode,
     });
   }
 
@@ -120,17 +129,8 @@ export class ServixMarketAdapter implements PriceAdapter {
   private async fetchPayload(
     context: FetchContext,
     apiUrl: string,
-    apiKey: string,
-    settings: Record<string, any>
+    apiKey: string
   ): Promise<{ payload: any; statusCode: number }> {
-    const cacheTtlSeconds = Number(settings.cache_ttl_seconds ?? DEFAULT_CACHE_TTL_SECONDS);
-    const now = Date.now();
-    const cached = this.cache.get(apiUrl);
-
-    if (cached && cacheTtlSeconds > 0 && now - cached.timestamp <= cacheTtlSeconds * 1000) {
-      return { payload: cached.payload, statusCode: cached.statusCode };
-    }
-
     const headers = {
       ...SERVIX_DEFAULT_HEADERS,
       'X-API-Key': apiKey,
@@ -162,7 +162,6 @@ export class ServixMarketAdapter implements PriceAdapter {
       throw new Error('Servix response was not a JSON object or array');
     }
 
-    this.cache.set(apiUrl, { timestamp: now, payload, statusCode: res.status });
     return { payload, statusCode: res.status };
   }
 

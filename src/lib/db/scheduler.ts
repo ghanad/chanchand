@@ -187,16 +187,12 @@ export function getScheduledBatchTargets(
   const publicScheduleMap = getPublicProductScheduleMap(db);
   const scheduleMap = getProductScheduleMap(db);
 
-  // Market products (usd, gold, coin) share one API response, so they are polled at
-  // most once per configured interval instead of on every trigger; this keeps
-  // provider quotas (e.g. 50 requests/day) safe.
+  // Market products only need their window checked here. The runner fetches the
+  // whole source snapshot once and enforces the poll interval per source, so
+  // individual market products must not be filtered out separately.
   const eligibleMarket = marketTargets.filter((t) => {
     const sched = scheduleMap.get(t.product_key) ?? { startHour: 0, endHour: 23 };
-    if (!isHourInWindow(currentHour, sched.startHour, sched.endHour)) {
-      return false;
-    }
-    const interval = getMarketPollIntervalMinutes(db, t.source_key);
-    return !hasSuccessfulPriceWithinMinutes(db, t.product_key, interval, now);
+    return isHourInWindow(currentHour, sched.startHour, sched.endHour);
   });
 
   const isPublicCollectionHour =

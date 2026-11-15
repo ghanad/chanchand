@@ -1,5 +1,6 @@
 import { AppConfig, FetchErrorRow, PriceSnapshotRow, RunRow } from './types';
 import { getDayBounds } from './db/scheduler';
+import { isMarketSource } from './market';
 
 export const USD_PRODUCT_KEY = 'usd';
 export const USD_HISTORY_LIMIT = 10000;
@@ -146,6 +147,15 @@ export function productsPayload(
 ): Array<Record<string, any>> {
   const products: Record<string, any> = {};
 
+  // Market products share one admin-managed provider quota, so regular users
+  // cannot trigger a manual refresh for them.
+  const marketProductKeys = new Set<string>();
+  for (const target of managedTargets || []) {
+    if (isMarketSource(target.source_key)) {
+      marketProductKeys.add(target.product_key);
+    }
+  }
+
   for (const dbProduct of dbProducts) {
     const isPublic = Boolean(dbProduct.is_public);
     const isOwner = currentUser?.id != null && dbProduct.user_id === currentUser.id;
@@ -155,7 +165,9 @@ export function productsPayload(
 
     let canRefresh = true;
     if (!isAdmin && currentUser) {
-      if (dbProduct.last_manual_refresh_at) {
+      if (marketProductKeys.has(dbProduct.key)) {
+        canRefresh = false;
+      } else if (dbProduct.last_manual_refresh_at) {
         const { startOfDay, endOfDay } = getDayBounds();
         if (dbProduct.last_manual_refresh_at >= startOfDay && dbProduct.last_manual_refresh_at <= endOfDay) {
           canRefresh = false;

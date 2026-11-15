@@ -26,11 +26,10 @@ const adapters: Record<string, () => PriceAdapter> = {
 };
 
 /**
- * Adapter instances are shared for the lifetime of the process so their
- * response caches survive between targets and runs. Market adapters answer with
- * the *whole* market snapshot in one HTTP response, so sharing the instance is
- * what turns N market products into a single API request (critical for providers
- * with a small daily quota).
+ * Adapter instances are shared for the lifetime of the process. Market adapters
+ * expose `fetchShared`/`parseShared`; the runner calls `fetchShared` once per
+ * source+URL and parses every product from that payload, so N market products
+ * cost one HTTP request per poll.
  */
 const instances: Record<string, PriceAdapter> = {};
 

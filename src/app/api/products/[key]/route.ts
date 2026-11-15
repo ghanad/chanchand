@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase, updateManagedProduct, deleteManagedProduct } from '@/lib/db';
 import { requireAuth } from '@/lib/api-guard';
 import { validateSafeUrl } from '@/lib/security';
+import { isMarketSource } from '@/lib/market';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,13 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     const urlCheck = validateSafeUrl(body.url);
     if (!urlCheck.valid) {
       return NextResponse.json({ error: `آدرس نامعتبر یا غیرمجاز است: ${urlCheck.reason}` }, { status: 400 });
+    }
+
+    if (auth.user.role !== 'admin' && isMarketSource(body.source_key)) {
+      return NextResponse.json(
+        { error: 'محصولات بازار (Servix/BRSAPI) فقط توسط مدیر سیستم قابل ویرایش هستند.' },
+        { status: 403 }
+      );
     }
 
     const db = getDatabase();

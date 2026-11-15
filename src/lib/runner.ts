@@ -1,3 +1,4 @@
+import type Database from 'better-sqlite3';
 import { AppConfig, TargetConfig, SourceConfig, PriceObservation } from './types';
 import {
   getDatabase,
@@ -41,6 +42,12 @@ export interface RunSummary {
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+interface MarketGroup {
+  sourceKey: string;
+  url: string;
+  targets: TargetConfig[];
+}
 
 export class PriceRunner {
   private dbUrl?: string;
@@ -144,6 +151,9 @@ export class PriceRunner {
     const currentHour = getTimezoneHour(now);
 
     try {
+      const marketTargets: TargetConfig[] = [];
+      const regularTargets: TargetConfig[] = [];
+
       for (const target of activeTargets) {
         const source = sources[target.source_key];
         if (!source) {
@@ -152,8 +162,32 @@ export class PriceRunner {
           });
           continue;
         }
+        if (isMarketSource(target.source_key, source.adapter) || target.product_key === USD_PRODUCT_KEY) {
+          marketTargets.push(target);
+        } else {
+          regularTargets.push(target);
+        }
+      }
 
-        const isMarket = isMarketSource(target.source_key, source.adapter) || target.product_key === USD_PRODUCT_KEY;
+      // Market providers return the whole snapshot in one response. Fetch each
+      // source+URL once per run and parse every product from that payload.
+      for (const group of this.groupMarketTargets(marketTargets)) {
+        const source = sources[group.sourceKey];
+        if (!source) continue;
+        const result = await this.processMarketGroup(db, runId, group, source, {
+          force: Boolean(options?.force),
+          now,
+          currentHour,
+          scheduleMap,
+          lastRequestAt,
+        });
+        successCount += result.success;
+        errorCount += result.errors;
+      }
+
+      for (const target of regularTargets) {
+        const source = sources[target.source_key];
+        if (!source) continue;
         const isPublic = publicKeys.has(target.product_key);
 
         if (!options?.force) {
@@ -167,20 +201,7 @@ export class PriceRunner {
             continue;
           }
 
-          // Market products are throttled by a configurable interval (default 60 min)
-          // because providers cap daily requests; public products are hourly and
-          // private products daily. Market targets share one cached API response.
-          if (isMarket) {
-            const interval = getMarketPollIntervalMinutes(db, target.source_key);
-            if (hasSuccessfulPriceWithinMinutes(db, target.product_key, interval, now)) {
-              logInfo(
-                'Runner',
-                `run ${runId}: skipping market product ${target.product_key}/${target.source_key}, collected within the last ${interval} minutes`,
-                { current_hour: currentHour, poll_interval_minutes: interval }
-              );
-              continue;
-            }
-          } else if (isPublic) {
+          if (isPublic) {
             if (hasSuccessfulPriceThisHour(db, target.product_key, now, target.url, target.source_key)) {
               logInfo(
                 'Runner',
@@ -287,6 +308,148 @@ export class PriceRunner {
       error_count: errorCount,
       status: runRow.status,
     };
+  }
+
+  private groupMarketTargets(targets: TargetConfig[]): MarketGroup[] {
+    const groups = new Map<string, MarketGroup>();
+    for (const target of targets) {
+      const key = `${target.source_key}::${normalizeTargetUrl(target.url) || target.url}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = { sourceKey: target.source_key, url: target.url, targets: [] };
+        groups.set(key, group);
+      }
+      group.targets.push(target);
+    }
+
+    return Array.from(groups.values()).sort((a, b) => {
+      const aUsd = a.targets.some((t) => t.product_key === USD_PRODUCT_KEY) ? 0 : 1;
+      const bUsd = b.targets.some((t) => t.product_key === USD_PRODUCT_KEY) ? 0 : 1;
+      return aUsd - bUsd;
+    });
+  }
+
+  private async processMarketGroup(
+    db: Database.Database,
+    runId: number,
+    group: MarketGroup,
+    source: SourceConfig,
+    options: {
+      force: boolean;
+      now: Date;
+      currentHour: number;
+      scheduleMap: Map<string, { startHour: number; endHour: number }>;
+      lastRequestAt: Record<string, number>;
+    }
+  ): Promise<{ success: number; errors: number }> {
+    const { force, now, currentHour, scheduleMap, lastRequestAt } = options;
+
+    if (!force) {
+      const inWindow = group.targets.some((target) => {
+        const sched = scheduleMap.get(target.product_key) ?? { startHour: 0, endHour: 23 };
+        return isHourInWindow(currentHour, sched.startHour, sched.endHour);
+      });
+      if (!inWindow) {
+        logInfo('Runner', `run ${runId}: skipping market group ${group.sourceKey}, outside active window`, {
+          products: group.targets.length,
+          current_hour: currentHour,
+        });
+        return { success: 0, errors: 0 };
+      }
+
+      const interval = getMarketPollIntervalMinutes(db, group.sourceKey);
+      // A small tolerance keeps an hourly cron from skipping a run just because
+      // the previous snapshot landed a few seconds after the hour mark.
+      const effectiveInterval = Math.max(1, interval - 2);
+      const recent = group.targets.some((target) =>
+        hasSuccessfulPriceWithinMinutes(db, target.product_key, effectiveInterval, now)
+      );
+      if (recent) {
+        logInfo(
+          'Runner',
+          `run ${runId}: skipping market group ${group.sourceKey}, collected within the last ${interval} minutes`,
+          { products: group.targets.length, current_hour: currentHour, poll_interval_minutes: interval }
+        );
+        return { success: 0, errors: 0 };
+      }
+    }
+
+    await this.respectRateLimit(group.sourceKey, source.rate_limit_seconds, lastRequestAt);
+
+    logInfo('Runner', `run ${runId}: fetching market group ${group.sourceKey}`, {
+      adapter: source.adapter,
+      url: redactUrl(group.url),
+      products: group.targets.length,
+      rate_limit_seconds: source.rate_limit_seconds,
+    });
+
+    const requestStartedAt = Date.now();
+    try {
+      const adapter = getAdapter(source.adapter);
+      if (!adapter.fetchShared || !adapter.parseShared) {
+        // Fallback for adapters without shared-fetch support.
+        let success = 0;
+        for (const target of group.targets) {
+          const observation = await adapter.fetch({ source, target });
+          recordPrice(db, runId, target, observation);
+          success++;
+        }
+        logInfo('Runner', `run ${runId}: collected market group ${group.sourceKey}`, {
+          products: success,
+          errors: 0,
+          elapsed_ms: Date.now() - requestStartedAt,
+        });
+        return { success, errors: 0 };
+      }
+
+      const shared = await adapter.fetchShared({ source, target: group.targets[0] });
+      let success = 0;
+      let parseErrors = 0;
+      for (const target of group.targets) {
+        try {
+          const observation = adapter.parseShared(shared, { source, target });
+          recordPrice(db, runId, target, observation);
+          success++;
+        } catch (err: any) {
+          parseErrors++;
+          const details = describeError(err);
+          recordError(db, runId, target, err, {
+            adapter: source.adapter,
+            rate_limit_seconds: source.rate_limit_seconds,
+            ...details,
+            product_key: target.product_key,
+            source_key: target.source_key,
+          });
+        }
+      }
+      logInfo('Runner', `run ${runId}: collected market group ${group.sourceKey}`, {
+        products: success,
+        errors: parseErrors,
+        elapsed_ms: Date.now() - requestStartedAt,
+      });
+      return { success, errors: parseErrors };
+    } catch (err: any) {
+      const details = describeError(err);
+      for (const target of group.targets) {
+        recordError(db, runId, target, err, {
+          adapter: source.adapter,
+          rate_limit_seconds: source.rate_limit_seconds,
+          ...details,
+          product_key: target.product_key,
+          source_key: target.source_key,
+        });
+      }
+      logWarn('Runner', `run ${runId}: failed market group ${group.sourceKey}`, {
+        adapter: source.adapter,
+        products: group.targets.length,
+        rate_limit_seconds: source.rate_limit_seconds,
+        elapsed_ms: Date.now() - requestStartedAt,
+        ...details,
+      });
+      return { success: 0, errors: group.targets.length };
+    } finally {
+      lastRequestAt[group.sourceKey] = Date.now();
+    }
   }
 
   private async respectRateLimit(

@@ -10,6 +10,7 @@ import {
   recordProductRefresh,
 } from '@/lib/db';
 import { requireAuth } from '@/lib/api-guard';
+import { isMarketSource } from '@/lib/market';
 import { TargetConfig } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -78,6 +79,16 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json(
         { error: `هدفی برای محصول «${productKey}» یافت نشد.` },
         { status: 404 }
+      );
+    }
+
+    // Market providers (Servix/BRSAPI) are admin-managed and share one daily
+    // quota; regular users must not trigger them manually.
+    const isMarketProduct = candidateTargets.some((t) => isMarketSource(t.source_key));
+    if (isMarketProduct && auth.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'استعلام دستی محصولات بازار فقط توسط مدیر سیستم مجاز است.' },
+        { status: 403 }
       );
     }
 

@@ -285,13 +285,14 @@ describe('PriceRunner module', () => {
     expect(summary.status).toBe('failed');
 
     const warnLines = warnSpy.mock.calls.map((call) => String(call[0]));
-    const failureLine = warnLines.find((line) => line.includes('failed coin-emami/servix_market'));
+    const failureLine = warnLines.find((line) => line.includes('failed market group servix_market'));
     expect(failureLine).toBeDefined();
     expect(failureLine).toMatch(/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [+-]\d{2}:\d{2}\] WARN \[Runner\]/);
     expect(failureLine).toContain('status=429');
     expect(failureLine).toContain('retry_after=60');
     expect(failureLine).toContain('Servix rate limit exceeded');
     expect(failureLine).toContain('rate_limit_seconds=3');
+    expect(failureLine).toContain('products=1');
 
     const errorRow = db.prepare('SELECT * FROM fetch_errors ORDER BY id DESC LIMIT 1').get() as any;
     expect(errorRow.error_type).toBe('HttpRequestError');

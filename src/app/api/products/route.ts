@@ -11,6 +11,7 @@ import { productsPayload, sourcesPayload } from '@/lib/serializers';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { requireAuth } from '@/lib/api-guard';
 import { validateSafeUrl } from '@/lib/security';
+import { isMarketSource } from '@/lib/market';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,6 +52,13 @@ export async function POST(req: NextRequest) {
     const urlCheck = validateSafeUrl(body.url);
     if (!urlCheck.valid) {
       return NextResponse.json({ error: `آدرس نامعتبر یا غیرمجاز است: ${urlCheck.reason}` }, { status: 400 });
+    }
+
+    if (auth.user.role !== 'admin' && isMarketSource(body.source_key)) {
+      return NextResponse.json(
+        { error: 'محصولات بازار (Servix/BRSAPI) فقط توسط مدیر سیستم قابل افزودن هستند.' },
+        { status: 403 }
+      );
     }
 
     const isPublic = auth.user.role === 'admin' ? Boolean(body.is_public) : false;

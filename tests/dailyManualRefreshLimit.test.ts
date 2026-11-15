@@ -12,7 +12,8 @@ import {
   recordProductRefresh,
 } from '../src/lib/db';
 import { hashPassword, signAuthToken, AUTH_COOKIE_NAME } from '../src/lib/auth';
-import { GET as getProducts } from '../src/app/api/products/route';
+import { GET as getProducts, POST as createProduct } from '../src/app/api/products/route';
+import { PUT as updateProduct } from '../src/app/api/products/[key]/route';
 import { POST as refreshProduct } from '../src/app/api/products/[key]/refresh/route';
 
 describe('Daily Manual Price Refresh Rate Limit for Regular Users', () => {
@@ -72,6 +73,74 @@ describe('Daily Manual Price Refresh Rate Limit for Regular Users', () => {
     expect(hasUserRefreshedProductToday(db, regularUserId, 'other_product')).toBe(false);
 
     db.close();
+  });
+
+  it('does not allow regular users to create or edit market products', async () => {
+    const reqCreate = new NextRequest('https://example.com/api/products', {
+      method: 'POST',
+      headers: {
+        cookie: `${AUTH_COOKIE_NAME}=${regularUserCookie}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'دلار',
+        url: 'https://servix.cc/api/v1/assets',
+        source_key: 'servix_market',
+        adapter_settings: { symbol: 'USD_RLS' },
+      }),
+    });
+    const resCreate = await createProduct(reqCreate);
+    expect(resCreate.status).toBe(403);
+
+    const db = getDatabase();
+    const p = addManagedProduct(db, {
+      title: 'محصول شخصی',
+      url: 'https://example.com/product/private-1',
+      user_id: regularUserId,
+    });
+    db.close();
+
+    const reqUpdate = new NextRequest(`https://example.com/api/products/${p.product_key}`, {
+      method: 'PUT',
+      headers: {
+        cookie: `${AUTH_COOKIE_NAME}=${regularUserCookie}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'محصول شخصی',
+        url: 'https://servix.cc/api/v1/assets',
+        source_key: 'servix_market',
+      }),
+    });
+    const resUpdate = await updateProduct(reqUpdate, { params: Promise.resolve({ key: p.product_key }) });
+    expect(resUpdate.status).toBe(403);
+  });
+
+  it('does not allow regular users to manually refresh admin-managed market products', async () => {
+    const db = getDatabase();
+    const p = addManagedProduct(db, {
+      title: 'دلار',
+      url: 'https://servix.cc/api/v1/assets',
+      source_key: 'servix_market',
+      user_id: regularUserId,
+      adapter_settings: { symbol: 'USD_RLS' },
+    });
+    db.close();
+
+    const reqList = new NextRequest('https://example.com/api/products', {
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${regularUserCookie}` },
+    });
+    const resList = await getProducts(reqList);
+    const jsonList = await resList.json();
+    const prod = jsonList.products.find((item: any) => item.key === p.product_key);
+    expect(prod.can_refresh).toBe(false);
+
+    const reqRefresh = new NextRequest(`https://example.com/api/products/${p.product_key}/refresh`, {
+      method: 'POST',
+      headers: { cookie: `${AUTH_COOKIE_NAME}=${regularUserCookie}` },
+    });
+    const resRefresh = await refreshProduct(reqRefresh, { params: Promise.resolve({ key: p.product_key }) });
+    expect(resRefresh.status).toBe(403);
   });
 
   it('allows regular user to refresh only once per day per product and blocks repeat calls with 429', async () => {

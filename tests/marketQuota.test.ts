@@ -125,6 +125,30 @@ describe('Market provider quota (50 requests/day) and per-product collection win
     db.close();
   });
 
+  it('fetches a failing market source once per run and records the error for every product', async () => {
+    const targets = seedMarketProducts();
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      new Response(JSON.stringify({ status: 429, code: 'DAILY_LIMIT_EXCEEDED' }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': '60' },
+      })
+    );
+
+    const db = getDatabase();
+    const runId = startRun(db, null, null, targets, undefined, 'cron');
+    const summary = await new PriceRunner().executeRun(null, runId, targets, { force: true });
+
+    // The provider is called once, not once per product, even when it fails.
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(summary.success_count).toBe(0);
+    expect(summary.error_count).toBe(6);
+
+    const errors = db.prepare('SELECT product_key FROM fetch_errors WHERE run_id = ?').all(runId) as any[];
+    expect(errors).toHaveLength(6);
+
+    db.close();
+  });
+
   it('does not call the provider again when a second run happens in the same hour', async () => {
     const targets = seedMarketProducts();
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
