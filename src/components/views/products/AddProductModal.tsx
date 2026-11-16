@@ -123,6 +123,16 @@ export function AddProductModal({
     };
   }, [isOpen, mode, carItems.length]);
 
+  const isDigikalaUrl = useMemo(() => {
+    const url = form.url.trim();
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return /(^|\.)digikala\.com$/.test(host) && /(dkp-|\/product\/)\d+/i.test(url);
+    } catch {
+      return false;
+    }
+  }, [form.url]);
+
   // Preview a Digikala link so the user can choose "cheapest anywhere" or a
   // specific colour before the product is created.
   useEffect(() => {
@@ -134,16 +144,8 @@ export function AddProductModal({
     }
 
     const url = form.url.trim();
-    let host = "";
-    try {
-      host = new URL(url).hostname.toLowerCase();
-    } catch {
-      host = "";
-    }
-    const isDigikalaProduct =
-      /(^|\.)digikala\.com$/.test(host) && /(dkp-|\/product\/)\d+/i.test(url);
 
-    if (!isDigikalaProduct) {
+    if (!isDigikalaUrl) {
       setPreview(null);
       setPreviewError(null);
       setIsLoadingPreview(false);
@@ -193,7 +195,7 @@ export function AddProductModal({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [isOpen, mode, form.url, setForm]);
+  }, [isOpen, mode, isDigikalaUrl, form.url, setForm]);
 
   // Filter cars by company and search query
   const filteredCars = useMemo(() => {
@@ -350,20 +352,7 @@ export function AddProductModal({
         ) : (
           <>
             <label>
-              عنوان محصول
-              <input
-                value={form.title}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, title: event.target.value }))
-                }
-                placeholder="مثلاً: تلویزیون ۵۵ اینچ سامسونگ"
-                autoComplete="off"
-                required
-                autoFocus
-              />
-            </label>
-            <label>
-              آدرس اینترنتی (URL)
+              آدرس صفحهٔ محصول
               <input
                 value={form.url}
                 onChange={(event) => {
@@ -384,110 +373,135 @@ export function AddProductModal({
                     return { ...current, url: val, source_key: nextSource };
                   });
                 }}
-                placeholder="https://..."
+                placeholder="https://www.digikala.com/product/dkp-..."
                 type="url"
                 dir="ltr"
+                required
+                autoFocus
+              />
+            </label>
+
+            {isDigikalaUrl ? (
+              isLoadingPreview ? (
+                <div className="product-preview-skeleton">
+                  <div className="product-preview-skeleton-image" />
+                  <div className="product-preview-skeleton-lines">
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              ) : previewError ? (
+                <div className="product-preview-hint product-preview-hint-error">
+                  {previewError} می‌توانید محصول را بدون پیش‌نمایش اضافه کنید.
+                </div>
+              ) : preview ? (
+                <div className="product-preview-card">
+                  <div className="product-preview-head">
+                    {preview.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="product-preview-image" src={preview.image_url} alt="" />
+                    ) : null}
+                    <div className="product-preview-meta">
+                      <div className="product-preview-title">{preview.title}</div>
+                      <div className="product-preview-price">
+                        {preview.in_stock ? toman(preview.floor_price_irr) : "در حال حاضر ناموجود"}
+                      </div>
+                      <div className="product-preview-sub">
+                        {preview.in_stock
+                          ? `ارزان‌ترین پیشنهاد${preview.floor_color_label ? ` · ${preview.floor_color_label}` : ""}`
+                          : "هیچ پیشنهاد موجودی برای این محصول نیست"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="product-preview-rule">
+                    <span className="product-preview-rule-label">قیمت بر اساس:</span>
+                    <div className="product-preview-options">
+                      <button
+                        type="button"
+                        className={`product-preview-option ${!form.color_id ? "active" : ""}`}
+                        onClick={() =>
+                          setForm((current) => ({ ...current, color_id: null, color_label: null }))
+                        }
+                      >
+                        <span className="product-preview-option-name">کف قیمت (هر رنگ)</span>
+                        <span className="product-preview-option-price">
+                          {toman(preview.floor_price_irr)}
+                        </span>
+                      </button>
+
+                      {(preview.colors || []).length > 1
+                        ? (preview.colors || []).map((color) => (
+                            <button
+                              key={color.id}
+                              type="button"
+                              disabled={!color.inStock}
+                              className={`product-preview-option ${
+                                form.color_id === color.id ? "active" : ""
+                              }`}
+                              onClick={() =>
+                                setForm((current) => ({
+                                  ...current,
+                                  color_id: color.id,
+                                  color_label: color.label,
+                                }))
+                              }
+                            >
+                              <span className="product-preview-option-name">
+                                <span
+                                  className="product-preview-color-dot"
+                                  style={{ background: color.hex || "var(--line)" }}
+                                />
+                                {color.label || "بدون رنگ"}
+                              </span>
+                              <span className="product-preview-option-price">
+                                {color.inStock ? toman(color.priceIrr) : "ناموجود"}
+                              </span>
+                            </button>
+                          ))
+                        : null}
+                    </div>
+                    <p className="product-preview-note">
+                      هر انتخاب یک اسلات از ظرفیت شما را مصرف می‌کند.
+                    </p>
+                  </div>
+                </div>
+              ) : null
+            ) : null}
+
+            <label>
+              عنوان محصول
+              <input
+                value={form.title}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="مثلاً: تلویزیون ۵۵ اینچ سامسونگ"
+                autoComplete="off"
                 required
               />
             </label>
 
-            {isLoadingPreview ? (
-              <div className="product-preview-hint">در حال دریافت اطلاعات محصول از دیجی‌کالا…</div>
-            ) : null}
-            {previewError ? (
-              <div className="product-preview-hint product-preview-hint-error">{previewError}</div>
-            ) : null}
-
-            {preview ? (
-              <div className="product-preview-card">
-                <div className="product-preview-head">
-                  {preview.image_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img className="product-preview-image" src={preview.image_url} alt="" />
-                  ) : null}
-                  <div className="product-preview-meta">
-                    <div className="product-preview-title">{preview.title}</div>
-                    <div className="product-preview-sub">
-                      {preview.in_stock
-                        ? `کف قیمت: ${toman(preview.floor_price_irr)}`
-                        : "در حال حاضر ناموجود"}
-                      {preview.floor_color_label ? ` · ${preview.floor_color_label}` : ""}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="product-preview-rule">
-                  <span className="product-preview-rule-label">قیمت بر اساس:</span>
-                  <div className="product-preview-options">
-                    <button
-                      type="button"
-                      className={`product-preview-option ${!form.color_id ? "active" : ""}`}
-                      onClick={() =>
-                        setForm((current) => ({ ...current, color_id: null, color_label: null }))
-                      }
-                    >
-                      <span className="product-preview-option-name">کف قیمت (هر رنگ)</span>
-                      <span className="product-preview-option-price">
-                        {toman(preview.floor_price_irr)}
-                      </span>
-                    </button>
-
-                    {(preview.colors || []).length > 1
-                      ? (preview.colors || []).map((color) => (
-                          <button
-                            key={color.id}
-                            type="button"
-                            disabled={!color.inStock}
-                            className={`product-preview-option ${
-                              form.color_id === color.id ? "active" : ""
-                            }`}
-                            onClick={() =>
-                              setForm((current) => ({
-                                ...current,
-                                color_id: color.id,
-                                color_label: color.label,
-                              }))
-                            }
-                          >
-                            <span className="product-preview-option-name">
-                              <span
-                                className="product-preview-color-dot"
-                                style={{ background: color.hex || "var(--line)" }}
-                              />
-                              {color.label || "بدون رنگ"}
-                            </span>
-                            <span className="product-preview-option-price">
-                              {color.inStock ? toman(color.priceIrr) : "ناموجود"}
-                            </span>
-                          </button>
-                        ))
-                      : null}
-                  </div>
-                  <p className="product-preview-note">
-                    هر انتخاب یک اسلات از ظرفیت شما را مصرف می‌کند.
-                  </p>
-                </div>
-              </div>
-            ) : null}
-
-            <label>
-              منبع قیمت‌گیری
-              <select
-                value={form.source_key}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    source_key: event.target.value,
-                  }))
-                }
-              >
-                {sources.map((source) => (
-                  <option key={source.key} value={source.key}>
-                    {source.key} ({source.adapter})
-                  </option>
-                ))}
-              </select>
-            </label>
+            {isDigikalaUrl ? null : (
+              <label>
+                منبع قیمت‌گیری
+                <select
+                  value={form.source_key}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      source_key: event.target.value,
+                    }))
+                  }
+                >
+                  {sources.map((source) => (
+                    <option key={source.key} value={source.key}>
+                      {source.key} ({source.adapter})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </>
         )}
 
