@@ -381,6 +381,13 @@ export function AddProductModal({
               />
             </label>
 
+            {!isDigikalaUrl ? (
+              <p className="product-preview-hint">
+                لینک صفحهٔ محصول دیجی‌کالا را بچسبانید تا عنوان، قیمت و رنگ‌ها خودکار
+                نمایش داده شوند.
+              </p>
+            ) : null}
+
             {isDigikalaUrl ? (
               isLoadingPreview ? (
                 <div className="product-preview-skeleton">
