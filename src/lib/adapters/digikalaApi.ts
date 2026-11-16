@@ -50,39 +50,68 @@ export class DigikalaApiAdapter implements PriceAdapter {
       ...context.source.headers,
     };
 
-    let response = await fetchWithCookieRedirect(apiUrl, {
-      headers,
-      signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
-    });
+    // Digikala has been retiring endpoints: `/v2/product/{id}/` now answers
+    // 403 for every product we track, while `/product/v1/products/{id}/`
+    // still works. Try the working one first and keep the other as a fallback
+    // so a single endpoint change cannot stop collection entirely.
+    const candidates = fresh
+      ? [productApiUrl(productId, true)]
+      : [
+          `https://api.digikala.com/product/v1/products/${productId}/`,
+          productApiUrl(productId, false),
+        ];
 
-    if (!response.ok) {
-      throw await createHttpErrorFromResponse('Digikala API', apiUrl, response);
-    }
+    let lastError: Error | null = null;
+    let response: Response | null = null;
+    let product: Record<string, any> | null = null;
 
-    let payload: any = await response.json();
-    let product = payload?.data?.product;
-
-    if (!product && !fresh && payload?.redirect_url?.uri?.includes('/fresh/product/')) {
-      apiUrl = productApiUrl(productId, true);
-      response = await fetchWithCookieRedirect(apiUrl, {
+    for (const url of candidates) {
+      apiUrl = url;
+      response = await fetchWithCookieRedirect(url, {
         headers,
         signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
       });
-      if (response.ok) {
-        payload = await response.json();
-        product = payload?.data?.product;
+
+      if (!response.ok) {
+        lastError = await createHttpErrorFromResponse('Digikala API', url, response);
+        continue;
       }
+
+      const payload: any = await response.json();
+      product = payload?.data?.product ?? null;
+
+      if (product) {
+        return this.parseApiProduct(product, context.source, {
+          colorId,
+          apiUrl,
+          statusCode: response.status,
+        });
+      }
+
+      // A regular product URL can redirect to the Fresh store.
+      if (!fresh && payload?.redirect_url?.uri?.includes('/fresh/product/')) {
+        const freshUrl = productApiUrl(productId, true);
+        const freshResponse = await fetchWithCookieRedirect(freshUrl, {
+          headers,
+          signal: AbortSignal.timeout(context.source.timeout_seconds * 1000),
+        });
+        if (freshResponse.ok) {
+          const freshPayload: any = await freshResponse.json();
+          const freshProduct = freshPayload?.data?.product;
+          if (freshProduct) {
+            return this.parseApiProduct(freshProduct, context.source, {
+              colorId,
+              apiUrl: freshUrl,
+              statusCode: freshResponse.status,
+            });
+          }
+        }
+      }
+
+      lastError = new Error('Digikala API response did not include product data');
     }
 
-    if (!product) {
-      throw new Error('Digikala API response did not include product data');
-    }
-
-    return this.parseApiProduct(product, context.source, {
-      colorId,
-      apiUrl,
-      statusCode: response.status,
-    });
+    throw lastError ?? new Error('could not extract Digikala API price data');
   }
 
   parseApiProduct(

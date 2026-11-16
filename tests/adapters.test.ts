@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DigikalaApiAdapter } from '../src/lib/adapters/digikalaApi';
 import { GenericHtmlAdapter } from '../src/lib/adapters/genericHtml';
 import { BrsapiMarketAdapter } from '../src/lib/adapters/brsapiMarket';
@@ -265,5 +265,83 @@ describe('adapters', () => {
     } finally {
       globalThis.fetch = originalFetch;
     }
+  });
+});
+
+describe('DigikalaApiAdapter endpoint failover', () => {
+  const SOURCE: any = {
+    adapter: 'digikala_api',
+    timeout_seconds: 5,
+    rate_limit_seconds: 0,
+    currency: 'IRR',
+    price_multiplier: 1,
+    headers: {},
+    settings: {},
+  };
+
+  const TARGET: any = {
+    product_key: 'p',
+    source_key: 'digikala_api',
+    url: 'https://www.digikala.com/product/dkp-11801878/',
+    enabled: true,
+  };
+
+  const productJson = JSON.stringify({
+    status: 200,
+    data: {
+      product: {
+        id: 11801878,
+        title_fa: 'هدفون',
+        variants: [
+          {
+            id: 1,
+            color: { id: 5, title: 'مشکی' },
+            status: 'marketable',
+            price: { selling_price: 33004000 },
+          },
+        ],
+      },
+    },
+  });
+
+  it('uses the working v1 endpoint instead of the retired v2 one', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes('/v2/product/')) {
+        return new Response('<html>403</html>', { status: 403 });
+      }
+      return new Response(productJson, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const obs = await new DigikalaApiAdapter().fetch({ source: SOURCE, target: TARGET });
+
+    expect(obs.price_irr).toBe(33004000);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('/product/v1/products/11801878/');
+    vi.unstubAllGlobals();
+  });
+
+  it('falls back to the second endpoint when the first one fails', async () => {
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (url: string) => {
+      calls.push(String(url));
+      if (String(url).includes('/product/v1/products/')) {
+        return new Response('<html>500</html>', { status: 500 });
+      }
+      return new Response(productJson, {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+
+    const obs = await new DigikalaApiAdapter().fetch({ source: SOURCE, target: TARGET });
+
+    expect(obs.price_irr).toBe(33004000);
+    expect(calls).toHaveLength(2);
+    vi.unstubAllGlobals();
   });
 });
