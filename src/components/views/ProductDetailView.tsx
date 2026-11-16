@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/formatters";
 import { PanelHead } from "@/components/common/PanelHead";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -12,14 +13,22 @@ import {
   ProductDetailChart,
   ProductDetailEditModal,
   ProductDetailDeleteModal,
+  ProductDetailColorModal,
   useProductDetailState,
 } from "./product-detail";
+import { useDashboard } from "@/context/DashboardContext";
+import { requestJson } from "@/lib/api-client";
 
 interface ProductDetailViewProps {
   productKey: string;
 }
 
 export function ProductDetailView({ productKey }: ProductDetailViewProps) {
+  const router = useRouter();
+  const { showToast } = useDashboard();
+  const [showColorModal, setShowColorModal] = useState(false);
+  const [isSavingColor, setIsSavingColor] = useState(false);
+
   const {
     isAdmin,
     basePath,
@@ -63,6 +72,30 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
     configuredSources,
   } = useProductDetailState(productKey);
 
+  async function handleChangeColor(colorId: string | null, colorLabel: string | null) {
+    setIsSavingColor(true);
+    try {
+      const result = await requestJson<{ product_key: string }>(
+        `/api/products/${encodeURIComponent(productKey)}/color`,
+        {
+          method: "POST",
+          body: JSON.stringify({ color_id: colorId, color_label: colorLabel }),
+        }
+      );
+      setShowColorModal(false);
+      if (result.product_key !== productKey) {
+        showToast(`رنگ محصول تغییر کرد (${result.product_key}).`);
+        router.push(`${basePath}/products/${result.product_key}`);
+      } else {
+        showToast("رنگ محصول به‌روزرسانی شد.");
+      }
+    } catch (error: any) {
+      showToast(error instanceof Error ? error.message : "خطا در تغییر رنگ محصول");
+    } finally {
+      setIsSavingColor(false);
+    }
+  }
+
   if (isInitialLoading) {
     return (
       <div className="page-stack">
@@ -102,6 +135,7 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
         onToggleActive={handleToggleActive}
         onOpenEdit={() => setShowEditModal(true)}
         onOpenDelete={() => setShowDeleteModal(true)}
+        onChangeColor={() => setShowColorModal(true)}
       />
 
       <ProductDetailSummary
@@ -155,6 +189,18 @@ export function ProductDetailView({ productKey }: ProductDetailViewProps) {
           isSaving={isSavingEdit}
         />
       )}
+
+      {/* Modal: Change colour */}
+      {product.primary_target ? (
+        <ProductDetailColorModal
+          isOpen={showColorModal}
+          onClose={() => setShowColorModal(false)}
+          productUrl={product.primary_target.url}
+          currentColorId={product.primary_target.color_id ?? null}
+          onConfirm={handleChangeColor}
+          isSaving={isSavingColor}
+        />
+      ) : null}
 
       {/* Modal: Delete Confirmation */}
       {(isAdmin || product.can_edit) && (

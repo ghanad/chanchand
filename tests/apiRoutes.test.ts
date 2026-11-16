@@ -179,6 +179,7 @@ describe('Next.js API Route Handlers Integration', () => {
             id: 0,
             title: 'مشکی',
             history: [
+              { day: '1405/08/20', selling_price: 980000, rrp_price: 1100000, is_marketable: true, seller: 'فروشنده' },
               { day: '1405/08/21', selling_price: 1000000, rrp_price: 1100000, is_marketable: true, seller: 'فروشنده' },
               { day: '1405/08/22', selling_price: 1050000, rrp_price: 1100000, is_marketable: true, seller: 'فروشنده' },
             ],

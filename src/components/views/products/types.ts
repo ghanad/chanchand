@@ -18,6 +18,9 @@ export interface ProductFormState {
   active_start_hour: number;
   active_end_hour: number;
   adapter_settings?: Record<string, any>;
+  /** Digikala colour chosen by the user; null/undefined means "cheapest anywhere". */
+  color_id?: string | null;
+  color_label?: string | null;
 }
 
 export interface ProductTableRowProps {

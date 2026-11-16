@@ -1,4 +1,4 @@
-import { extractProductId, extractVariantId } from './adapters/digikalaApi';
+import { extractProductId } from './adapters/digikalaApi';
 
 const TRACKING_PARAMS = new Set([
   'utm_source',
@@ -18,7 +18,10 @@ const TRACKING_PARAMS = new Set([
 /**
  * Normalizes a product target URL for canonical deduplication.
  * - Trims whitespace
- * - Handles Digikala canonical product ID & variant
+ * - Handles Digikala canonical product ID
+ * - Drops Digikala's `variant_id`: the colour is chosen explicitly by the user
+ *   and stored on the target, never derived from the link (a shared link with a
+ *   variant must not fork the product into a duplicate)
  * - Strips common marketing/tracking query parameters
  * - Lowercases protocol and host
  * - Normalizes trailing slashes
@@ -39,15 +42,9 @@ export function normalizeTargetUrl(rawUrl: string): string {
     if (isDigikala) {
       const productId = extractProductId(trimmed);
       if (productId) {
-        const variantId = extractVariantId(trimmed);
         const fresh = url.pathname.includes('/fresh/');
         const basePath = fresh ? `/fresh/v1/product/${productId}/` : `/product/dkp-${productId}/`;
-        const params = new URLSearchParams();
-        if (variantId) {
-          params.set('variant_id', variantId);
-        }
-        const qs = params.toString();
-        return `${protocol}//www.digikala.com${basePath}${qs ? `?${qs}` : ''}`;
+        return `${protocol}//www.digikala.com${basePath}`;
       }
     }
 
@@ -85,8 +82,24 @@ export function normalizeTargetUrl(rawUrl: string): string {
  * For ecommerce links (like Digikala or generic html), this is the normalized URL.
  * For market/API sources (like Servix or BRSAPI), multiple products share the same endpoint URL
  * and are distinguished by their symbol/code in adapter_settings.
+ *
+ * `variantKey` (the Digikala colour id) is appended last so that two colours of
+ * the same product page stay two distinct targets instead of being merged.
  */
 export function getTargetDeduplicationKey(
+  sourceKey: string = '',
+  url: string,
+  adapterSettings?: string | Record<string, any>,
+  variantKey?: string | null
+): string {
+  const base = getBaseTargetKey(sourceKey, url, adapterSettings);
+  if (!base) return '';
+
+  const variant = variantKey === undefined || variantKey === null ? '' : String(variantKey).trim();
+  return variant ? `${base}::variant:${variant}` : base;
+}
+
+function getBaseTargetKey(
   sourceKey: string = '',
   url: string,
   adapterSettings?: string | Record<string, any>
@@ -128,3 +141,11 @@ export function getTargetDeduplicationKey(
   return norm;
 }
 
+/** Exposed for callers that need the multi-item shape check without a variant. */
+export function getBaseTargetDeduplicationKey(
+  sourceKey: string = '',
+  url: string,
+  adapterSettings?: string | Record<string, any>
+): string {
+  return getBaseTargetKey(sourceKey, url, adapterSettings);
+}

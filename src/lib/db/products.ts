@@ -146,12 +146,26 @@ export function addManagedProduct(
     active_start_hour?: number | null;
     active_end_hour?: number | null;
     adapter_settings?: Record<string, any> | string;
+    /** Digikala colour id; null/undefined means "cheapest of the whole product". */
+    color_id?: string | null;
+    color_label?: string | null;
   }
 ): { product_key: string; reused?: boolean } {
-  const cleanTitle = options.title.trim();
-  if (!cleanTitle) throw new Error('title cannot be empty');
   const cleanUrl = options.url.trim();
   if (!cleanUrl) throw new Error('url cannot be empty');
+
+  const colorId = options.color_id === undefined || options.color_id === null
+    ? null
+    : String(options.color_id).trim() || null;
+  const colorLabel = options.color_label === undefined || options.color_label === null
+    ? null
+    : String(options.color_label).trim() || null;
+
+  const rawTitle = options.title.trim();
+  if (!rawTitle) throw new Error('title cannot be empty');
+  // Two colours of the same product must be distinguishable in the list.
+  const cleanTitle =
+    colorLabel && !rawTitle.includes(colorLabel) ? `${rawTitle} - ${colorLabel}` : rawTitle;
 
   const sourceKey = resolveTargetSourceKey(cleanUrl, options.source_key);
   const userId = options.user_id ?? null;
@@ -182,8 +196,8 @@ export function addManagedProduct(
   const adapterSettingsObj = parseAdapterSettings(sourceKey, options.adapter_settings, cleanTitle);
   const adapterSettingsStr = JSON.stringify(adapterSettingsObj);
 
-  // Deduplication check: does a target with this URL and symbol/item_name already exist?
-  const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, adapterSettingsObj);
+  // Deduplication check: same URL + same colour means the same tracked product.
+  const existingTarget = findManagedTargetByUrl(db, cleanUrl, sourceKey, adapterSettingsObj, colorId);
   if (existingTarget) {
     const existingProd = db
       .prepare('SELECT * FROM managed_products WHERE key = ?')
@@ -224,7 +238,7 @@ export function addManagedProduct(
     'INSERT INTO managed_products (key, title, user_id, is_public, show_usd_chart, show_gold_chart, active_start_hour, active_end_hour, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   );
   const insertTgt = db.prepare(
-    'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?)'
+    'INSERT INTO managed_targets (product_key, source_key, url, enabled, adapter_settings, color_id, color_label, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)'
   );
   const insertUserProd = db.prepare(
     'INSERT OR IGNORE INTO user_products (user_id, product_key, custom_title, created_at) VALUES (?, ?, ?, ?)'
@@ -232,7 +246,7 @@ export function addManagedProduct(
 
   const txn = db.transaction(() => {
     insertProd.run(productKey, cleanTitle, userId, isPublic, showUsdChart, showGoldChart, startHour, endHour, now, now);
-    insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, now, now);
+    insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, colorId, colorLabel, now, now);
     if (userId != null) {
       insertUserProd.run(userId, productKey, cleanTitle, now);
     }
@@ -331,6 +345,8 @@ export function updateManagedProduct(
       is_public: false,
       show_usd_chart: false,
       show_gold_chart: false,
+      color_id: existingTarget?.color_id ?? null,
+      color_label: existingTarget?.color_label ?? null,
     });
   }
 
@@ -354,10 +370,16 @@ export function updateManagedProduct(
     }
     if (existingTarget) {
       const adapterSettingsObj = parseAdapterSettings(sourceKey, existingTarget.adapter_settings, cleanTitle);
-      db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, adapter_settings = ?, updated_at = ? WHERE id = ?').run(
+      // A different URL is a different product, so a colour picked for the old
+      // one no longer applies: fall back to the "cheapest of the product" rule.
+      const nextColorId = isUrlChanging ? null : existingTarget.color_id ?? null;
+      const nextColorLabel = isUrlChanging ? null : existingTarget.color_label ?? null;
+      db.prepare('UPDATE managed_targets SET source_key = ?, url = ?, adapter_settings = ?, color_id = ?, color_label = ?, updated_at = ? WHERE id = ?').run(
         sourceKey,
         cleanUrl,
         JSON.stringify(adapterSettingsObj),
+        nextColorId,
+        nextColorLabel,
         now,
         existingTarget.id
       );

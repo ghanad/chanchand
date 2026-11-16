@@ -16,10 +16,9 @@ describe('normalizeTargetUrl', () => {
     expect(normC).toBe('https://www.digikala.com/product/dkp-1234567/');
   });
 
-  it('preserves Digikala variant_id when present', () => {
-    const urlWithVariant = 'https://www.digikala.com/product/dkp-55555/slug/?variant_id=9876&utm_campaign=winter';
-    const norm = normalizeTargetUrl(urlWithVariant);
-    expect(norm).toBe('https://www.digikala.com/product/dkp-55555/?variant_id=9876');
+  it('drops Digikala variant_id so a shared colour link does not fork the product', () => {
+    const urlWithVariant = 'https://www.digikala.com/product/dkp-55555/slug/?product_id=55555&variant_id=9876&utm_campaign=winter';
+    expect(normalizeTargetUrl(urlWithVariant)).toBe('https://www.digikala.com/product/dkp-55555/');
   });
 
   it('strips tracking parameters and trailing slashes for generic ecommerce URLs', () => {
@@ -55,5 +54,17 @@ describe('getTargetDeduplicationKey', () => {
     expect(keyCar1).toBe('iranjib::https://www.iranjib.ir/showgroup/45/prices::پژو ۲۰۷ دستی');
     expect(keyCar2).toBe('iranjib::https://www.iranjib.ir/showgroup/45/prices::دنا پلاس توربو');
     expect(keyCar1).not.toBe(keyCar2);
+  });
+
+  it('separates Digikala colours of the same product page', () => {
+    const url = 'https://www.digikala.com/product/dkp-11111/';
+    const floor = getTargetDeduplicationKey('digikala_api', url);
+    const black = getTargetDeduplicationKey('digikala_api', url, undefined, '82');
+    const white = getTargetDeduplicationKey('digikala_api', url, undefined, '83');
+
+    expect(floor).toBe('https://www.digikala.com/product/dkp-11111/');
+    expect(black).toBe('https://www.digikala.com/product/dkp-11111/::variant:82');
+    expect(black).not.toBe(white);
+    expect(black).not.toBe(floor);
   });
 });

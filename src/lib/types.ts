@@ -27,6 +27,12 @@ export interface TargetConfig {
   url: string;
   enabled: boolean;
   adapter_settings?: Record<string, any>;
+  /**
+   * Digikala colour (variant dimension) this target follows. `null` means
+   * "cheapest offer of the whole product, colour does not matter".
+   */
+  color_id?: string | null;
+  color_label?: string | null;
 }
 
 export interface AppConfig {
@@ -67,6 +73,8 @@ export interface ManagedTargetRow {
   url: string;
   enabled: number;
   adapter_settings: string;
+  color_id: string | null;
+  color_label: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -8,6 +8,8 @@ import { startBackfillRun } from './db/runs';
 import { jalaliDateToIso } from './jalali';
 import { describeError, logInfo, logWarn } from './logger';
 import { parsePriceToIrr } from './pricing';
+import { pickVariant, summarizeVariants } from './digikalaVariants';
+import { fetchDigikalaJson, fetchDigikalaProduct } from './digikalaProduct';
 
 /**
  * Digikala exposes a public (unofficial) price-chart endpoint that returns the
@@ -20,11 +22,17 @@ import { parsePriceToIrr } from './pricing';
  * We call it exactly once, when a product is first added to the database, so a
  * newly tracked product starts with 30 days of history instead of an empty
  * chart. Products that already exist keep the history we collected ourselves.
+ *
+ * Important: each chart group follows one *seller's* line for that colour, not
+ * the cheapest seller we track. The level can therefore differ from our live
+ * price by several percent. We only import the history when the two agree
+ * closely enough (`DEFAULT_MAX_CHART_MISMATCH`, overridable per source via
+ * `settings.chart_max_mismatch`); otherwise the chart starts today
+ * instead of showing a fabricated cliff.
  */
 
-const DIGIKALA_REFERER = 'https://www.digikala.com/';
-const DIGIKALA_USER_AGENT =
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+/** How far the chart's newest price may drift from our live price before we refuse to import it. */
+const DEFAULT_MAX_CHART_MISMATCH = 0.05;
 
 const DEFAULT_SOURCE: SourceConfig = {
   adapter: 'digikala_api',
@@ -63,10 +71,12 @@ export interface ParsedPriceChart {
   groups: PriceChartGroup[];
 }
 
-export interface PriceChartHint {
-  colorTitle?: string | null;
-  sizeTitle?: string | null;
-  currentPriceIrr?: number | null;
+export interface ChartSeries {
+  /** `color` = one colour's line; `floor` = per-day cheapest across all colours. */
+  kind: 'color' | 'floor';
+  points: PriceChartPoint[];
+  label: string | null;
+  groupIds: Array<string | number | null>;
 }
 
 export interface BackfillResult {
@@ -78,19 +88,13 @@ export interface BackfillResult {
     | 'no_product_id'
     | 'no_history'
     | 'fetch_failed'
-    | 'no_new_days';
+    | 'no_new_days'
+    | 'color_not_in_chart'
+    | 'chart_mismatch';
 }
 
 export function priceChartApiUrl(productId: string): string {
   return `https://api.digikala.com/v1/product/${productId}/price-chart/`;
-}
-
-/** Product detail endpoints, newest first, used only to pick the right chart group. */
-export function productDetailApiUrls(productId: string): string[] {
-  return [
-    `https://api.digikala.com/product/v1/products/${productId}/`,
-    `https://api.digikala.com/v2/product/${productId}/`,
-  ];
 }
 
 function normalizeLabel(value: string | null | undefined): string {
@@ -159,89 +163,62 @@ export function parsePriceChartPayload(
 }
 
 /**
- * Picks the chart group that matches the product's default variant. When the
- * product only has one group we take it as-is; otherwise we match the group
- * title against the variant colour/size and fall back to the price closest to
- * the current selling price.
+ * Turns the per-colour chart groups into the single series we actually track:
+ * the chosen colour's line, or the per-day cheapest across every colour.
  */
-export function pickPriceChartGroup(
+export function selectChartSeries(
   groups: PriceChartGroup[],
-  hint?: PriceChartHint | null
-): PriceChartGroup | null {
+  options: { colorId?: string | null; colorLabel?: string | null } = {}
+): ChartSeries | null {
   if (groups.length === 0) return null;
-  if (groups.length === 1) return groups[0];
 
-  const wanted = [hint?.colorTitle, hint?.sizeTitle]
-    .map(normalizeLabel)
-    .filter((label) => label.length > 0);
+  const colorId = options.colorId === undefined || options.colorId === null
+    ? ''
+    : String(options.colorId).trim();
 
-  for (const label of wanted) {
-    const match = groups.find((g) => normalizeLabel(g.title) === label);
-    if (match) return match;
-  }
-
-  const currentPrice = hint?.currentPriceIrr ?? null;
-  if (currentPrice && currentPrice > 0) {
-    let best: PriceChartGroup | null = null;
-    let bestDiff = Number.POSITIVE_INFINITY;
-    for (const group of groups) {
-      const last = [...group.points].reverse().find((p) => p.priceIrr !== null);
-      if (!last || last.priceIrr === null) continue;
-      const diff = Math.abs(last.priceIrr - currentPrice);
-      if (diff < bestDiff) {
-        bestDiff = diff;
-        best = group;
+  if (colorId) {
+    // Match by label first: Digikala's chart group `id` is a positional index
+    // (0,1,2…), *not* the colour id, so matching by id would happily return a
+    // different colour. Ids are only trusted for untitled groups.
+    const wanted = normalizeLabel(options.colorLabel);
+    if (wanted) {
+      const byLabel = groups.find((g) => normalizeLabel(g.title) === wanted);
+      if (byLabel) {
+        return { kind: 'color', points: byLabel.points, label: byLabel.title, groupIds: [byLabel.id] };
       }
     }
-    if (best) return best;
+    const byId = groups.find(
+      (g) => g.id !== null && String(g.id) === colorId && !normalizeLabel(g.title)
+    );
+    if (byId) {
+      return { kind: 'color', points: byId.points, label: byId.title, groupIds: [byId.id] };
+    }
+    return null;
   }
 
-  return groups[0];
-}
-
-async function fetchJson(
-  url: string,
-  source: SourceConfig,
-  timeoutMs: number
-): Promise<any | null> {
-  const headers: Record<string, string> = {
-    'User-Agent': DIGIKALA_USER_AGENT,
-    Accept: 'application/json, text/plain, */*',
-    Referer: DIGIKALA_REFERER,
-    ...source.headers,
-  };
-
-  const response = await fetchWithCookieRedirect(url, {
-    headers,
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) return null;
-  return response.json();
-}
-
-async function fetchVariantHint(
-  productId: string,
-  source: SourceConfig,
-  timeoutMs: number
-): Promise<PriceChartHint | null> {
-  for (const url of productDetailApiUrls(productId)) {
-    try {
-      const payload = await fetchJson(url, source, timeoutMs);
-      const variant = payload?.data?.product?.default_variant;
-      if (!variant) continue;
-
-      const colorTitle =
-        variant?.color?.title ?? variant?.color?.title_fa ?? variant?.color?.name ?? null;
-      const sizeTitle = variant?.size?.title ?? variant?.size?.title_fa ?? null;
-      const currentPriceIrr = parsePriceToIrr(
-        variant?.price?.selling_price ?? variant?.price?.final_price,
-        source.price_multiplier
-      );
-
-      return { colorTitle, sizeTitle, currentPriceIrr };
-    } catch {
-      // Try the next endpoint; the hint is optional.
+  const cheapestPerDay = new Map<string, PriceChartPoint>();
+  for (const group of groups) {
+    for (const point of group.points) {
+      if (point.priceIrr === null) continue;
+      if (point.isMarketable === false) continue;
+      const current = cheapestPerDay.get(point.day);
+      if (!current || (point.priceIrr as number) < (current.priceIrr as number)) {
+        cheapestPerDay.set(point.day, point);
+      }
     }
+  }
+
+  const points = Array.from(cheapestPerDay.values()).sort((a, b) =>
+    a.observedAt.localeCompare(b.observedAt)
+  );
+  if (points.length === 0) return null;
+
+  return { kind: 'floor', points, label: null, groupIds: groups.map((g) => g.id) };
+}
+
+function newestPricedPoint(points: PriceChartPoint[]): PriceChartPoint | null {
+  for (let i = points.length - 1; i >= 0; i -= 1) {
+    if (points[i].priceIrr !== null) return points[i];
   }
   return null;
 }
@@ -261,6 +238,8 @@ export async function backfillDigikalaPriceHistory(
     productKey: string;
     url: string;
     sourceKey: string;
+    colorId?: string | null;
+    colorLabel?: string | null;
     now?: Date;
   }
 ): Promise<BackfillResult> {
@@ -279,12 +258,12 @@ export async function backfillDigikalaPriceHistory(
     }
 
     // Keep product creation snappy: the chart request gets at most 10s and the
-    // optional variant hint at most 6s.
+    // optional product detail at most 6s.
     const timeoutMs = Math.max(5, Math.min(source.timeout_seconds || 12, 10)) * 1000;
-    const hintTimeoutMs = Math.min(timeoutMs, 6000);
+    const detailTimeoutMs = Math.min(timeoutMs, 6000);
     const apiUrl = priceChartApiUrl(productId);
 
-    const payload = await fetchJson(apiUrl, source, timeoutMs);
+    const payload = await fetchDigikalaJson(apiUrl, source, timeoutMs);
     if (!payload) {
       logWarn('digikala_history', 'price-chart request failed', {
         product_key: productKey,
@@ -299,12 +278,64 @@ export async function backfillDigikalaPriceHistory(
       return { inserted: 0, skipped: 0, groups: 0, reason: 'no_history' };
     }
 
-    const hint =
-      parsed.groups.length > 1 ? await fetchVariantHint(productId, source, hintTimeoutMs) : null;
-    const group = pickPriceChartGroup(parsed.groups, hint);
-    if (!group) {
-      return { inserted: 0, skipped: 0, groups: parsed.groups.length, reason: 'no_history' };
+    // Resolve the live price with the same rule the runner uses, so the imported
+    // history and the first live snapshot describe the same thing.
+    const product = await fetchDigikalaProduct(productId, source, detailTimeoutMs);
+    const colorId = options.colorId ?? null;
+    let livePriceIrr: number | null = null;
+    let colorLabel = options.colorLabel ?? null;
+
+    if (product) {
+      if (colorId) {
+        const picked = pickVariant(product, { colorId, multiplier: source.price_multiplier });
+        livePriceIrr = picked.priceIrr;
+        colorLabel = colorLabel ?? picked.variant?.colorLabel ?? null;
+      } else {
+        const summary = summarizeVariants(product, source.price_multiplier);
+        livePriceIrr = summary.floor.priceIrr;
+      }
     }
+
+    const series = selectChartSeries(parsed.groups, { colorId, colorLabel });
+    if (!series) {
+      return {
+        inserted: 0,
+        skipped: 0,
+        groups: parsed.groups.length,
+        reason: colorId ? 'color_not_in_chart' : 'no_history',
+      };
+    }
+
+    const anchor = newestPricedPoint(series.points);
+    const mismatch =
+      livePriceIrr && anchor && anchor.priceIrr
+        ? Math.abs(anchor.priceIrr - livePriceIrr) / livePriceIrr
+        : 0;
+
+    const maxMismatch = Number.isFinite(Number(source.settings?.chart_max_mismatch))
+      ? Number(source.settings?.chart_max_mismatch)
+      : DEFAULT_MAX_CHART_MISMATCH;
+
+    if (livePriceIrr && anchor && anchor.priceIrr && mismatch > maxMismatch) {
+      logInfo('digikala_history', 'skipping chart history: level does not match live price', {
+        product_key: productKey,
+        product_id: productId,
+        chart_price: anchor.priceIrr,
+        live_price: livePriceIrr,
+        mismatch_percent: Math.round(mismatch * 1000) / 10,
+      });
+      return {
+        inserted: 0,
+        skipped: 0,
+        groups: parsed.groups.length,
+        reason: 'chart_mismatch',
+      };
+    }
+
+    // The newest chart day is "today": the live collector will record it, so
+    // importing it here would put two points on the same calendar day.
+    const newestDay = series.points[series.points.length - 1].observedAt.slice(0, 10);
+    const withoutToday = series.points.filter((point) => point.observedAt.slice(0, 10) !== newestDay);
 
     const existingDays = snapshotDatesForProduct(db, productKey, sourceKey);
     const target: TargetConfig = {
@@ -313,9 +344,11 @@ export async function backfillDigikalaPriceHistory(
       url,
       enabled: true,
       adapter_settings: {},
+      color_id: colorId,
+      color_label: colorLabel,
     };
 
-    const rows = group.points
+    const rows = withoutToday
       .filter((point) => point.priceIrr !== null)
       .map((point) => {
         const observedAt =
@@ -326,7 +359,7 @@ export async function backfillDigikalaPriceHistory(
       })
       .filter(({ observedAt }) => !existingDays.has(observedAt.slice(0, 10)));
 
-    const skipped = group.points.length - rows.length;
+    const skipped = series.points.length - rows.length;
     if (rows.length === 0) {
       return { inserted: 0, skipped, groups: parsed.groups.length, reason: 'no_new_days' };
     }
@@ -336,8 +369,8 @@ export async function backfillDigikalaPriceHistory(
       source_key: sourceKey,
       product_id: productId,
       api_url: apiUrl,
-      chart_group_id: group.id,
-      chart_group_title: group.title,
+      chart_group_id: series.groupIds.length === 1 ? series.groupIds[0] : null,
+      chart_group_title: series.label,
       points: rows.length,
     });
 
@@ -353,9 +386,13 @@ export async function backfillDigikalaPriceHistory(
             parse_method: 'price_chart',
             api_url: apiUrl,
             product_id: productId,
-            chart_group_id: group.id,
-            chart_group_title: group.title,
+            chart_kind: series.kind,
+            chart_group_id: series.groupIds.length === 1 ? series.groupIds[0] : null,
+            chart_group_title: series.label,
+            chart_group_ids: series.kind === 'floor' ? series.groupIds : undefined,
             chart_selection_title: parsed.selectionTitle,
+            color_id: colorId,
+            color_label: colorLabel,
             day: point.day,
             rrp_price_irr: point.rrpPriceIrr,
             is_marketable: point.isMarketable,
@@ -371,9 +408,12 @@ export async function backfillDigikalaPriceHistory(
     logInfo('digikala_history', 'backfilled price history', {
       product_key: productKey,
       product_id: productId,
-      group: group.title ?? group.id,
+      kind: series.kind,
+      group: series.label ?? 'floor',
+      color_id: colorId,
       inserted: rows.length,
       skipped,
+      mismatch_percent: Math.round(mismatch * 1000) / 10,
     });
 
     return { inserted: rows.length, skipped, groups: parsed.groups.length };

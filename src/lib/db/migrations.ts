@@ -164,7 +164,22 @@ export function runMigrations(db: Database.Database): void {
     logWarn('DB', 'managed_products migration warning', describeError(err));
   }
 
-  // 5. User products column migrations
+  // 5. Managed targets: colour (variant) columns
+  try {
+    const targetCols = db.prepare('PRAGMA table_info(managed_targets)').all() as { name: string }[];
+    if (targetCols.length > 0) {
+      if (!targetCols.some((col) => col.name === 'color_id')) {
+        db.prepare('ALTER TABLE managed_targets ADD COLUMN color_id VARCHAR(64) DEFAULT NULL').run();
+      }
+      if (!targetCols.some((col) => col.name === 'color_label')) {
+        db.prepare('ALTER TABLE managed_targets ADD COLUMN color_label VARCHAR(128) DEFAULT NULL').run();
+      }
+    }
+  } catch (err) {
+    logWarn('DB', 'managed_targets colour migration warning', describeError(err));
+  }
+
+  // 5b. User products column migrations
   try {
     const userProdCols = db.prepare('PRAGMA table_info(user_products)').all() as { name: string }[];
     if (userProdCols.length > 0 && !userProdCols.some((col) => col.name === 'last_manual_refresh_at')) {
@@ -188,7 +203,7 @@ export function runMigrations(db: Database.Database): void {
     const allTargets = db.prepare('SELECT * FROM managed_targets ORDER BY id ASC').all() as ManagedTargetRow[];
     const seenTargetKeys = new Map<string, string>();
     for (const tgt of allTargets) {
-      const dedupKey = getTargetDeduplicationKey(tgt.source_key, tgt.url, tgt.adapter_settings);
+      const dedupKey = getTargetDeduplicationKey(tgt.source_key, tgt.url, tgt.adapter_settings, tgt.color_id);
       if (!dedupKey) continue;
       const canonicalKey = seenTargetKeys.get(dedupKey);
       if (!canonicalKey) {

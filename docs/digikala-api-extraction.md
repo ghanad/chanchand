@@ -37,13 +37,17 @@ If no product ID can be extracted, stop and treat the URL as unsupported.
 
 ## Variant ID
 
-If the URL contains `variant_id`, extract it from the query string:
+Digikala share links may carry a `variant_id` query parameter:
 
 ```text
 https://www.digikala.com/product/dkp-14590108/?variant_id=50179968
 ```
 
-Only accept the value if it is numeric. If it is missing or invalid, continue without a requested variant.
+That value identifies a **(colour × seller) offer**, not a colour, and it changes
+from day to day. We therefore **ignore it** and strip it from the stored URL: the
+colour is always an explicit user choice stored on the target
+(`managed_targets.color_id`), never derived from the link. Keeping it would also
+fork the same product into duplicates.
 
 ## API Endpoint
 
@@ -106,14 +110,15 @@ Digikala product data can include a default variant and a list of variants:
 }
 ```
 
-Use this selection logic:
+Selection logic (implemented in `src/lib/digikalaVariants.ts`):
 
-1. If a valid `variant_id` was requested, first compare it with `product.default_variant.id`.
-2. If it does not match the default variant, search `product.variants[]` for the same `id`.
-3. If the requested variant is not found, stop and report that the requested variant is unavailable in the API response.
-4. If no `variant_id` was requested, use `product.default_variant` when it exists.
-5. If there is no default variant, use the first variant in `product.variants[]` whose `status` is `marketable`.
-6. If no marketable variant exists, use the first variant object in `product.variants[]`.
+1. Collect every variant from `product.variants[]` plus `product.default_variant`, de-duplicated by `id`.
+2. Keep only `marketable` variants that have a price (`status` of `marketable`/`available`/`active`; when `status` is missing, "has a price" counts as marketable).
+3. If the target has a `color_id`, keep only variants whose `color.id` matches it. If no variant of that colour exists at all, report `out_of_stock` with `color_missing: true`.
+4. Pick the **cheapest** remaining variant. The seller is never part of the identity: within the chosen scope we always follow the cheapest offer.
+5. If nothing remains, record `out_of_stock` with a null price — never silently fall back to another colour or to `default_variant`.
+
+`default_variant` is deliberately not preferred: Digikala rotates it between sellers (and sometimes colours), which used to make the recorded series a mix of unrelated offers.
 
 ## Price Extraction
 
@@ -321,12 +326,29 @@ Notes:
 
 ### Picking the right group
 
-When there is more than one group, read the product's `default_variant` and
-match `color.title` / `size.title` against the group `title`; if nothing
-matches, choose the group whose latest price is closest to
-`default_variant.price.selling_price`. The product payload is served from
+The tracked product is either a specific colour or "cheapest anywhere":
+
+- **colour pinned** — match the target's `color_label` against the group
+  `title` (normalised: ZWNJ, Arabic yeh/kaf, whitespace). Match by `id` only for
+  untitled groups, because the group `id` is a positional index and can
+  coincidentally equal a *different* colour's id.
+- **no colour** — build a synthetic "floor" series: for every day take the
+  cheapest point across all groups, ignoring days whose `is_marketable` is
+  `false`.
+
+The product payload is served from
 `https://api.digikala.com/product/v1/products/{id}/` (the older
 `/v2/product/{id}/` path is kept as a fallback).
+
+### Level check
+
+Each group follows one *seller's* line, not the cheapest offer we track, so its
+level can be 10%+ away from the live price. The backfill therefore compares the
+chart's newest price with the live price computed by the same rule the runner
+uses, and **skips the import** when they differ by more than
+`settings.chart_max_mismatch` (default `0.05`). Importing a mismatched series
+would show a fabricated cliff on the first day. The newest chart day is also
+dropped, because the live collector records that day itself.
 
 ### Implementation
 

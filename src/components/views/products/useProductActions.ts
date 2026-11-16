@@ -61,7 +61,10 @@ export function useProductActions({
     event.preventDefault();
     setBusyAction("add");
     try {
-      const result = await requestJson<{ product_key: string }>("/api/products", {
+      const result = await requestJson<{
+        product_key: string;
+        history_backfill?: { reason?: string; inserted?: number };
+      }>("/api/products", {
         method: "POST",
         body: JSON.stringify({
           title: form.title.trim(),
@@ -75,9 +78,15 @@ export function useProductActions({
           adapter_settings:
             form.adapter_settings ||
             (form.source_key === "iranjib" ? { item_name: form.title.trim() } : undefined),
+          color_id: form.color_id ?? null,
+          color_label: form.color_label ?? null,
         }),
       });
-      showToast(`محصول ${result.product_key} اضافه شد.`);
+      const historyNote =
+        result.history_backfill?.reason === "chart_mismatch"
+          ? " تاریخچهٔ قبلی برای این انتخاب با قیمت امروز هم‌خوان نبود، نمودار از امروز شروع می‌شود."
+          : "";
+      showToast(`محصول ${result.product_key} اضافه شد.${historyNote}`);
       setForm((current) => ({
         title: "",
         url: "",
@@ -88,6 +97,8 @@ export function useProductActions({
         active_start_hour: 0,
         active_end_hour: 23,
         adapter_settings: undefined,
+        color_id: null,
+        color_label: null,
       }));
       setShowAddProductModal(false);
       triggerRefresh();

@@ -1,6 +1,10 @@
 import Database from 'better-sqlite3';
 import { ManagedProductRow, ManagedTargetRow } from '../types';
-import { normalizeTargetUrl, getTargetDeduplicationKey } from '../urls';
+import {
+  normalizeTargetUrl,
+  getTargetDeduplicationKey,
+  getBaseTargetDeduplicationKey,
+} from '../urls';
 
 export function isUserTrackingProduct(
   db: Database.Database,
@@ -17,29 +21,31 @@ export function findManagedTargetByUrl(
   db: Database.Database,
   rawUrl: string,
   sourceKey?: string | null,
-  adapterSettings?: Record<string, any> | string
+  adapterSettings?: Record<string, any> | string,
+  variantKey?: string | null
 ): ManagedTargetRow | undefined {
   const norm = normalizeTargetUrl(rawUrl);
   if (!norm) return undefined;
 
-  const targetKey = getTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings);
+  const baseKey = getBaseTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings);
+  const targetKey = getTargetDeduplicationKey(sourceKey || '', rawUrl, adapterSettings, variantKey);
   const isMultiItem =
     (sourceKey &&
       (sourceKey.includes('market') ||
         sourceKey.includes('servix') ||
         sourceKey.includes('brsapi') ||
         sourceKey.includes('iranjib'))) ||
-    targetKey.includes('::');
+    baseKey.includes('::');
 
   // If it's a multi-item endpoint without an explicit symbol, we cannot safely match by URL alone
-  const symbolPart = targetKey.includes('::') ? targetKey.split('::')[2] : '';
+  const symbolPart = baseKey.includes('::') ? baseKey.split('::')[2] : '';
   if (isMultiItem && !symbolPart) {
     return undefined;
   }
 
   const allTargets = db.prepare('SELECT * FROM managed_targets').all() as ManagedTargetRow[];
   return allTargets.find((t) => {
-    const key = getTargetDeduplicationKey(t.source_key, t.url, t.adapter_settings);
+    const key = getTargetDeduplicationKey(t.source_key, t.url, t.adapter_settings, t.color_id);
     return key === targetKey;
   });
 }

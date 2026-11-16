@@ -4,4 +4,5 @@ export * from "./ProductDetailSummary";
 export * from "./ProductDetailChart";
 export * from "./ProductDetailEditModal";
 export * from "./ProductDetailDeleteModal";
+export * from "./ProductDetailColorModal";
 export * from "./useProductDetailState";

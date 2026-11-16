@@ -47,6 +47,8 @@ export interface ProductRow {
     source_key: string;
     url: string;
     enabled: boolean;
+    color_id?: string | null;
+    color_label?: string | null;
   } | null;
 }
 

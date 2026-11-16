@@ -73,6 +73,8 @@ export function createTables(db: Database.Database): void {
       url TEXT NOT NULL,
       enabled BOOLEAN NOT NULL DEFAULT 1,
       adapter_settings JSON NOT NULL DEFAULT '{}',
+      color_id VARCHAR(64) DEFAULT NULL,
+      color_label VARCHAR(128) DEFAULT NULL,
       created_at DATETIME NOT NULL,
       updated_at DATETIME NOT NULL
     );

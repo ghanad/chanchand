@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
       is_public: body.is_public !== undefined ? Boolean(body.is_public) : true,
       show_usd_chart: body.show_usd_chart !== undefined ? Boolean(body.show_usd_chart) : false,
       show_gold_chart: body.show_gold_chart !== undefined ? Boolean(body.show_gold_chart) : false,
+      color_id: body.color_id ?? null,
+      color_label: body.color_label ?? null,
     });
 
     if (!result.reused) {
@@ -40,6 +42,8 @@ export async function POST(req: NextRequest) {
         productKey: result.product_key,
         url: body.url,
         sourceKey: target?.source_key ?? body.source_key ?? 'digikala_api',
+        colorId: target?.color_id ?? body.color_id ?? null,
+        colorLabel: target?.color_label ?? body.color_label ?? null,
       });
       return NextResponse.json({ ...result, history_backfill: backfill });
     }

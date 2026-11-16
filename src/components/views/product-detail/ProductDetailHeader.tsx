@@ -19,6 +19,7 @@ interface ProductDetailHeaderProps {
   onToggleActive: () => void;
   onOpenEdit: () => void;
   onOpenDelete: () => void;
+  onChangeColor?: () => void;
 }
 
 export function ProductDetailHeader({
@@ -35,12 +36,17 @@ export function ProductDetailHeader({
   onToggleActive,
   onOpenEdit,
   onOpenDelete,
+  onChangeColor,
 }: ProductDetailHeaderProps) {
   const canModify = isAdmin || Boolean(product.can_edit);
   const isIranjib =
     product.sources?.some((s) => s.toLowerCase().includes("iranjib")) ||
     Boolean(product.primary_target?.source_key?.toLowerCase().includes("iranjib")) ||
     Boolean(product.primary_target?.url?.toLowerCase().includes("iranjib.ir"));
+
+  const isDigikala =
+    product.sources?.some((s) => s.toLowerCase().startsWith("digikala")) ||
+    Boolean(product.primary_target?.source_key?.toLowerCase().startsWith("digikala"));
 
   const displayUrl = React.useMemo(() => {
     if (!product.primary_target?.url) return "";
@@ -115,6 +121,25 @@ export function ProductDetailHeader({
                   {s}
                 </span>
               ))}
+              {isDigikala ? (
+                <button
+                  type="button"
+                  className={`product-color-badge ${product.primary_target?.color_id ? "pinned" : "floor"}`}
+                  onClick={onChangeColor}
+                  disabled={!canModify || !onChangeColor}
+                  title={
+                    product.primary_target?.color_id
+                      ? "قیمت این محصول بر اساس ارزان‌ترین فروشندهٔ همین رنگ محاسبه می‌شود. برای تغییر رنگ کلیک کنید."
+                      : "قیمت این محصول بر اساس ارزان‌ترین پیشنهاد بین همهٔ رنگ‌ها محاسبه می‌شود. برای انتخاب یک رنگ کلیک کنید."
+                  }
+                >
+                  <span className="product-color-dot" />
+                  {product.primary_target?.color_id
+                    ? `رنگ: ${product.primary_target.color_label || product.primary_target.color_id}`
+                    : "کف قیمت (هر رنگ)"}
+                  {canModify && onChangeColor ? <span className="product-color-edit">تغییر</span> : null}
+                </button>
+              ) : null}
               {latestSnapshot && (
                 <StatusPill
                   text={availabilityText(latestSnapshot.availability)}

@@ -83,6 +83,8 @@ export class PriceRunner {
             url: t.url,
             enabled: Boolean(t.enabled),
             adapter_settings: adapterSettings,
+            color_id: t.color_id ?? null,
+            color_label: t.color_label ?? null,
           };
         });
       } else {
@@ -128,6 +130,8 @@ export class PriceRunner {
             url: t.url,
             enabled: Boolean(t.enabled),
             adapter_settings: adapterSettings,
+            color_id: t.color_id ?? null,
+            color_label: t.color_label ?? null,
           };
         });
       } else {
@@ -220,7 +224,7 @@ export class PriceRunner {
           }
         }
 
-        const dedupKey = getTargetDeduplicationKey(target.source_key, target.url, target.adapter_settings);
+        const dedupKey = getTargetDeduplicationKey(target.source_key, target.url, target.adapter_settings, target.color_id);
         if (dedupKey && fetchedObservations.has(dedupKey)) {
           const cachedObservation = fetchedObservations.get(dedupKey)!;
           recordPrice(db, runId, target, cachedObservation);

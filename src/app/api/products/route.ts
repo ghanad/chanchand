@@ -80,6 +80,8 @@ export async function POST(req: NextRequest) {
       active_start_hour: startHour,
       active_end_hour: endHour,
       adapter_settings: body.adapter_settings,
+      color_id: body.color_id ?? null,
+      color_label: body.color_label ?? null,
     });
 
     // First time this product enters the database: seed ~30 days of Digikala
@@ -90,6 +92,8 @@ export async function POST(req: NextRequest) {
         productKey: result.product_key,
         url: body.url,
         sourceKey: target?.source_key ?? body.source_key ?? 'digikala_api',
+        colorId: target?.color_id ?? body.color_id ?? null,
+        colorLabel: target?.color_label ?? body.color_label ?? null,
       });
       return NextResponse.json({ ...result, history_backfill: backfill });
     }

@@ -4,6 +4,34 @@ import { ProductActiveHoursField } from "./ProductActiveHoursField";
 import { SourceRow } from "../../../types/dashboard";
 import { ProductFormState } from "./types";
 import { requestJson } from "@/lib/api-client";
+import { formatNumber } from "@/lib/formatters";
+
+interface PreviewColor {
+  id: string;
+  label: string | null;
+  hex: string | null;
+  priceIrr: number | null;
+  sellerCount: number;
+  inStock: boolean;
+}
+
+interface ProductPreview {
+  supported: boolean;
+  product_id?: string;
+  title?: string | null;
+  brand?: string | null;
+  image_url?: string | null;
+  floor_price_irr?: number | null;
+  floor_color_label?: string | null;
+  in_stock?: boolean;
+  colors?: PreviewColor[];
+  error?: string;
+}
+
+function toman(priceIrr: number | null | undefined): string {
+  if (priceIrr === null || priceIrr === undefined) return "—";
+  return `${formatNumber(Math.round(priceIrr / 10))} تومان`;
+}
 
 interface IranjibItemData {
   company: string;
@@ -49,6 +77,9 @@ export function AddProductModal({
   const [carSearch, setCarSearch] = useState<string>("");
   const [selectedCar, setSelectedCar] = useState<IranjibItemData | null>(null);
   const [isLoadingCars, setIsLoadingCars] = useState<boolean>(false);
+  const [preview, setPreview] = useState<ProductPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
   const [iranjibUrl, setIranjibUrl] = useState<string>(
     "https://www.iranjib.ir/showgroup/45/%D9%82%DB%8C%D9%85%D8%AA-%D8%AE%D9%88%D8%AF%D8%B1%D9%88-%D8%AA%D9%88%D9%84%DB%8C%D8%AF-%D8%AF%D8%A7%D8%AE%D9%84/"
   );
@@ -91,6 +122,78 @@ export function AddProductModal({
       isMounted = false;
     };
   }, [isOpen, mode, carItems.length]);
+
+  // Preview a Digikala link so the user can choose "cheapest anywhere" or a
+  // specific colour before the product is created.
+  useEffect(() => {
+    if (!isOpen || mode !== "general") {
+      setPreview(null);
+      setPreviewError(null);
+      setIsLoadingPreview(false);
+      return;
+    }
+
+    const url = form.url.trim();
+    let host = "";
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      host = "";
+    }
+    const isDigikalaProduct =
+      /(^|\.)digikala\.com$/.test(host) && /(dkp-|\/product\/)\d+/i.test(url);
+
+    if (!isDigikalaProduct) {
+      setPreview(null);
+      setPreviewError(null);
+      setIsLoadingPreview(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPreview(true);
+    setPreviewError(null);
+
+    const timer = setTimeout(() => {
+      requestJson<ProductPreview>(`/api/products/preview?url=${encodeURIComponent(url)}`)
+        .then((data) => {
+          if (cancelled) return;
+          if (!data || !data.supported) {
+            setPreview(null);
+            return;
+          }
+          if (data.error) {
+            setPreview(null);
+            setPreviewError(data.error);
+            return;
+          }
+          setPreview(data);
+          setForm((current) => {
+            const next = { ...current };
+            if (!next.title.trim() && data.title) next.title = data.title;
+            // The colour belongs to the previous link: drop it when it is gone.
+            if (next.color_id && !(data.colors || []).some((c) => c.id === next.color_id)) {
+              next.color_id = null;
+              next.color_label = null;
+            }
+            return next;
+          });
+        })
+        .catch((err) => {
+          if (!cancelled) {
+            setPreviewError(err instanceof Error ? err.message : "خطا در دریافت پیش‌نمایش محصول");
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setIsLoadingPreview(false);
+        });
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isOpen, mode, form.url, setForm]);
 
   // Filter cars by company and search query
   const filteredCars = useMemo(() => {
@@ -287,6 +390,86 @@ export function AddProductModal({
                 required
               />
             </label>
+
+            {isLoadingPreview ? (
+              <div className="product-preview-hint">در حال دریافت اطلاعات محصول از دیجی‌کالا…</div>
+            ) : null}
+            {previewError ? (
+              <div className="product-preview-hint product-preview-hint-error">{previewError}</div>
+            ) : null}
+
+            {preview ? (
+              <div className="product-preview-card">
+                <div className="product-preview-head">
+                  {preview.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="product-preview-image" src={preview.image_url} alt="" />
+                  ) : null}
+                  <div className="product-preview-meta">
+                    <div className="product-preview-title">{preview.title}</div>
+                    <div className="product-preview-sub">
+                      {preview.in_stock
+                        ? `کف قیمت: ${toman(preview.floor_price_irr)}`
+                        : "در حال حاضر ناموجود"}
+                      {preview.floor_color_label ? ` · ${preview.floor_color_label}` : ""}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="product-preview-rule">
+                  <span className="product-preview-rule-label">قیمت بر اساس:</span>
+                  <div className="product-preview-options">
+                    <button
+                      type="button"
+                      className={`product-preview-option ${!form.color_id ? "active" : ""}`}
+                      onClick={() =>
+                        setForm((current) => ({ ...current, color_id: null, color_label: null }))
+                      }
+                    >
+                      <span className="product-preview-option-name">کف قیمت (هر رنگ)</span>
+                      <span className="product-preview-option-price">
+                        {toman(preview.floor_price_irr)}
+                      </span>
+                    </button>
+
+                    {(preview.colors || []).length > 1
+                      ? (preview.colors || []).map((color) => (
+                          <button
+                            key={color.id}
+                            type="button"
+                            disabled={!color.inStock}
+                            className={`product-preview-option ${
+                              form.color_id === color.id ? "active" : ""
+                            }`}
+                            onClick={() =>
+                              setForm((current) => ({
+                                ...current,
+                                color_id: color.id,
+                                color_label: color.label,
+                              }))
+                            }
+                          >
+                            <span className="product-preview-option-name">
+                              <span
+                                className="product-preview-color-dot"
+                                style={{ background: color.hex || "var(--line)" }}
+                              />
+                              {color.label || "بدون رنگ"}
+                            </span>
+                            <span className="product-preview-option-price">
+                              {color.inStock ? toman(color.priceIrr) : "ناموجود"}
+                            </span>
+                          </button>
+                        ))
+                      : null}
+                  </div>
+                  <p className="product-preview-note">
+                    هر انتخاب یک اسلات از ظرفیت شما را مصرف می‌کند.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
             <label>
               منبع قیمت‌گیری
               <select

@@ -142,6 +142,8 @@ export function productsPayload(
     source_key: string;
     url: string;
     enabled: number | boolean;
+    color_id?: string | null;
+    color_label?: string | null;
   }>,
   currentUser?: { id: number; role: string } | null
 ): Array<Record<string, any>> {
@@ -245,6 +247,8 @@ export function productsPayload(
         source_key: target.source_key,
         url: target.url,
         enabled: isEnabled,
+        color_id: target.color_id ?? null,
+        color_label: target.color_label ?? null,
       };
     }
   }

@@ -1,24 +1,12 @@
 import { FetchContext, PriceAdapter } from './types';
 import { PriceObservation, SourceConfig } from '../types';
-import { detectAvailability, parsePriceToIrr } from '../pricing';
+import { detectAvailability } from '../pricing';
 import { createHttpErrorFromResponse, fetchWithCookieRedirect } from './fetchUtils';
+import { pickVariant } from '../digikalaVariants';
 
 export function extractProductId(url: string): string | null {
   const match = url.match(/(?:dkp-|(?:\/product\/))(\d+)/i);
   return match ? match[1] : null;
-}
-
-export function extractVariantId(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    const variantId = parsed.searchParams.get('variant_id');
-    if (variantId && /^\d+$/.test(variantId.trim())) {
-      return variantId.trim();
-    }
-  } catch {
-    // Ignore invalid URLs
-  }
-  return null;
 }
 
 export function isFreshUrl(url: string): boolean {
@@ -45,14 +33,13 @@ export class DigikalaApiAdapter implements PriceAdapter {
     if (!productId) {
       throw new Error('could not extract Digikala product ID from target URL');
     }
-    const variantId = extractVariantId(context.target.url);
-    return this.fetchApi(context, productId, variantId, isFreshUrl(context.target.url));
+    return this.fetchApi(context, productId, context.target.color_id ?? null, isFreshUrl(context.target.url));
   }
 
   async fetchApi(
     context: FetchContext,
     productId: string,
-    variantId?: string | null,
+    colorId?: string | null,
     fresh = false
   ): Promise<PriceObservation> {
     let apiUrl = productApiUrl(productId, fresh);
@@ -92,7 +79,7 @@ export class DigikalaApiAdapter implements PriceAdapter {
     }
 
     return this.parseApiProduct(product, context.source, {
-      variantId,
+      colorId,
       apiUrl,
       statusCode: response.status,
     });
@@ -102,30 +89,28 @@ export class DigikalaApiAdapter implements PriceAdapter {
     product: Record<string, any>,
     source: SourceConfig,
     options: {
-      variantId?: string | null;
+      colorId?: string | null;
       apiUrl?: string;
       statusCode?: number;
     } = {}
   ): PriceObservation {
-    const variant = this.bestVariant(product, options.variantId);
-    if (options.variantId && !variant) {
-      throw new Error(`Digikala API response did not include requested variant ${options.variantId}`);
-    }
+    const picked = pickVariant(product, {
+      colorId: options.colorId,
+      multiplier: source.price_multiplier,
+    });
 
-    const priceIrr = this.variantPriceIrr(variant, source);
-    const seller = this.sellerName(variant?.seller);
-    const availability = this.apiAvailability(product, variant);
-
-    if (priceIrr === null && availability === 'unknown') {
+    const availability = this.apiAvailability(product, picked.availability);
+    if (picked.priceIrr === null && availability === 'unknown') {
       throw new Error('could not extract Digikala API price data');
     }
 
     const title = product.title_fa || product.title_en || product.test_title_fa || null;
+    const seller = picked.variant?.seller ?? null;
 
     return {
       title,
       seller,
-      price_irr: priceIrr,
+      price_irr: picked.priceIrr,
       availability,
       raw_observation: {
         adapter: this.name,
@@ -133,8 +118,14 @@ export class DigikalaApiAdapter implements PriceAdapter {
         parse_method: 'digikala_api',
         api_url: options.apiUrl,
         product_id: product.id,
-        requested_variant_id: options.variantId,
-        variant_id: variant?.id,
+        requested_color_id: options.colorId ?? null,
+        color_id: picked.variant?.colorId ?? null,
+        color_label: picked.variant?.colorLabel ?? null,
+        color_missing: options.colorId ? !picked.colorExists : undefined,
+        variant_id: picked.variant?.id ?? null,
+        variant_status: picked.variant?.status ?? null,
+        candidate_count: picked.candidateCount,
+        price_rule: options.colorId ? 'cheapest_of_color' : 'cheapest_of_product',
         extracted: {
           title,
           seller,
@@ -144,64 +135,13 @@ export class DigikalaApiAdapter implements PriceAdapter {
     };
   }
 
-  private bestVariant(product: Record<string, any>, variantId?: string | null): Record<string, any> | null {
-    const defaultVariant = product.default_variant;
-    if (variantId) {
-      if (defaultVariant && String(defaultVariant.id) === variantId) {
-        return defaultVariant;
-      }
-      if (Array.isArray(product.variants)) {
-        for (const v of product.variants) {
-          if (v && String(v.id) === variantId) {
-            return v;
-          }
-        }
-      }
-      return null;
-    }
-
-    if (defaultVariant && typeof defaultVariant === 'object') {
-      return defaultVariant;
-    }
-
-    if (Array.isArray(product.variants)) {
-      for (const v of product.variants) {
-        if (v && String(v.status || '').toLowerCase() === 'marketable') {
-          return v;
-        }
-      }
-      for (const v of product.variants) {
-        if (v && typeof v === 'object') {
-          return v;
-        }
-      }
-    }
-    return null;
-  }
-
-  private variantPriceIrr(variant: Record<string, any> | null, source: SourceConfig): number | null {
-    if (!variant) return null;
-    const price = variant.price;
-    if (price && typeof price === 'object') {
-      for (const key of ['selling_price', 'final_price', 'rrp_price']) {
-        const parsed = parsePriceToIrr(price[key], source.price_multiplier);
-        if (parsed !== null) {
-          return parsed;
-        }
-      }
-    }
-    return parsePriceToIrr(variant.price, source.price_multiplier);
-  }
-
   private apiAvailability(
     product: Record<string, any>,
-    variant: Record<string, any> | null
+    picked: 'in_stock' | 'out_of_stock' | 'unknown'
   ): 'in_stock' | 'out_of_stock' | 'unknown' {
-    const candidates = [
-      variant?.status,
-      product.status,
-      product.data_layer?.dimension20,
-    ];
+    if (picked !== 'unknown') return picked;
+
+    const candidates = [product.status, product.data_layer?.dimension20];
 
     for (const val of candidates) {
       if (typeof val !== 'string') continue;
@@ -218,19 +158,5 @@ export class DigikalaApiAdapter implements PriceAdapter {
       }
     }
     return 'unknown';
-  }
-
-  private sellerName(value: any): string | null {
-    if (typeof value === 'string') {
-      return value.trim() || null;
-    }
-    if (value && typeof value === 'object') {
-      for (const key of ['title', 'name', 'title_fa']) {
-        if (typeof value[key] === 'string' && value[key].trim()) {
-          return value[key].trim();
-        }
-      }
-    }
-    return null;
   }
 }
