@@ -45,6 +45,7 @@ Core flow:
 - Payment Gateways: `src/lib/payment/types.ts` (`PaymentGateway` interface), `src/lib/payment/zarinpal.ts` (ZarinPal REST v4 adapter), `src/lib/payment/mock.ts` (Mock adapter for testing/dev), `src/lib/payment/index.ts` (gateway registry & factory)
 - Database schema & CRUD: `src/lib/db/*` (modular database package with `src/lib/db/index.ts`, managing `managed_products` with `user_id`, `is_public`, `show_usd_chart`, `show_gold_chart` (grams of 18K gold from the `gold-18k` product), `active_start_hour`, `active_end_hour`, `managed_targets` (with `color_id`/`color_label`), `user_products` watchlist with `last_manual_refresh_at`, `product_refresh_logs` audit, `users` with `must_change_password`, `mobile`, `extra_slots`, `slot_expires_at`, `packages` with `duration_days`, `payment_transactions`, `user_subscriptions`, `getScheduledBatchTargets` with per-product configurable public hours [24-hour / 0-23 by default] and LRU 24-hour private batching)
 - URL normalization & deduplication: `src/lib/urls.ts`
+- Product chart series (out-of-stock gaps vs priced points, axis-safe filtering): `src/lib/chartRows.ts`
 - Collection-window labels (۲۴/۱۲/… ساعته): `src/lib/schedule.ts`
 - Per-product collection windows (`active_start_hour`/`active_end_hour` for every product, incl. market): `src/lib/db/scheduler.ts` (`getProductScheduleMap`, `getPublicProductScheduleMap`)
 - Market source detection & well-known market product keys: `src/lib/market.ts`

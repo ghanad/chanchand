@@ -8,12 +8,22 @@ interface ProductPriceCellProps {
 
 export function ProductPriceCell({ latestSnapshot }: ProductPriceCellProps) {
   if (!latestSnapshot || latestSnapshot.price_toman === undefined || latestSnapshot.price_toman === null) {
+    const isOutOfStock = latestSnapshot?.availability === "out_of_stock";
     return (
       <td className="col-price">
         <div className="product-info-text">
-          <span className="price-empty-state" title="هنوز قیمتی ثبت نشده است">
-            —
-          </span>
+          {isOutOfStock ? (
+            <span
+              className="price-empty-state price-oos-state"
+              title="این کالا در آخرین بررسی ناموجود بود"
+            >
+              ناموجود
+            </span>
+          ) : (
+            <span className="price-empty-state" title="هنوز قیمتی ثبت نشده است">
+              —
+            </span>
+          )}
         </div>
       </td>
     );

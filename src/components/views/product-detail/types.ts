@@ -9,8 +9,4 @@ export interface ProductDetailEditForm {
   active_end_hour: number;
 }
 
-export interface ChartRow {
-  time: string;
-  source: string;
-  price: number;
-}
+export type { ChartPoint as ChartRow } from "@/lib/chartRows";

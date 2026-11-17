@@ -8,7 +8,7 @@ import {
   HistoryMetric,
 } from "@/types/dashboard";
 import { requestJson } from "@/lib/api-client";
-import { formatDate } from "@/lib/formatters";
+import { buildChartRows } from "@/lib/chartRows";
 import { useDashboard } from "@/context/DashboardContext";
 import { ProductDetailEditForm } from "./types";
 
@@ -321,19 +321,10 @@ export function useProductDetailState(productKey: string) {
         };
   }, [activeMetric]);
 
-  const chartRows = useMemo(() => {
-    return history.flatMap((row) => {
-      const price = row[metricConfig.key];
-      if (!Number.isFinite(price)) return [];
-      return [
-        {
-          time: formatDate(row.observed_at),
-          source: row.source_key,
-          price: Number(price),
-        },
-      ];
-    });
-  }, [history, metricConfig.key]);
+  const chartRows = useMemo(
+    () => buildChartRows(history, metricConfig.key),
+    [history, metricConfig.key],
+  );
 
   const isActive = Boolean(product && product.enabled_target_count > 0);
   const configuredSources = sources.filter((s) => s.configured);

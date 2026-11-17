@@ -262,6 +262,23 @@
   color: var(--muted);
 }
 
+.chart-oos-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 4px 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chart-oos-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 1px dashed var(--muted);
+  border-radius: 2px;
+}
+
 .table-wrap {
   position: relative;
   overflow: auto;

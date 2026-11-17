@@ -72,6 +72,11 @@
   color: var(--muted);
 }
 
+.product-compact-table .price-oos-state {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .price-change-pill {
   display: inline-flex;
   align-items: center;

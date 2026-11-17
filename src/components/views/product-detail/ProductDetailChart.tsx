@@ -21,6 +21,7 @@ import {
 } from "@/lib/formatters";
 import { PanelHead } from "@/components/common/PanelHead";
 import { EmptyState } from "@/components/common/EmptyState";
+import { countPricedPoints, hasOutOfStockPoints, pricedPoints } from "@/lib/chartRows";
 import { ChartRow } from "./types";
 
 interface ProductDetailChartProps {
@@ -39,6 +40,58 @@ interface ProductDetailChartProps {
     empty: string;
   };
   productKey: string;
+}
+
+interface ChartTooltipContentProps {
+  active?: boolean;
+  label?: string | number;
+  payload?: Array<{ payload?: ChartRow }>;
+  rows: ChartRow[];
+  activeMetric: HistoryMetric;
+  metricConfig: { name: string; suffix: string };
+}
+
+/**
+ * Custom tooltip so an out-of-stock point explains itself instead of rendering
+ * a bare `null`. Recharts may omit the payload entry for a null value, so the
+ * row is looked up by its x-axis label as a fallback.
+ */
+function ChartTooltipContent({
+  active,
+  label,
+  payload,
+  rows,
+  activeMetric,
+  metricConfig,
+}: ChartTooltipContentProps) {
+  if (!active) return null;
+
+  const point =
+    payload?.[0]?.payload ?? rows.find((row) => row.time === String(label ?? ""));
+  if (!point) return null;
+
+  // A point is only plottable when it is not marked unavailable and carries a
+  // finite price; everything else is reported as "ناموجود".
+  const price = point.reason === "out_of_stock" ? null : point.price;
+
+  return (
+    <div className="chart-tooltip">
+      <div className="chart-tooltip-time">{label}</div>
+      {price === null ? (
+        <div className="chart-tooltip-row primary">ناموجود</div>
+      ) : (
+        <div className="chart-tooltip-row primary">
+          <span>{metricConfig.name}</span>
+          <span>
+            {activeMetric === "gold"
+              ? formatGoldGram(price)
+              : numberFormatter.format(price)}{" "}
+            {metricConfig.suffix}
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ProductDetailChart({
@@ -74,12 +127,22 @@ export function ProductDetailChart({
     return chartRows.slice(start, end + 1);
   }, [chartRows, zoomRange]);
 
+  // Null (out-of-stock) points must never reach the axis-domain helpers:
+  // Math.min coerces null to 0 and the chart would be squashed to the x-axis.
+  const visiblePricedRows = useMemo(() => pricedPoints(visibleRows), [visibleRows]);
+  const totalPricedPoints = useMemo(() => countPricedPoints(chartRows), [chartRows]);
+  const showOutOfStockLegend = useMemo(() => hasOutOfStockPoints(visibleRows), [visibleRows]);
+  // Every row that is not priced is an explicit out-of-stock point (rows with a
+  // missing rate are dropped before they reach the chart).
+  const visibleOutOfStockCount = visibleRows.length - visiblePricedRows.length;
+  const totalOutOfStockCount = chartRows.length - totalPricedPoints;
+
   const chartPriceDomain = useMemo(() => {
-    if (!visibleRows.length) return undefined;
+    if (!visiblePricedRows.length) return undefined;
     return activeMetric === "gold"
-      ? goldGramAxisDomain(visibleRows)
-      : priceAxisDomain(visibleRows);
-  }, [visibleRows, activeMetric]);
+      ? goldGramAxisDomain(visiblePricedRows)
+      : priceAxisDomain(visiblePricedRows);
+  }, [visiblePricedRows, activeMetric]);
 
   const priceSpread = useMemo(() => {
     if (!chartPriceDomain) return undefined;
@@ -189,8 +252,12 @@ export function ProductDetailChart({
         title="روند قیمت محصول"
         meta={
           zoomRange
-            ? `${formatNumber(visibleRows.length)} از ${formatNumber(chartRows.length)} نقطه (بزرگ‌نمایی)`
-            : `${formatNumber(chartRows.length)} نقطه در نمودار`
+            ? `${formatNumber(visiblePricedRows.length)} از ${formatNumber(totalPricedPoints)} نقطه قیمت${
+                visibleOutOfStockCount ? ` · ${formatNumber(visibleOutOfStockCount)} ناموجود` : ""
+              } (بزرگ‌نمایی)`
+            : `${formatNumber(totalPricedPoints)} نقطه قیمت${
+                totalOutOfStockCount ? ` · ${formatNumber(totalOutOfStockCount)} ناموجود` : ""
+              }`
         }
         action={
           <div className="chart-toolbar-actions">
@@ -264,7 +331,7 @@ export function ProductDetailChart({
           </div>
         }
       />
-      {visibleRows.length ? (
+      {visiblePricedRows.length ? (
         <ResponsiveContainer width="100%" height={360}>
           <AreaChart
             data={visibleRows}
@@ -294,15 +361,13 @@ export function ProductDetailChart({
               }}
             />
             <Tooltip
-              formatter={(value) => [
-                `${
-                  activeMetric === "gold"
-                    ? formatGoldGram(Number(value))
-                    : numberFormatter.format(Number(value))
-                } ${metricConfig.suffix}`,
-                metricConfig.name,
-              ]}
-              labelFormatter={(value) => `زمان: ${value}`}
+              content={
+                <ChartTooltipContent
+                  rows={visibleRows}
+                  activeMetric={activeMetric}
+                  metricConfig={metricConfig}
+                />
+              }
             />
             <Area
               type="monotone"
@@ -310,6 +375,7 @@ export function ProductDetailChart({
               stroke={chartColor}
               strokeWidth={3}
               fill={`url(#${chartFillId})`}
+              connectNulls={false}
             />
             {refAreaLeft && refAreaRight && refAreaLeft !== refAreaRight && (
               <ReferenceArea
@@ -326,7 +392,19 @@ export function ProductDetailChart({
           </AreaChart>
         </ResponsiveContainer>
       ) : (
-        <EmptyState text={metricConfig.empty} />
+        <EmptyState
+          text={
+            visibleRows.length
+              ? "در این بازه کالا ناموجود بوده و قیمتی ثبت نشده است."
+              : metricConfig.empty
+          }
+        />
+      )}
+      {showOutOfStockLegend && visiblePricedRows.length > 0 && (
+        <p className="chart-oos-legend">
+          <span className="chart-oos-swatch" aria-hidden="true" />
+          شکاف در خط نمودار یعنی کالا در آن بازه ناموجود بوده است.
+        </p>
       )}
     </section>
   );
