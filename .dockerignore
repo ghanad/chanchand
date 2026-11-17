@@ -18,6 +18,18 @@ htmlcov/
 frontend/node_modules/
 node_modules/
 
+# Local build output and caches (the image is built from scratch in the builder stage)
+.next/
+*.tsbuildinfo
+coverage/
+
+# Not needed to build or run the app
+data/
+tests/
+docs/
+.github/
+*.md
+
 *.db
 *.db-*
 *.sqlite
