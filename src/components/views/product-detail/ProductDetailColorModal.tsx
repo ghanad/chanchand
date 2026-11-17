@@ -115,8 +115,9 @@ export function ProductDetailColorModal({
                 <button
                   key={color.id}
                   type="button"
-                  disabled={!color.inStock}
-                  className={`product-preview-option ${selected === color.id ? "active" : ""}`}
+                  className={`product-preview-option ${selected === color.id ? "active" : ""} ${
+                    color.inStock ? "" : "out-of-stock"
+                  }`}
                   onClick={() => setSelected(color.id)}
                 >
                   <span className="product-preview-option-name">
@@ -132,6 +133,21 @@ export function ProductDetailColorModal({
                 </button>
               ))}
             </div>
+            <p className="product-preview-note">
+              کف قیمت بین همهٔ رنگ‌ها جابه‌جا می‌شود؛ انتخاب یک رنگ، محصول را روی همان رنگ
+              قفل می‌کند.
+            </p>
+            {colors.length === 1 ? (
+              <p className="product-preview-note">
+                این محصول الان فقط یک رنگ دارد؛ امروز هر دو گزینه یک قیمت می‌دهند و
+                تفاوتشان از روزی معلوم می‌شود که رنگ دیگری اضافه شود.
+              </p>
+            ) : null}
+            {colors.some((color) => !color.inStock) ? (
+              <p className="product-preview-note">
+                رنگ‌های ناموجود هم قابل انتخاب‌اند؛ از زمانی که موجود شوند رصد می‌شوند.
+              </p>
+            ) : null}
           </>
         ) : null}
 

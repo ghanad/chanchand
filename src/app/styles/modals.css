@@ -552,6 +552,12 @@
   background: rgba(37, 99, 235, 0.08);
 }
 
+/* A colour with no marketable offer is still selectable: the product starts
+   tracking it and records the out-of-stock gap until it returns. */
+.product-preview-option.out-of-stock {
+  border-style: dashed;
+}
+
 .product-preview-option:disabled {
   opacity: 0.5;
   cursor: not-allowed;

@@ -433,43 +433,57 @@ export function AddProductModal({
                       >
                         <span className="product-preview-option-name">کف قیمت (هر رنگ)</span>
                         <span className="product-preview-option-price">
-                          {toman(preview.floor_price_irr)}
+                          {preview.in_stock ? toman(preview.floor_price_irr) : "ناموجود"}
                         </span>
                       </button>
 
-                      {(preview.colors || []).length > 1
-                        ? (preview.colors || []).map((color) => (
-                            <button
-                              key={color.id}
-                              type="button"
-                              disabled={!color.inStock}
-                              className={`product-preview-option ${
-                                form.color_id === color.id ? "active" : ""
-                              }`}
-                              onClick={() =>
-                                setForm((current) => ({
-                                  ...current,
-                                  color_id: color.id,
-                                  color_label: color.label,
-                                }))
-                              }
-                            >
-                              <span className="product-preview-option-name">
-                                <span
-                                  className="product-preview-color-dot"
-                                  style={{ background: color.hex || "var(--line)" }}
-                                />
-                                {color.label || "بدون رنگ"}
-                              </span>
-                              <span className="product-preview-option-price">
-                                {color.inStock ? toman(color.priceIrr) : "ناموجود"}
-                              </span>
-                            </button>
-                          ))
-                        : null}
+                      {(preview.colors || []).map((color) => (
+                        <button
+                          key={color.id}
+                          type="button"
+                          className={`product-preview-option ${
+                            form.color_id === color.id ? "active" : ""
+                          } ${color.inStock ? "" : "out-of-stock"}`}
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              color_id: color.id,
+                              color_label: color.label,
+                            }))
+                          }
+                        >
+                          <span className="product-preview-option-name">
+                            <span
+                              className="product-preview-color-dot"
+                              style={{ background: color.hex || "var(--line)" }}
+                            />
+                            {color.label || "بدون رنگ"}
+                          </span>
+                          <span className="product-preview-option-price">
+                            {color.inStock ? toman(color.priceIrr) : "ناموجود"}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                     <p className="product-preview-note">
-                      هر انتخاب یک اسلات از ظرفیت شما را مصرف می‌کند.
+                      کف قیمت بین همهٔ رنگ‌ها جابه‌جا می‌شود؛ انتخاب یک رنگ، محصول را روی
+                      همان رنگ قفل می‌کند.
+                    </p>
+                    {(preview.colors || []).length === 1 ? (
+                      <p className="product-preview-note">
+                        این محصول الان فقط یک رنگ دارد؛ امروز هر دو گزینه یک قیمت می‌دهند و
+                        تفاوتشان از روزی معلوم می‌شود که رنگ دیگری اضافه شود.
+                      </p>
+                    ) : null}
+                    {(preview.colors || []).some((color) => !color.inStock) ? (
+                      <p className="product-preview-note">
+                        رنگ‌های ناموجود هم قابل انتخاب‌اند؛ از زمانی که موجود شوند رصد
+                        می‌شوند.
+                      </p>
+                    ) : null}
+                    <p className="product-preview-note">
+                      هر گزینه یک اسلات جدا مصرف می‌کند؛ برای یک محصول فقط یکی را انتخاب
+                      کن.
                     </p>
                   </div>
                 </div>
