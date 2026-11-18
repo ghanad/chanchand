@@ -13,6 +13,7 @@ import {
   WalletDirectSlotPanel,
   WalletPackagesGrid,
   WalletTransactionsPanel,
+  WalletSlotsPanel,
 } from "@/components/views/wallet";
 
 function WalletContent() {
@@ -208,7 +209,12 @@ function WalletContent() {
         slotPrice={slotPrice}
       />
 
-      {/* بخش ۳: تاریخچه تراکنش‌ها */}
+      {/* بخش ۳: اسلات هر محصول */}
+      {currentUser.role !== "admin" && (
+        <WalletSlotsPanel slots={walletData?.product_slots || []} onChanged={loadWallet} />
+      )}
+
+      {/* بخش ۴: تاریخچه تراکنش‌ها */}
       <WalletTransactionsPanel
         walletTransactions={walletTransactions}
         paymentTransactions={paymentTransactions}

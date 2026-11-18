@@ -5,6 +5,7 @@ export * from './seeds';
 export * from './sources';
 export * from './targets';
 export * from './users';
+export * from './slots';
 export * from './products';
 export * from './productRefreshes';
 export * from './runs';

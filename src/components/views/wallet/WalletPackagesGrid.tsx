@@ -30,7 +30,7 @@ export function WalletPackagesGrid({
             <span>بسته‌های افزایش ظرفیت پایش ماهانه (پرداخت آنلاین)</span>
           </h2>
           <p>
-            با خرید هر بسته، اسلات‌های پایش ماهانه (۳۰ روزه) فوراً به حسابتان افزوده می‌شوند و از طریق کلیه کارت‌های عضو شتاب قابل پرداخت هستند.
+            با خرید هر بسته، اسلات‌ها فوراً به اعتبار شما افزوده می‌شوند. هر اسلات ۳۰ روز از لحظه افزودن همان محصول اعتبار دارد و از طریق کلیه کارت‌های عضو شتاب قابل پرداخت است.
           </p>
         </div>
 
@@ -94,7 +94,7 @@ export function WalletPackagesGrid({
                     </li>
                     <li className="wallet-package-feature-item">
                       <span aria-hidden="true">✓</span>
-                      <span>اعتبار ۳۰ روزه با امکان تمدید ماهانه آسان</span>
+                      <span>۳۰ روز از لحظه افزودن محصول، با امکان تمدید آسان</span>
                     </li>
                     <li className="wallet-package-feature-item">
                       <span aria-hidden="true">✓</span>

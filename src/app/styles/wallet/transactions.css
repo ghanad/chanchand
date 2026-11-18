@@ -138,3 +138,95 @@
   direction: ltr;
   display: inline-block;
 }
+
+/* Per-product slot windows panel */
+.wallet-slots-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 22px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.wallet-slots-empty {
+  padding: 22px 0;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.wallet-slot-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.wallet-slot-link:hover {
+  text-decoration: underline;
+}
+
+.wallet-slot-renew-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(180, 59, 59, 0.28);
+  background: rgba(180, 59, 59, 0.1);
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.wallet-slot-renew-btn:hover:not(:disabled) {
+  background: rgba(180, 59, 59, 0.18);
+}
+
+.wallet-slot-renew-btn:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.wallet-slot-transfer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.wallet-slot-transfer select {
+  min-height: 28px;
+  max-width: 180px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 11.5px;
+  padding: 0 6px;
+}
+
+.wallet-slot-transfer-btn,
+.wallet-slot-cancel-btn {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+.wallet-slot-transfer-btn:hover:not(:disabled),
+.wallet-slot-cancel-btn:hover:not(:disabled) {
+  color: var(--foreground);
+}
+
+.wallet-slot-transfer-btn:disabled,
+.wallet-slot-cancel-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -175,22 +175,24 @@ export function UserTableRow({
             </span>
           </div>
           <div className="user-subscription-info text-xs">
-            {user.slot_expires_at ? (
-              (() => {
-                const expiresMs = new Date(user.slot_expires_at).getTime();
-                const diffDays = Math.ceil((expiresMs - nowMs) / (1000 * 60 * 60 * 24));
-                const isExpired = diffDays <= 0;
-                return (
-                  <span
-                    className={`user-sub-badge ${isExpired ? "text-[var(--danger)] font-medium" : "text-[var(--muted)]"}`}
-                    title={`انقضا: ${formatDate(user.slot_expires_at)}`}
-                  >
-                    {isExpired ? "منقضی‌شده" : `${formatNumber(diffDays)} روز باقی‌مانده`}
-                  </span>
-                );
-              })()
+            {(user.paid_expired ?? 0) > 0 ? (
+              <span
+                className="user-sub-badge text-[var(--danger)] font-medium"
+                title="پنجره پایش این تعداد محصول تمام شده و قیمت‌ها ثبت نمی‌شوند."
+              >
+                {formatNumber(user.paid_expired ?? 0)} منقضی‌شده
+              </span>
+            ) : (user.paid_active ?? 0) > 0 ? (
+              <span className="user-sub-badge text-[var(--muted)]">
+                {formatNumber(user.paid_active ?? 0)} اسلات پولی فعال
+              </span>
             ) : (
-              <span className="user-sub-badge text-[var(--muted)]">پایه (بدون انقضا)</span>
+              <span className="user-sub-badge text-[var(--muted)]">پایه (بدون اسلات پولی)</span>
+            )}
+            {(user.extra_slots ?? 0) > 0 && (
+              <span className="user-sub-badge text-[var(--muted)]" style={{ marginInlineStart: 6 }}>
+                +{formatNumber(user.extra_slots ?? 0)} اعتبار آماده
+              </span>
             )}
           </div>
         </div>

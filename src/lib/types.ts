@@ -53,6 +53,9 @@ export interface ManagedProductRow {
   owner_username?: string | null;
   is_tracked_by_user?: boolean;
   last_manual_refresh_at?: string | null;
+  /** Slot window of *this* user's tracking row (NULL = free slot). */
+  slot_started_at?: string | null;
+  slot_expires_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,7 +66,24 @@ export interface UserProductRow {
   product_key: string;
   custom_title: string | null;
   last_manual_refresh_at?: string | null;
+  /** NULL for a permanent free slot, otherwise the start of the paid window. */
+  slot_started_at?: string | null;
+  /** NULL for a free slot; a timestamp (past = lapsed) for a paid slot. */
+  slot_expires_at?: string | null;
+  slot_transferred_at?: string | null;
   created_at: string;
+}
+
+/** One tracked product and the slot window currently attached to it. */
+export interface ProductSlotInfo {
+  product_key: string;
+  title: string;
+  /** `free` = permanent free slot, `paid` = active paid window, `expired` = lapsed. */
+  kind: 'free' | 'paid' | 'expired';
+  started_at: string | null;
+  expires_at: string | null;
+  days_remaining: number | null;
+  transferred_at: string | null;
 }
 
 export interface ManagedTargetRow {
@@ -162,6 +182,8 @@ export interface SafeUser {
   slot_expires_at?: string | null;
   used_slots?: number;
   total_slots?: number;
+  paid_active?: number;
+  paid_expired?: number;
   created_at: string;
   updated_at: string;
 }
@@ -178,14 +200,24 @@ export interface WalletTransactionRow {
 
 export interface UserQuota {
   freeLimit: number;
+  /** Purchased slot credits that are not bound to a product yet. */
   extraSlots: number;
   totalLimit: number;
   usedCount: number;
   remaining: number;
   canAdd: boolean;
+  /** Earliest expiry among active paid slots (kept for older callers). */
   slotExpiresAt?: string | null;
+  /** Days until the earliest active paid slot lapses. */
   daysRemaining?: number | null;
+  /** True when at least one paid slot has lapsed. */
   isExpired?: boolean;
+  /** Products currently monitored on one of the permanent free slots. */
+  freeUsed?: number;
+  /** Products currently monitored on an active paid slot. */
+  paidActive?: number;
+  /** Products whose paid window has lapsed (collection paused). */
+  paidExpired?: number;
 }
 
 export interface PackageRow {
@@ -205,6 +237,8 @@ export interface UserSubscriptionRow {
   id: number;
   user_id: number;
   slots: number;
+  /** Credits from this purchase that are still unused. */
+  remaining_slots?: number;
   price_toman: number;
   duration_days: number;
   source_type: 'package' | 'wallet_slot' | 'admin';

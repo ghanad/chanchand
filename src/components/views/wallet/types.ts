@@ -1,4 +1,4 @@
-import { WalletTransactionRow, UserSubscriptionRow } from "@/lib/types";
+import { WalletTransactionRow, UserSubscriptionRow, ProductSlotInfo } from "@/lib/types";
 
 export interface WalletData {
   wallet_balance: number;
@@ -15,7 +15,11 @@ export interface WalletData {
     slotExpiresAt?: string | null;
     daysRemaining?: number | null;
     isExpired?: boolean;
+    freeUsed?: number;
+    paidActive?: number;
+    paidExpired?: number;
   };
+  product_slots?: ProductSlotInfo[];
   transactions: WalletTransactionRow[];
   subscriptions?: UserSubscriptionRow[];
 }

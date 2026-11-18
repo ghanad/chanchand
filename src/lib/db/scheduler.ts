@@ -74,41 +74,41 @@ export function isPublicProduct(db: Database.Database, productKey: string): bool
 export function isProductEligibleForCollection(db: Database.Database, productKey: string): boolean {
   if (isPublicProduct(db, productKey)) return true;
 
-  const users = db.prepare(`
-    SELECT DISTINCT u.id, u.role, u.extra_slots, u.slot_expires_at
-    FROM users u
-    JOIN user_products up ON up.user_id = u.id
-    WHERE up.product_key = ?
-    UNION
-    SELECT u.id, u.role, u.extra_slots, u.slot_expires_at
-    FROM managed_products mp
-    JOIN users u ON u.id = mp.user_id
-    WHERE mp.key = ?
-  `).all(productKey, productKey) as Array<{ id: number; role: string; extra_slots: number; slot_expires_at: string | null }>;
+  const trackers = db
+    .prepare(`
+      SELECT up.user_id, up.slot_expires_at, u.role
+      FROM user_products up
+      JOIN users u ON u.id = up.user_id
+      WHERE up.product_key = ?
+    `)
+    .all(productKey) as Array<{ user_id: number; slot_expires_at: string | null; role: string }>;
 
-  if (users.length === 0) {
-    return true;
-  }
+  // No explicit tracker row (legacy/orphan product): keep collecting rather than
+  // silently freezing a product someone may still be watching.
+  if (trackers.length === 0) return true;
 
-  for (const user of users) {
-    if (user.role === 'admin') return true;
+  const now = Date.now();
 
-    const isSubscriptionActive = Boolean(
-      (user.extra_slots || 0) > 0 &&
-      (!user.slot_expires_at || new Date(user.slot_expires_at).getTime() > Date.now())
-    );
-    if (isSubscriptionActive) return true;
+  for (const tracker of trackers) {
+    if (tracker.role === 'admin') return true;
 
-    const userFirstThree = db.prepare(`
-      SELECT product_key FROM user_products
-      WHERE user_id = ?
-      ORDER BY id ASC
-      LIMIT ?
-    `).pluck().all(user.id, FREE_PRODUCT_LIMIT) as string[];
-
-    if (userFirstThree.length === 0 || userFirstThree.includes(productKey)) {
-      return true;
+    if (tracker.slot_expires_at != null) {
+      // Paid slot: collected while its own 30-day window is open.
+      if (new Date(tracker.slot_expires_at).getTime() > now) return true;
+      continue;
     }
+
+    // Free slot: only the oldest FREE_PRODUCT_LIMIT free products are monitored.
+    const freeKeys = db
+      .prepare(
+        `SELECT product_key FROM user_products
+         WHERE user_id = ? AND slot_expires_at IS NULL
+         ORDER BY id ASC LIMIT ?`
+      )
+      .pluck()
+      .all(tracker.user_id, FREE_PRODUCT_LIMIT) as string[];
+
+    if (freeKeys.includes(productKey)) return true;
   }
 
   return false;

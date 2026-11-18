@@ -23,9 +23,9 @@ export function WalletDirectSlotPanel({
           ⚡
         </div>
         <div className="wallet-direct-slot-text">
-          <h4>شارژ ماهانه ۱ اسلات پایش با کسر از موجودی کیف پول</h4>
+          <h4>خرید ۱ اسلات پایش با کسر از موجودی کیف پول</h4>
           <p>
-            تعرفه شارژ ماهانه هر اسلات (۳۰ روزه): <strong>{formatNumber(slotPrice)} تومان</strong>
+            تعرفه هر اسلات (۳۰ روز از لحظه افزودن محصول): <strong>{formatNumber(slotPrice)} تومان</strong>
             {canAffordSlot ? (
               <span style={{ color: "var(--ok)", marginInlineStart: "8px" }}>
                 (موجودی شما کافی است)

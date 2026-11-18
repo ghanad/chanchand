@@ -149,11 +149,33 @@ export function createTables(db: Database.Database): void {
       product_key VARCHAR(128) NOT NULL REFERENCES managed_products(key) ON DELETE CASCADE,
       custom_title TEXT,
       last_manual_refresh_at DATETIME DEFAULT NULL,
+      -- Per-product slot window. NULL means this row is served by one of the
+      -- user's FREE_PRODUCT_LIMIT permanent free slots; a timestamp means the
+      -- row is a paid slot that starts when the product is added and ends
+      -- duration_days later. An expiry in the past means the slot lapsed
+      -- (collection pauses until it is renewed).
+      slot_started_at DATETIME DEFAULT NULL,
+      slot_expires_at DATETIME DEFAULT NULL,
+      -- Set when the remaining window of this slot was moved to another
+      -- product. A slot can be transferred at most once.
+      slot_transferred_at DATETIME DEFAULT NULL,
       created_at DATETIME NOT NULL,
       UNIQUE(user_id, product_key)
     );
     CREATE INDEX IF NOT EXISTS ix_user_products_user_id ON user_products(user_id);
     CREATE INDEX IF NOT EXISTS ix_user_products_product_key ON user_products(product_key);
+
+    -- Records that a user already received the one-time Digikala 30-day
+    -- history import for a product. Deleting and re-adding the same product
+    -- must not hand out another free month of history.
+    CREATE TABLE IF NOT EXISTS product_history_grants (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      product_key VARCHAR(128) NOT NULL,
+      granted_at DATETIME NOT NULL,
+      UNIQUE(user_id, product_key)
+    );
+    CREATE INDEX IF NOT EXISTS ix_product_history_grants_user_id ON product_history_grants(user_id);
 
     CREATE TABLE IF NOT EXISTS product_refresh_logs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -222,6 +244,9 @@ export function createTables(db: Database.Database): void {
       payment_transaction_id INTEGER REFERENCES payment_transactions(id),
       starts_at DATETIME NOT NULL,
       expires_at DATETIME NOT NULL,
+      -- How many of the granted credits are still unused. A package of N slots
+      -- decrements this each time a product consumes one.
+      remaining_slots INTEGER NOT NULL DEFAULT 0,
       status VARCHAR(32) NOT NULL DEFAULT 'active',
       created_at DATETIME NOT NULL
     );

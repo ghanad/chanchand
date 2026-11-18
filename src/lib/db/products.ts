@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { ManagedProductRow } from '../types';
 import { normalizeTargetUrl } from '../urls';
 import { getUserById, getUserQuota } from './users';
+import { assignSlotToNewProduct } from './slots';
 import { findManagedTargetByUrl, isUserTrackingProduct } from './targets';
 
 export * from './targets';
@@ -107,7 +108,9 @@ export function getManagedProducts(
                COALESCE(
                  up.last_manual_refresh_at,
                  (SELECT MAX(refreshed_at) FROM product_refresh_logs prl WHERE prl.user_id = ? AND prl.product_key = mp.key)
-               ) AS last_manual_refresh_at
+               ) AS last_manual_refresh_at,
+               up.slot_started_at AS slot_started_at,
+               up.slot_expires_at AS slot_expires_at
         FROM managed_products mp
         LEFT JOIN user_products up ON up.product_key = mp.key AND up.user_id = ?
         LEFT JOIN users u ON u.id = mp.user_id
@@ -206,13 +209,23 @@ export function addManagedProduct(
       if (userId != null) {
         const alreadyLinked = isUserTrackingProduct(db, userId, existingTarget.product_key);
         if (!alreadyLinked) {
-          assertUserCanAddProduct(db, userId);
+          const linkTxn = db.transaction(() => {
+            assertUserCanAddProduct(db, userId);
+            db.prepare(`
+              INSERT INTO user_products (user_id, product_key, custom_title, created_at)
+              VALUES (?, ?, ?, ?)
+              ON CONFLICT(user_id, product_key) DO UPDATE SET custom_title = excluded.custom_title
+            `).run(userId, existingTarget.product_key, cleanTitle, now);
+            assignSlotToNewProduct(db, userId, existingTarget.product_key, {
+              isAdmin: getUserById(db, userId)?.role === 'admin',
+            });
+          });
+          linkTxn();
+        } else {
+          db.prepare(
+            'UPDATE user_products SET custom_title = ? WHERE user_id = ? AND product_key = ?'
+          ).run(cleanTitle, userId, existingTarget.product_key);
         }
-        db.prepare(`
-          INSERT INTO user_products (user_id, product_key, custom_title, created_at)
-          VALUES (?, ?, ?, ?)
-          ON CONFLICT(user_id, product_key) DO UPDATE SET custom_title = excluded.custom_title
-        `).run(userId, existingTarget.product_key, cleanTitle, now);
       }
       return { product_key: existingTarget.product_key, reused: true };
     }
@@ -249,6 +262,9 @@ export function addManagedProduct(
     insertTgt.run(productKey, sourceKey, cleanUrl, adapterSettingsStr, colorId, colorLabel, now, now);
     if (userId != null) {
       insertUserProd.run(userId, productKey, cleanTitle, now);
+      assignSlotToNewProduct(db, userId, productKey, {
+        isAdmin: getUserById(db, userId)?.role === 'admin',
+      });
     }
   });
   txn();

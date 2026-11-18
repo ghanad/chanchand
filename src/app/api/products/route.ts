@@ -6,6 +6,8 @@ import {
   getManagedSources,
   sourcesFromLatestRun,
   addManagedProduct,
+  hasHistoryGrant,
+  recordHistoryGrant,
 } from '@/lib/db';
 import { productsPayload, sourcesPayload } from '@/lib/serializers';
 import { getAuthUserFromRequest } from '@/lib/auth';
@@ -86,6 +88,15 @@ export async function POST(req: NextRequest) {
 
     // First time this product enters the database: seed ~30 days of Digikala
     // price history so the chart is not empty. Reused products already have it.
+    // The import is granted at most once per (user, product) for the lifetime of
+    // the product key, so delete + re-add cannot farm another free month.
+    if (!result.reused && hasHistoryGrant(db, auth.user.id, result.product_key)) {
+      return NextResponse.json({
+        ...result,
+        history_backfill: { reason: 'already_granted', inserted: 0 },
+      });
+    }
+
     if (!result.reused) {
       const target = getManagedTargets(db).find((t) => t.product_key === result.product_key);
       const backfill = await backfillDigikalaPriceHistory(db, {
@@ -95,6 +106,7 @@ export async function POST(req: NextRequest) {
         colorId: target?.color_id ?? body.color_id ?? null,
         colorLabel: target?.color_label ?? body.color_label ?? null,
       });
+      recordHistoryGrant(db, auth.user.id, result.product_key);
       return NextResponse.json({ ...result, history_backfill: backfill });
     }
 

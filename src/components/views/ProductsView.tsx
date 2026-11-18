@@ -100,7 +100,8 @@ export function ProductsView() {
               <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "var(--danger)" }}>
                 <span aria-hidden="true" style={{ fontSize: "16px" }}>⚠️</span>
                 <span>
-                  <strong>اشتراک ماهانه ظرفیت شما منقضی شده است.</strong> پایش محصولات مازاد متوقف شده است. جهت ادامه پایش خودکار، اشتراک خود را تمدید فرمایید.
+                  <strong>پنجره پایش {formatNumber(currentUser.quota?.paidExpired ?? 0)} محصول شما تمام شده است.</strong>{" "}
+                  قیمت این محصولات از این به بعد ثبت نمی‌شود. برای فعال‌سازی مجدد، از فهرست محصولات دکمه «تمدید» را بزنید یا یک اسلات جدید بخرید.
                 </span>
               </div>
               <Link

@@ -39,6 +39,8 @@ export interface ProductRow {
   can_edit?: boolean;
   can_refresh?: boolean;
   last_manual_refresh_at?: string | null;
+  slot_started_at?: string | null;
+  slot_expires_at?: string | null;
   configured: boolean;
   target_count: number;
   enabled_target_count: number;

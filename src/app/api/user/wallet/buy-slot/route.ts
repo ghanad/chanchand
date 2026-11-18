@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'شارژ ماهانه ۱ اسلات ظرفیت پایش (۳۰ روزه) با موفقیت فعال شد.',
+      message: 'یک اسلات ۳۰ روزه به اعتبار شما اضافه شد. پنجره هر محصول از لحظه افزودن آن شروع می‌شود.',
       ...result,
     });
   } catch (err: any) {

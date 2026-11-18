@@ -5,6 +5,7 @@ import { SourceRow } from "../../../types/dashboard";
 import { ProductFormState } from "./types";
 import { requestJson } from "@/lib/api-client";
 import { formatNumber } from "@/lib/formatters";
+import { useDashboard } from "@/context/DashboardContext";
 
 interface PreviewColor {
   id: string;
@@ -70,6 +71,8 @@ export function AddProductModal({
   isAdmin,
   isBusy,
 }: AddProductModalProps) {
+  const { currentUser } = useDashboard();
+  const quota = currentUser?.quota;
   const [mode, setMode] = useState<"general" | "car">("general");
   const [carItems, setCarItems] = useState<IranjibItemData[]>([]);
   const [carCompanies, setCarCompanies] = useState<string[]>([]);
@@ -271,6 +274,29 @@ export function AddProductModal({
       </div>
 
       <form className="modal-form" onSubmit={onSubmit}>
+        {!isAdmin && quota && (
+          <div className="add-product-slot-hint">
+            {quota.remaining > 0 ? (
+              <>
+                <span aria-hidden="true">🎟️</span>
+                <span>
+                  این محصول یکی از <strong>{formatNumber(quota.remaining)}</strong> اسلات خالی شما را اشغال می‌کند.
+                  {quota.freeUsed !== undefined && quota.freeUsed < quota.freeLimit
+                    ? " از سهمیه رایگان دائمی استفاده می‌شود."
+                    : " پنجره پایش آن ۳۰ روز از همین لحظه شروع می‌شود و پس از آن باید تمدید شود."}
+                </span>
+              </>
+            ) : (
+              <>
+                <span aria-hidden="true">⚠️</span>
+                <span>
+                  هیچ اسلات خالی ندارید. برای افزودن محصول جدید ابتدا یک اسلات ۳۰ روزه از کیف پول خریداری کنید.
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
         {mode === "car" ? (
           <div className="car-picker-box">
             <div className="car-picker-header">

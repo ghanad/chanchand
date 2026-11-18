@@ -136,6 +136,8 @@ export function productsPayload(
     active_end_hour?: number | null;
     is_tracked_by_user?: boolean;
     last_manual_refresh_at?: string | null;
+    slot_started_at?: string | null;
+    slot_expires_at?: string | null;
   }> = [],
   managedTargets?: Array<{
     product_key: string;
@@ -190,6 +192,8 @@ export function productsPayload(
       can_edit: canEdit,
       can_refresh: canRefresh,
       last_manual_refresh_at: dbProduct.last_manual_refresh_at ?? null,
+      slot_started_at: dbProduct.slot_started_at ?? null,
+      slot_expires_at: dbProduct.slot_expires_at ?? null,
       configured: true,
       target_count: 0,
       enabled_target_count: 0,

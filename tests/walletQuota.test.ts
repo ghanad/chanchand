@@ -15,6 +15,9 @@ import {
   getSlotPriceToman,
   FREE_PRODUCT_LIMIT,
   isProductEligibleForCollection,
+  deleteManagedProduct,
+  renewProductSlot,
+  transferProductSlot,
 } from '../src/lib/db';
 import { hashPassword, signAuthToken, AUTH_COOKIE_NAME } from '../src/lib/auth';
 import { POST as postProduct } from '../src/app/api/products/route';
@@ -222,80 +225,193 @@ describe('User Product Quota and Wallet Monetization', () => {
     expect(buyData.error).toContain('کافی نیست');
   });
 
-  it('sets 30-day expiration date upon purchasing slot and creates user_subscriptions entry', async () => {
+  it('grants an unbound slot credit on purchase and starts the window when a product is added', () => {
     const db = getDatabase();
-    // Admin charges user wallet with 50,000
     chargeUserWallet(db, { userId: viewerId, amount: 50000 });
 
     const purchaseRes = purchaseProductSlot(db, { userId: viewerId });
     expect(purchaseRes.extra_slots).toBe(1);
-    expect(purchaseRes.slot_expires_at).toBeDefined();
-
-    const expiryDate = new Date(purchaseRes.slot_expires_at);
-    const now = new Date();
-    const diffDays = Math.round((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    expect(diffDays).toBe(30);
+    // A purchase no longer carries an expiry: days start when a product uses it.
+    expect(purchaseRes.slot_expires_at).toBeNull();
 
     const quota = getUserQuota(db, viewerId, false);
     expect(quota.extraSlots).toBe(1);
-    expect(quota.isExpired).toBe(false);
-    expect(quota.daysRemaining).toBe(30);
+    expect(quota.remaining).toBe(4);
+    expect(quota.paidActive).toBe(0);
+    expect(quota.daysRemaining).toBeNull();
 
-    // Verify subscription record was created
+    // Verify the purchase record was created with one unused credit
     const subs = db.prepare('SELECT * FROM user_subscriptions WHERE user_id = ?').all(viewerId) as any[];
     expect(subs.length).toBe(1);
     expect(subs[0].slots).toBe(1);
+    expect(subs[0].remaining_slots).toBe(1);
     expect(subs[0].duration_days).toBe(30);
     expect(subs[0].source_type).toBe('wallet_slot');
     expect(subs[0].status).toBe('active');
 
+    // Fill the three free slots, then a fourth product consumes the credit.
+    for (let i = 1; i <= 3; i++) {
+      addManagedProduct(db, {
+        title: `Free ${i}`,
+        url: `https://www.digikala.com/product/dkp-${7000 + i}`,
+        user_id: viewerId,
+      });
+    }
+    const paidKey = addManagedProduct(db, {
+      title: 'Paid',
+      url: 'https://www.digikala.com/product/dkp-7004',
+      user_id: viewerId,
+    }).product_key;
+
+    const row = db
+      .prepare('SELECT slot_started_at, slot_expires_at FROM user_products WHERE user_id = ? AND product_key = ?')
+      .get(viewerId, paidKey) as { slot_started_at: string; slot_expires_at: string };
+    expect(row.slot_started_at).toBeTruthy();
+    const diffDays = Math.round((new Date(row.slot_expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    expect(diffDays).toBe(30);
+
+    const quotaAfter = getUserQuota(db, viewerId, false);
+    expect(quotaAfter.extraSlots).toBe(0);
+    expect(quotaAfter.paidActive).toBe(1);
+    expect(quotaAfter.daysRemaining).toBe(30);
+    expect(quotaAfter.usedCount).toBe(4);
+
+    const subsAfter = db.prepare('SELECT remaining_slots FROM user_subscriptions WHERE user_id = ?').all(viewerId) as any[];
+    expect(subsAfter[0].remaining_slots).toBe(0);
+
     db.close();
   });
 
-  it('treats expired extra slots as 0 and flags isExpired when slot_expires_at is in the past', () => {
+  it('deleting a paid product does not refund its remaining days', () => {
     const db = getDatabase();
-    const pastDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(); // 2 days ago
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+    purchaseProductSlot(db, { userId: viewerId });
 
-    db.prepare('UPDATE users SET extra_slots = 5, slot_expires_at = ? WHERE id = ?').run(pastDate, viewerId);
+    for (let i = 1; i <= 3; i++) {
+      addManagedProduct(db, {
+        title: `Free ${i}`,
+        url: `https://www.digikala.com/product/dkp-${7100 + i}`,
+        user_id: viewerId,
+      });
+    }
+    const paidKey = addManagedProduct(db, {
+      title: 'Paid',
+      url: 'https://www.digikala.com/product/dkp-7104',
+      user_id: viewerId,
+    }).product_key;
+
+    deleteManagedProduct(db, paidKey, { id: viewerId, role: 'viewer' });
 
     const quota = getUserQuota(db, viewerId, false);
+    // The credit was consumed; deleting the product must not hand it back.
     expect(quota.extraSlots).toBe(0);
-    expect(quota.isExpired).toBe(true);
-    expect(quota.daysRemaining).toBe(0);
-    expect(quota.totalLimit).toBe(3); // Falls back to 3 free limit
+    expect(quota.remaining).toBe(0);
+    expect(quota.canAdd).toBe(false);
 
     db.close();
   });
 
-  it('pauses collection for excess products when user subscription expires', () => {
+  it('reports a lapsed paid slot and pauses collection for that product only', () => {
     const db = getDatabase();
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+    purchaseProductSlot(db, { userId: viewerId });
 
-    // User adds 4 products
-    const p1 = addManagedProduct(db, { title: 'P1', url: 'https://digikala.com/p1', user_id: viewerId }).product_key;
-    const p2 = addManagedProduct(db, { title: 'P2', url: 'https://digikala.com/p2', user_id: viewerId }).product_key;
-    const p3 = addManagedProduct(db, { title: 'P3', url: 'https://digikala.com/p3', user_id: viewerId }).product_key;
+    const freeKeys: string[] = [];
+    for (let i = 1; i <= 3; i++) {
+      freeKeys.push(
+        addManagedProduct(db, {
+          title: `Free ${i}`,
+          url: `https://www.digikala.com/product/dkp-${7200 + i}`,
+          user_id: viewerId,
+        }).product_key
+      );
+    }
+    const paidKey = addManagedProduct(db, {
+      title: 'Paid',
+      url: 'https://www.digikala.com/product/dkp-7204',
+      user_id: viewerId,
+    }).product_key;
 
-    // Grant 1 extra slot valid in the future
-    const futureDate = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
-    db.prepare('UPDATE users SET extra_slots = 1, slot_expires_at = ? WHERE id = ?').run(futureDate, viewerId);
+    for (const key of [...freeKeys, paidKey]) {
+      expect(isProductEligibleForCollection(db, key)).toBe(true);
+    }
 
-    const p4 = addManagedProduct(db, { title: 'P4', url: 'https://digikala.com/p4', user_id: viewerId }).product_key;
+    const pastDate = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    db.prepare('UPDATE user_products SET slot_expires_at = ? WHERE user_id = ? AND product_key = ?').run(
+      pastDate,
+      viewerId,
+      paidKey
+    );
 
-    // Both p1 (free) and p4 (extra) are eligible while subscription is active
-    expect(isProductEligibleForCollection(db, p1)).toBe(true);
-    expect(isProductEligibleForCollection(db, p4)).toBe(true);
+    const quota = getUserQuota(db, viewerId, false);
+    expect(quota.isExpired).toBe(true);
+    expect(quota.paidExpired).toBe(1);
+    expect(quota.paidActive).toBe(0);
+    expect(quota.extraSlots).toBe(0);
+    expect(quota.totalLimit).toBe(3);
 
-    // Now simulate subscription expiration
-    const pastDate = new Date(Date.now() - 1000).toISOString();
-    db.prepare('UPDATE users SET slot_expires_at = ? WHERE id = ?').run(pastDate, viewerId);
+    for (const key of freeKeys) {
+      expect(isProductEligibleForCollection(db, key)).toBe(true);
+    }
+    expect(isProductEligibleForCollection(db, paidKey)).toBe(false);
 
-    // p1, p2, p3 (first 3 free products) are still eligible
-    expect(isProductEligibleForCollection(db, p1)).toBe(true);
-    expect(isProductEligibleForCollection(db, p2)).toBe(true);
-    expect(isProductEligibleForCollection(db, p3)).toBe(true);
+    // Renewing with a fresh credit re-opens the window.
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+    purchaseProductSlot(db, { userId: viewerId });
+    renewProductSlot(db, viewerId, paidKey);
 
-    // p4 (excess product beyond free 3) is now ineligible / paused!
-    expect(isProductEligibleForCollection(db, p4)).toBe(false);
+    expect(isProductEligibleForCollection(db, paidKey)).toBe(true);
+    const renewed = getUserQuota(db, viewerId, false);
+    expect(renewed.paidActive).toBe(1);
+    expect(renewed.isExpired).toBe(false);
+
+    db.close();
+  });
+
+  it('transfers a remaining window once and refuses a second transfer', () => {
+    const db = getDatabase();
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+    purchaseProductSlot(db, { userId: viewerId });
+
+    for (let i = 1; i <= 3; i++) {
+      addManagedProduct(db, {
+        title: `Free ${i}`,
+        url: `https://www.digikala.com/product/dkp-${7300 + i}`,
+        user_id: viewerId,
+      });
+    }
+    const fromKey = addManagedProduct(db, {
+      title: 'From',
+      url: 'https://www.digikala.com/product/dkp-7304',
+      user_id: viewerId,
+    }).product_key;
+
+    // A second paid product would need another credit; add it while the credit
+    // pool still has one, then move the first window onto it.
+    chargeUserWallet(db, { userId: viewerId, amount: 50000 });
+    purchaseProductSlot(db, { userId: viewerId });
+    const toKey = addManagedProduct(db, {
+      title: 'To',
+      url: 'https://www.digikala.com/product/dkp-7305',
+      user_id: viewerId,
+    }).product_key;
+
+    // Simulate the destination slot having lapsed, then move the window onto it.
+    db.prepare('UPDATE user_products SET slot_expires_at = ? WHERE user_id = ? AND product_key = ?').run(
+      new Date(Date.now() - 1000).toISOString(),
+      viewerId,
+      toKey
+    );
+
+    const result = transferProductSlot(db, viewerId, fromKey, toKey);
+    expect(result.to).toBe(toKey);
+
+    const toRow = db
+      .prepare('SELECT slot_expires_at FROM user_products WHERE user_id = ? AND product_key = ?')
+      .get(viewerId, toKey) as { slot_expires_at: string };
+    expect(new Date(toRow.slot_expires_at).getTime()).toBeGreaterThan(Date.now());
+
+    expect(() => transferProductSlot(db, viewerId, fromKey, toKey)).toThrow(/منتقل شده/);
 
     db.close();
   });

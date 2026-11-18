@@ -58,7 +58,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
       const res = await requestJson<{ success: boolean; message: string }>("/api/user/wallet/buy-slot", {
         method: "POST",
       });
-      showToast(res.message || "یک اسلات جدید با موفقیت فعال شد.");
+      showToast(res.message || "یک اسلات به اعتبار شما اضافه شد.");
       await refreshCurrentUser();
       triggerRefresh();
       onClose();
@@ -117,7 +117,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
           </div>
 
           <div className="flex justify-between items-center text-xs pt-2 border-t border-[var(--border-subtle)]">
-            <span className="text-[var(--text-muted)]">تعرفه شارژ ماهانه هر اسلات (۳۰ روزه):</span>
+            <span className="text-[var(--text-muted)]">تعرفه هر اسلات (۳۰ روز از لحظه افزودن محصول):</span>
             <span className="font-bold text-xs text-[var(--foreground)]" dir="ltr">
               {formatNumber(slotPrice)} تومان
             </span>
@@ -133,10 +133,10 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
                 disabled={buyingSlot}
               >
                 {buyingSlot ? (
-                  <span>در حال فعال‌سازی اسلات...</span>
+                  <span>در حال افزودن اعتبار...</span>
                 ) : (
                   <>
-                    <span>شارژ ماهانه ۱ اسلات با موجودی کیف پول ({formatNumber(slotPrice)} تومان)</span>
+                    <span>خرید ۱ اسلات با موجودی کیف پول ({formatNumber(slotPrice)} تومان)</span>
                     <span aria-hidden="true">⚡</span>
                   </>
                 )}
@@ -162,7 +162,7 @@ export function UpgradeQuotaModal({ isOpen, onClose }: UpgradeQuotaModalProps) {
         {/* لیست بسته‌های افزایش ظرفیت */}
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-muted)]">
-            <span>بسته‌های اشتراک ماهانه افزایش ظرفیت (پرداخت آنلاین):</span>
+            <span>بسته‌های افزایش ظرفیت (پرداخت آنلاین):</span>
             <Link
               href="/account/wallet"
               onClick={onClose}

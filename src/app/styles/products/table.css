@@ -731,3 +731,52 @@
   margin: 0;
   line-height: 1.6;
 }
+
+/* Per-product slot window badge (free / paid days left / lapsed) */
+.product-status-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.slot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.slot-badge-free {
+  color: var(--muted);
+  background: rgba(120, 120, 120, 0.08);
+  border-color: rgba(120, 120, 120, 0.18);
+}
+
+.slot-badge-paid {
+  color: var(--ok);
+  background: rgba(19, 118, 79, 0.1);
+  border-color: rgba(19, 118, 79, 0.25);
+}
+
+.slot-badge-expired {
+  color: var(--danger);
+  background: rgba(180, 59, 59, 0.1);
+  border-color: rgba(180, 59, 59, 0.28);
+  cursor: pointer;
+}
+
+.slot-badge-expired:hover:not(:disabled) {
+  background: rgba(180, 59, 59, 0.18);
+}
+
+.slot-badge-expired:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}

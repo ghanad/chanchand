@@ -4,17 +4,13 @@ import path from 'path';
 import { initDatabase } from './schema';
 
 export const DEFAULT_DB_URL = 'sqlite:///data/price_getter.db';
-export const FREE_PRODUCT_LIMIT = 3;
-export const DEFAULT_SLOT_PRICE_TOMAN = 50000;
 
-export function getSlotPriceToman(): number {
-  const envVal = process.env.SLOT_PRICE_TOMAN;
-  if (envVal) {
-    const parsed = parseInt(envVal, 10);
-    if (!isNaN(parsed) && parsed > 0) return parsed;
-  }
-  return DEFAULT_SLOT_PRICE_TOMAN;
-}
+export {
+  DEFAULT_SLOT_PRICE_TOMAN,
+  FREE_PRODUCT_LIMIT,
+  SLOT_DURATION_DAYS,
+  getSlotPriceToman,
+} from './constants';
 
 export function resolveDbPath(dbUrl?: string): string {
   const url = dbUrl || process.env.PRICE_GETTER_DB_URL || DEFAULT_DB_URL;

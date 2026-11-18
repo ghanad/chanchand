@@ -7,6 +7,7 @@ import {
   getSlotPriceToman,
   getUserWalletTransactions,
   getUserSubscriptions,
+  getUserProductSlots,
 } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     const transactions = getUserWalletTransactions(db, user.id, 20);
     const subscriptions = getUserSubscriptions(db, user.id);
     const slotPrice = getSlotPriceToman();
+    const productSlots = getUserProductSlots(db, user.id);
 
     return NextResponse.json({
       wallet_balance: user.wallet_balance ?? 0,
@@ -35,6 +37,7 @@ export async function GET(req: NextRequest) {
       slot_expires_at: user.slot_expires_at ?? null,
       slot_price: slotPrice,
       quota,
+      product_slots: productSlots,
       transactions,
       subscriptions,
     });

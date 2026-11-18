@@ -16,6 +16,9 @@ export interface UserQuotaInfo {
   slotExpiresAt?: string | null;
   daysRemaining?: number | null;
   isExpired?: boolean;
+  freeUsed?: number;
+  paidActive?: number;
+  paidExpired?: number;
 }
 
 export interface CurrentUser {

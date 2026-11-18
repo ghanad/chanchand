@@ -163,11 +163,18 @@ export function WalletHeroGrid({
           </div>
 
           <div className="wallet-quota-mini-stat">
-            <div className="wallet-quota-mini-num" style={{ color: quota.isExpired ? "var(--danger)" : undefined }}>
+            <div className="wallet-quota-mini-num">{isAdmin ? "∞" : formatNumber(quota.paidActive ?? 0)}</div>
+            <div className="wallet-quota-mini-lbl">اسلات پولی فعال</div>
+          </div>
+
+          <div className="wallet-quota-mini-stat">
+            <div className="wallet-quota-mini-num" style={{ color: (quota.paidExpired ?? 0) > 0 ? "var(--danger)" : undefined }}>
               {isAdmin ? "∞" : `+${formatNumber(extraSlots)}`}
             </div>
             <div className="wallet-quota-mini-lbl">
-              {quota.isExpired ? "اسلات منقضی شده" : "اسلات‌های ماهانه فعال"}
+              {(quota.paidExpired ?? 0) > 0
+                ? `اعتبار آماده (${formatNumber(quota.paidExpired ?? 0)} منقضی)`
+                : "اعتبار آماده (مصرف‌نشده)"}
             </div>
           </div>
 
@@ -182,15 +189,16 @@ export function WalletHeroGrid({
         <div className="wallet-quota-note">
           <span aria-hidden="true">🛡️</span>
           <span>
-            سهمیه پایه (۳ محصول) دائمی و رایگان است. اسلات‌های اضافه به صورت اشتراک ماهانه (۳۰ روزه) فعال می‌شوند.
-            {quota.slotExpiresAt && !quota.isExpired && (
+            سهمیه پایه (۳ محصول) دائمی و رایگان است. هر اسلات پولی، ۳۰ روز از <strong>لحظه افزودن همان محصول</strong> اعتبار دارد؛
+            خرید اسلات روزی از شما کم نمی‌کند تا محصولی را که می‌خواهید انتخاب کنید.
+            {quota.slotExpiresAt && (
               <strong style={{ marginInlineStart: "6px", color: "var(--ok)" }}>
-                (اعتبار فعال تا: {formatDateOnly(quota.slotExpiresAt)} — {quota.daysRemaining} روز مانده)
+                (نزدیک‌ترین پایان: {formatDateOnly(quota.slotExpiresAt)} — {quota.daysRemaining} روز مانده)
               </strong>
             )}
-            {quota.isExpired && (
+            {(quota.paidExpired ?? 0) > 0 && (
               <strong style={{ marginInlineStart: "6px", color: "var(--danger)" }}>
-                (اشتراک اسلات‌های اضافه منقضی شده است — جهت فعال‌سازی مجدد پایش کالاها، اشتراک را تمدید کنید)
+                ({formatNumber(quota.paidExpired ?? 0)} محصول از پنجره پایش خارج شده — از فهرست محصولات تمدید کنید)
               </strong>
             )}
           </span>

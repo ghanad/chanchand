@@ -7,6 +7,7 @@ import { ProductKebabMenu } from "./ProductKebabMenu";
 import { ProductTitleCell } from "./ProductTitleCell";
 import { ProductUrlCell } from "./ProductUrlCell";
 import { ProductPriceCell } from "./ProductPriceCell";
+import { ProductSlotBadge } from "./ProductSlotBadge";
 
 export function ProductTableRow({
   product,
@@ -109,14 +110,22 @@ export function ProductTableRow({
 
       {/* 5. Status Column (Interactive Switch for editable, Static Badge for read-only public) */}
       <td className="col-status" onClick={(e) => e.stopPropagation()}>
-        <ProductStatusSwitch
-          product={product}
-          canEdit={canEdit}
-          isActive={isActive}
-          canToggle={canToggle}
-          isToggling={isToggling}
-          onToggle={onToggle}
-        />
+        <div className="product-status-cell">
+          <ProductStatusSwitch
+            product={product}
+            canEdit={canEdit}
+            isActive={isActive}
+            canToggle={canToggle}
+            isToggling={isToggling}
+            onToggle={onToggle}
+          />
+          <ProductSlotBadge
+            productKey={product.key}
+            slotExpiresAt={product.slot_expires_at}
+            isAdmin={isAdmin}
+            isPublic={product.is_public}
+          />
+        </div>
       </td>
 
       {/* 6. Last Check Observation Time */}

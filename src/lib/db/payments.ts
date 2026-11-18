@@ -126,33 +126,24 @@ export function markPaymentTransactionPaid(
     const pkg = current.package_id ? getPackageById(db, current.package_id) : null;
     const durationDays = pkg?.duration_days || 30;
 
-    let newExpiry: Date;
-    let newExtraSlots: number;
+    // Packages grant unbound credits. Each credit starts its own window when it
+    // is attached to a product, so buying early never burns days.
+    const newExtraSlots = (user.extra_slots || 0) + current.slots;
+    const nominalExpiryIso = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString();
 
-    if (user.slot_expires_at && new Date(user.slot_expires_at).getTime() > now.getTime() && (user.extra_slots || 0) > 0) {
-      newExtraSlots = (user.extra_slots || 0) + current.slots;
-      const currentExpiry = new Date(user.slot_expires_at);
-      newExpiry = new Date(Math.max(currentExpiry.getTime(), now.getTime() + durationDays * 24 * 60 * 60 * 1000));
-    } else {
-      newExtraSlots = current.slots;
-      newExpiry = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
-    }
-    const newExpiryIso = newExpiry.toISOString();
-
-    db.prepare('UPDATE users SET extra_slots = ?, slot_expires_at = ?, updated_at = ? WHERE id = ?').run(
+    db.prepare('UPDATE users SET extra_slots = ?, slot_expires_at = NULL, updated_at = ? WHERE id = ?').run(
       newExtraSlots,
-      newExpiryIso,
       nowIso,
       user.id
     );
 
-    // Record subscription grant
+    // Record subscription grant (activated_at stays NULL until a product uses it)
     db.prepare(`
       INSERT INTO user_subscriptions (
         user_id, slots, price_toman, duration_days, source_type,
         package_id, package_title, payment_transaction_id,
-        starts_at, expires_at, status, created_at
-      ) VALUES (?, ?, ?, ?, 'package', ?, ?, ?, ?, ?, 'active', ?)
+        starts_at, expires_at, status, created_at, remaining_slots
+      ) VALUES (?, ?, ?, ?, 'package', ?, ?, ?, ?, ?, 'active', ?, ?)
     `).run(
       user.id,
       current.slots,
@@ -162,11 +153,12 @@ export function markPaymentTransactionPaid(
       current.package_title,
       id,
       nowIso,
-      newExpiryIso,
-      nowIso
+      nominalExpiryIso,
+      nowIso,
+      current.slots
     );
 
-    return { success: true, alreadyPaid: false, extraSlots: newExtraSlots, slotExpiresAt: newExpiryIso };
+    return { success: true, alreadyPaid: false, extraSlots: newExtraSlots, slotExpiresAt: undefined };
   });
 
   return txn();

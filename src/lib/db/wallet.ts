@@ -3,7 +3,7 @@ import {
   UserQuota,
   WalletTransactionRow,
 } from '../types';
-import { getSlotPriceToman } from './connection';
+import { getSlotPriceToman, SLOT_DURATION_DAYS } from './constants';
 import { getUserById, getUserQuota } from './users';
 
 export function chargeUserWallet(
@@ -66,12 +66,18 @@ export function purchaseProductSlot(
     slotPrice?: number;
     durationDays?: number;
   }
-): { extra_slots: number; slot_expires_at: string; wallet_balance: number; transaction: WalletTransactionRow; quota: UserQuota } {
+): {
+  extra_slots: number;
+  slot_expires_at: null;
+  wallet_balance: number;
+  transaction: WalletTransactionRow;
+  quota: UserQuota;
+} {
   const price = params.slotPrice ?? getSlotPriceToman();
   if (price <= 0) {
     throw new Error('قیمت اسلات نامعتبر است.');
   }
-  const durationDays = params.durationDays ?? 30;
+  const durationDays = params.durationDays ?? SLOT_DURATION_DAYS;
 
   const txn = db.transaction(() => {
     const user = getUserById(db, params.userId);
@@ -82,48 +88,46 @@ export function purchaseProductSlot(
     const currentBalance = user.wallet_balance || 0;
     if (currentBalance < price) {
       throw new Error(
-        `موجودی کیف پول شما (${currentBalance.toLocaleString('fa-IR')} تومان) برای شارژ ماهانه اسلات (${price.toLocaleString('fa-IR')} تومان) کافی نیست.`
+        `موجودی کیف پول شما (${currentBalance.toLocaleString('fa-IR')} تومان) برای خرید اسلات (${price.toLocaleString('fa-IR')} تومان) کافی نیست.`
       );
     }
 
     const newBalance = currentBalance - price;
     const now = new Date();
     const nowIso = now.toISOString();
-
-    let newExpiry: Date;
-    let newSlots = 1;
-
-    if (user.slot_expires_at && new Date(user.slot_expires_at).getTime() > now.getTime() && (user.extra_slots || 0) > 0) {
-      newSlots = (user.extra_slots || 0) + 1;
-      const currentExpiry = new Date(user.slot_expires_at);
-      newExpiry = new Date(Math.max(currentExpiry.getTime(), now.getTime() + durationDays * 24 * 60 * 60 * 1000));
-    } else {
-      newSlots = 1;
-      newExpiry = new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000);
-    }
-
-    const newExpiryIso = newExpiry.toISOString();
+    // A purchase adds an unbound credit. Its 30-day window starts only when the
+    // user attaches it to a product, so no days are lost while deciding.
+    const newCredits = (user.extra_slots || 0) + 1;
 
     db.prepare(`
       UPDATE users
-      SET wallet_balance = ?, extra_slots = ?, slot_expires_at = ?, updated_at = ?
+      SET wallet_balance = ?, extra_slots = ?, slot_expires_at = NULL, updated_at = ?
       WHERE id = ?
-    `).run(newBalance, newSlots, newExpiryIso, nowIso, params.userId);
+    `).run(newBalance, newCredits, nowIso, params.userId);
 
-    const desc = `شارژ ماهانه ۱ اسلات ظرفیت پایش محصول (${durationDays} روزه)`;
+    const desc = `خرید ۱ اسلات پایش محصول (${durationDays} روزه)`;
     const insertTxn = db.prepare(`
       INSERT INTO wallet_transactions (user_id, amount, balance_after, type, description, created_at)
       VALUES (?, ?, ?, 'slot_purchase', ?, ?)
     `);
     const res = insertTxn.run(params.userId, -price, newBalance, desc, nowIso);
 
-    // Record subscription
+    // Purchase record. `expires_at` is a placeholder until the credit is
+    // activated on a product, at which point the real window is written back.
     db.prepare(`
       INSERT INTO user_subscriptions (
         user_id, slots, price_toman, duration_days, source_type,
-        starts_at, expires_at, status, created_at
-      ) VALUES (?, ?, ?, ?, 'wallet_slot', ?, ?, 'active', ?)
-    `).run(params.userId, 1, price, durationDays, nowIso, newExpiryIso, nowIso);
+        starts_at, expires_at, status, created_at, remaining_slots
+      ) VALUES (?, ?, ?, ?, 'wallet_slot', ?, ?, 'active', ?, 1)
+    `).run(
+      params.userId,
+      1,
+      price,
+      durationDays,
+      nowIso,
+      new Date(now.getTime() + durationDays * 24 * 60 * 60 * 1000).toISOString(),
+      nowIso
+    );
 
     const transaction: WalletTransactionRow = {
       id: Number(res.lastInsertRowid),
@@ -138,8 +142,8 @@ export function purchaseProductSlot(
     const quota = getUserQuota(db, params.userId, user.role === 'admin');
 
     return {
-      extra_slots: newSlots,
-      slot_expires_at: newExpiryIso,
+      extra_slots: newCredits,
+      slot_expires_at: null,
       wallet_balance: newBalance,
       transaction,
       quota,

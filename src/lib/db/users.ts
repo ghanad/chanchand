@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
-import { SafeUser, UserQuota, UserRole, UserRow } from '../types';
-import { FREE_PRODUCT_LIMIT } from './connection';
+import { ProductSlotInfo, SafeUser, UserQuota, UserRole, UserRow } from '../types';
+import { FREE_PRODUCT_LIMIT } from './constants';
 
 export function getUserByUsername(db: Database.Database, username: string): UserRow | null {
   const row = db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE').get(username) as UserRow | undefined;
@@ -35,16 +35,18 @@ export function listUsers(db: Database.Database): SafeUser[] {
     ORDER BY u.id ASC
   `).all() as (Omit<SafeUser, 'must_change_password'> & { must_change_password: number; used_slots: number })[];
   return rows.map((r) => {
-    const extraSlots = r.extra_slots ?? 0;
     const isAdmin = r.role === 'admin';
+    const quota = getUserQuota(db, r.id, isAdmin);
     return {
       ...r,
       mobile: r.mobile ?? null,
       wallet_balance: r.wallet_balance ?? 0,
-      extra_slots: extraSlots,
-      slot_expires_at: r.slot_expires_at ?? null,
-      used_slots: Number(r.used_slots ?? 0),
-      total_slots: isAdmin ? 999999 : FREE_PRODUCT_LIMIT + extraSlots,
+      extra_slots: r.extra_slots ?? 0,
+      slot_expires_at: null,
+      used_slots: quota.usedCount,
+      total_slots: isAdmin ? 999999 : quota.totalLimit,
+      paid_active: quota.paidActive ?? 0,
+      paid_expired: quota.paidExpired ?? 0,
       must_change_password: Boolean(r.must_change_password),
     };
   });
@@ -216,62 +218,128 @@ export function deleteUser(db: Database.Database, id: number): boolean {
 }
 
 export function getUserQuota(db: Database.Database, userId: number, isAdmin = false): UserQuota {
-  const usedCount = (
-    db.prepare('SELECT COUNT(*) as cnt FROM user_products WHERE user_id = ?').get(userId) as { cnt: number }
-  )?.cnt ?? 0;
+  const rows = db
+    .prepare('SELECT id, product_key, slot_expires_at FROM user_products WHERE user_id = ? ORDER BY id ASC')
+    .all(userId) as Array<{ id: number; product_key: string; slot_expires_at: string | null }>;
 
   if (isAdmin) {
     return {
       freeLimit: FREE_PRODUCT_LIMIT,
       extraSlots: 999999,
       totalLimit: 999999,
-      usedCount,
+      usedCount: rows.length,
       remaining: 999999,
       canAdd: true,
       slotExpiresAt: null,
       daysRemaining: null,
       isExpired: false,
+      freeUsed: rows.length,
+      paidActive: 0,
+      paidExpired: 0,
     };
   }
 
   const user = getUserById(db, userId);
-  const rawSlots = user?.extra_slots ?? 0;
-  const slotExpiresAt = user?.slot_expires_at ?? null;
+  // `extra_slots` is now a pool of purchased-but-unbound slot credits. A credit
+  // starts its 30-day window only when it is attached to a product.
+  const credits = Math.max(0, user?.extra_slots ?? 0);
+  const now = Date.now();
 
-  let isExpired = false;
-  let daysRemaining: number | null = null;
-  let activeExtraSlots = 0;
+  const freeRows = rows.filter((r) => r.slot_expires_at == null);
+  const paidRows = rows.filter((r) => r.slot_expires_at != null);
+  const activePaidRows = paidRows.filter((r) => new Date(r.slot_expires_at as string).getTime() > now);
+  const expiredPaidRows = paidRows.filter((r) => new Date(r.slot_expires_at as string).getTime() <= now);
 
-  if (rawSlots > 0) {
-    if (slotExpiresAt) {
-      const expiryTime = new Date(slotExpiresAt).getTime();
-      const nowTime = Date.now();
-      if (expiryTime <= nowTime) {
-        isExpired = true;
-        daysRemaining = 0;
-        activeExtraSlots = 0;
-      } else {
-        isExpired = false;
-        daysRemaining = Math.max(1, Math.ceil((expiryTime - nowTime) / (1000 * 60 * 60 * 24)));
-        activeExtraSlots = rawSlots;
-      }
-    } else {
-      activeExtraSlots = rawSlots;
+  // Only the oldest FREE_PRODUCT_LIMIT free rows are actually monitored.
+  const freeUsed = Math.min(freeRows.length, FREE_PRODUCT_LIMIT);
+  const paidActive = activePaidRows.length;
+  const paidExpired = expiredPaidRows.length;
+
+  const totalLimit = FREE_PRODUCT_LIMIT + paidActive + credits;
+  const usedCount = freeUsed + paidActive;
+  const remaining = Math.max(0, FREE_PRODUCT_LIMIT - freeUsed + credits);
+
+  let nextExpiry: string | null = null;
+  for (const r of activePaidRows) {
+    const iso = r.slot_expires_at as string;
+    if (!nextExpiry || new Date(iso).getTime() < new Date(nextExpiry).getTime()) {
+      nextExpiry = iso;
     }
   }
-
-  const totalLimit = FREE_PRODUCT_LIMIT + activeExtraSlots;
-  const remaining = Math.max(0, totalLimit - usedCount);
+  const daysRemaining = nextExpiry
+    ? Math.max(1, Math.ceil((new Date(nextExpiry).getTime() - now) / (1000 * 60 * 60 * 24)))
+    : null;
 
   return {
     freeLimit: FREE_PRODUCT_LIMIT,
-    extraSlots: activeExtraSlots,
+    extraSlots: credits,
     totalLimit,
     usedCount,
     remaining,
-    canAdd: usedCount < totalLimit,
-    slotExpiresAt,
+    canAdd: remaining > 0,
+    slotExpiresAt: nextExpiry,
     daysRemaining,
-    isExpired,
+    isExpired: paidExpired > 0,
+    freeUsed,
+    paidActive,
+    paidExpired,
   };
+}
+
+/**
+ * Every tracked product with the slot window attached to it. This is what the
+ * wallet page and the product list use to answer "how long is this product
+ * monitored for, and which products are out of window?".
+ */
+export function getUserProductSlots(db: Database.Database, userId: number): ProductSlotInfo[] {
+  const rows = db
+    .prepare(`
+      SELECT up.product_key,
+             up.slot_started_at,
+             up.slot_expires_at,
+             up.slot_transferred_at,
+             COALESCE(mp.title, up.product_key) AS title
+      FROM user_products up
+      LEFT JOIN managed_products mp ON mp.key = up.product_key
+      WHERE up.user_id = ?
+      ORDER BY up.id ASC
+    `)
+    .all(userId) as Array<{
+    product_key: string;
+    slot_started_at: string | null;
+    slot_expires_at: string | null;
+    slot_transferred_at: string | null;
+    title: string;
+  }>;
+
+  const now = Date.now();
+  let freeSeen = 0;
+
+  return rows.map((row) => {
+    if (row.slot_expires_at == null) {
+      freeSeen += 1;
+      const isFree = freeSeen <= FREE_PRODUCT_LIMIT;
+      return {
+        product_key: row.product_key,
+        title: row.title,
+        kind: isFree ? 'free' : 'expired',
+        started_at: row.slot_started_at,
+        expires_at: null,
+        days_remaining: null,
+        transferred_at: row.slot_transferred_at,
+      } satisfies ProductSlotInfo;
+    }
+
+    const expiresMs = new Date(row.slot_expires_at).getTime();
+    const active = expiresMs > now;
+    return {
+      product_key: row.product_key,
+      title: row.title,
+      kind: active ? 'paid' : 'expired',
+      started_at: row.slot_started_at,
+      expires_at: row.slot_expires_at,
+      days_remaining: active ? Math.max(1, Math.ceil((expiresMs - now) / (1000 * 60 * 60 * 24))) : 0,
+      transferred_at: row.slot_transferred_at,
+    } satisfies ProductSlotInfo;
+  });
 }

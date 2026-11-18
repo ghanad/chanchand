@@ -10,6 +10,8 @@ export interface UserItem {
   slot_expires_at?: string | null;
   used_slots?: number;
   total_slots?: number;
+  paid_active?: number;
+  paid_expired?: number;
   created_at: string;
   updated_at: string;
 }

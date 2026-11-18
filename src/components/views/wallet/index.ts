@@ -4,3 +4,4 @@ export * from "./WalletHeroGrid";
 export * from "./WalletDirectSlotPanel";
 export * from "./WalletPackagesGrid";
 export * from "./WalletTransactionsPanel";
+export * from "./WalletSlotsPanel";

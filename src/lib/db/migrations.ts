@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { ManagedTargetRow } from '../types';
 import { getTargetDeduplicationKey } from '../urls';
 import { describeError, logWarn } from '../logger';
+import { FREE_PRODUCT_LIMIT, SLOT_DURATION_DAYS } from './constants';
 
 export function runMigrations(db: Database.Database): void {
   // 1. Runs table columns
@@ -261,5 +262,91 @@ export function runMigrations(db: Database.Database): void {
     }
   } catch (err) {
     logWarn('DB', 'user_products migration warning', describeError(err));
+  }
+
+  // 7. Per-product slot windows and one-time history grants
+  try {
+    const upColumns = db.prepare('PRAGMA table_info(user_products)').all() as { name: string }[];
+    if (upColumns.length > 0) {
+      if (!upColumns.some((col) => col.name === 'slot_started_at')) {
+        db.prepare('ALTER TABLE user_products ADD COLUMN slot_started_at DATETIME DEFAULT NULL').run();
+      }
+      if (!upColumns.some((col) => col.name === 'slot_expires_at')) {
+        db.prepare('ALTER TABLE user_products ADD COLUMN slot_expires_at DATETIME DEFAULT NULL').run();
+      }
+      if (!upColumns.some((col) => col.name === 'slot_transferred_at')) {
+        db.prepare('ALTER TABLE user_products ADD COLUMN slot_transferred_at DATETIME DEFAULT NULL').run();
+      }
+    }
+
+    const subColumns = db.prepare('PRAGMA table_info(user_subscriptions)').all() as { name: string }[];
+    if (subColumns.length > 0 && !subColumns.some((col) => col.name === 'remaining_slots')) {
+      db.prepare('ALTER TABLE user_subscriptions ADD COLUMN remaining_slots INTEGER NOT NULL DEFAULT 0').run();
+      // Existing grants were bought before credits existed; treat them as fully
+      // available so the wallet history stays meaningful.
+      db.prepare('UPDATE user_subscriptions SET remaining_slots = slots').run();
+    }
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS product_history_grants (        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        product_key VARCHAR(128) NOT NULL,
+        granted_at DATETIME NOT NULL,
+        UNIQUE(user_id, product_key)
+      );
+      CREATE INDEX IF NOT EXISTS ix_product_history_grants_user_id ON product_history_grants(user_id);
+    `);
+
+    // Every already-tracked product has had its one-time history import. Record
+    // it so delete + re-add cannot hand out another free month.
+    db.prepare(`
+      INSERT OR IGNORE INTO product_history_grants (user_id, product_key, granted_at)
+      SELECT user_id, product_key, created_at FROM user_products
+    `).run();
+
+    // Materialise the legacy shared pool (users.extra_slots + one shared
+    // slot_expires_at) into per-product windows. Idempotent: rows that already
+    // carry a slot_expires_at are skipped and the pool is cleared afterwards.
+    const nowMs = Date.now();
+    const nowIso = new Date(nowMs).toISOString();
+    const legacyUsers = db
+      .prepare('SELECT id, extra_slots, slot_expires_at FROM users')
+      .all() as Array<{ id: number; extra_slots: number; slot_expires_at: string | null }>;
+
+    for (const u of legacyUsers) {
+      const rows = db
+        .prepare('SELECT id, created_at, slot_expires_at FROM user_products WHERE user_id = ? ORDER BY id ASC')
+        .all(u.id) as Array<{ id: number; created_at: string; slot_expires_at: string | null }>;
+
+      const unassigned = rows.slice(FREE_PRODUCT_LIMIT).filter((r) => r.slot_expires_at == null);
+      if (unassigned.length === 0 && u.slot_expires_at == null) continue;
+
+      const legacyExpiryMs = u.slot_expires_at ? new Date(u.slot_expires_at).getTime() : null;
+      const legacyExpiryIso = legacyExpiryMs != null && legacyExpiryMs > nowMs ? u.slot_expires_at : null;
+      const fallbackExpiryIso = new Date(nowMs + SLOT_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      let credits = Math.max(0, u.extra_slots || 0);
+
+      for (const row of unassigned) {
+        if (credits > 0) {
+          credits -= 1;
+          db.prepare('UPDATE user_products SET slot_started_at = ?, slot_expires_at = ? WHERE id = ?').run(
+            row.created_at,
+            legacyExpiryIso ?? fallbackExpiryIso,
+            row.id
+          );
+        } else {
+          // More products than paid capacity: the slot has lapsed.
+          db.prepare('UPDATE user_products SET slot_started_at = ?, slot_expires_at = ? WHERE id = ?').run(
+            row.created_at,
+            nowIso,
+            row.id
+          );
+        }
+      }
+
+      db.prepare('UPDATE users SET extra_slots = ?, slot_expires_at = NULL WHERE id = ?').run(credits, u.id);
+    }
+  } catch (err) {
+    logWarn('DB', 'product slot migration warning', describeError(err));
   }
 }

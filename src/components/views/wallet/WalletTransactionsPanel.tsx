@@ -240,27 +240,30 @@ export function WalletTransactionsPanel({
               <thead>
                 <tr>
                   <th scope="col">عنوان دوره / بسته</th>
-                  <th scope="col">ظرفیت اسلات</th>
+                  <th scope="col">اسلات خریداری‌شده</th>
+                  <th scope="col">باقی‌مانده</th>
                   <th scope="col">نوع شارژ</th>
-                  <th scope="col">مدت اعتبار</th>
-                  <th scope="col">تاریخ شروع</th>
-                  <th scope="col">تاریخ پایان</th>
+                  <th scope="col">مدت هر اسلات</th>
+                  <th scope="col">تاریخ خرید</th>
                   <th scope="col">وضعیت</th>
                 </tr>
               </thead>
               <tbody>
                 {subscriptions.map((sub) => {
-                  const isSubActive = new Date(sub.expires_at).getTime() > nowMs;
-                  const daysLeft = Math.max(0, Math.ceil((new Date(sub.expires_at).getTime() - nowMs) / (1000 * 60 * 60 * 24)));
+                  const remaining = sub.remaining_slots ?? sub.slots;
+                  const isUnused = remaining > 0;
                   return (
                     <tr key={sub.id}>
                       <td style={{ fontWeight: 600 }}>
-                        {sub.package_title || (sub.source_type === "wallet_slot" ? "شارژ تک‌اسلات با کیف پول" : "شارژ سهمیه توسط مدیر")}
+                        {sub.package_title || (sub.source_type === "wallet_slot" ? "خرید تک‌اسلات با کیف پول" : "شارژ سهمیه توسط مدیر")}
                       </td>
                       <td>
                         <span className="wallet-package-slots-tag">
                           +{formatNumber(sub.slots)} محصول
                         </span>
+                      </td>
+                      <td style={{ fontWeight: 600, color: isUnused ? "var(--ok)" : "var(--muted)" }}>
+                        {formatNumber(remaining)} اسلات
                       </td>
                       <td style={{ color: "var(--muted)" }}>
                         {sub.source_type === "package"
@@ -269,23 +272,20 @@ export function WalletTransactionsPanel({
                           ? "کیف پول"
                           : "مدیر سیستم"}
                       </td>
-                      <td>{formatNumber(sub.duration_days)} روز</td>
+                      <td>{formatNumber(sub.duration_days)} روز از زمان فعال‌سازی</td>
                       <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
                         <DateTime value={sub.starts_at} />
-                      </td>
-                      <td style={{ color: "var(--muted)", whiteSpace: "nowrap" }}>
-                        <DateTime value={sub.expires_at} />
                       </td>
                       <td>
                         <span
                           className="status-pill"
                           style={{
-                            background: isSubActive ? "rgba(19, 118, 79, 0.1)" : "rgba(180, 59, 59, 0.1)",
-                            color: isSubActive ? "var(--ok)" : "var(--muted)",
-                            border: `1px solid ${isSubActive ? "rgba(19, 118, 79, 0.25)" : "rgba(180, 59, 59, 0.25)"}`,
+                            background: isUnused ? "rgba(19, 118, 79, 0.1)" : "rgba(120, 120, 120, 0.08)",
+                            color: isUnused ? "var(--ok)" : "var(--muted)",
+                            border: `1px solid ${isUnused ? "rgba(19, 118, 79, 0.25)" : "rgba(120, 120, 120, 0.18)"}`,
                           }}
                         >
-                          {isSubActive ? `فعال (${daysLeft} روز مانده)` : "منقضی شده"}
+                          {isUnused ? "اعتبار آماده مصرف" : "کاملاً مصرف‌شده"}
                         </span>
                       </td>
                     </tr>
